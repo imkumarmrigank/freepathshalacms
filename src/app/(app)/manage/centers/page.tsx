@@ -1,0 +1,86 @@
+import { requireRole } from "@/lib/auth";
+import { query } from "@/lib/db";
+import { getCenter, listCenters } from "@/lib/queries";
+import { Badge, Card, Empty, PageHeader } from "@/components/ui";
+import Link from "next/link";
+import CenterForm from "./CenterForm";
+import ManagerPicker from "./ManagerPicker";
+
+export default async function CentersPage({
+  searchParams,
+}: { searchParams: Promise<{ edit?: string }> }) {
+  await requireRole("super_admin");
+  const { edit } = await searchParams;
+  const [centers, editing, staff] = await Promise.all([
+    listCenters(false),
+    edit ? getCenter(Number(edit)) : Promise.resolve(null),
+    query<{ id: number; name: string; email: string }>(
+      "SELECT id, name, email FROM users WHERE role IN ('center_manager','teacher') AND is_active ORDER BY name",
+    ),
+  ]);
+
+  const counts = await query<{ center_id: number; students: string; staff: string }>(
+    `SELECT c.id AS center_id,
+            (SELECT count(*) FROM students s WHERE s.center_id = c.id AND s.status = 'active') AS students,
+            (SELECT count(*) FROM users u WHERE u.center_id = c.id AND u.is_active) AS staff
+       FROM centers c`,
+  );
+  const byId = new Map(counts.map((c) => [Number(c.center_id), c]));
+
+  return (
+    <>
+      <PageHeader title="Centres"
+        subtitle="Each centre has one manager, its own teachers, and a geofence for staff check-in"
+        right={edit ? <Link href="/manage/centers" className="btn btn-ghost">Cancel edit</Link> : undefined} />
+
+      <div className="grid gap-5 lg:grid-cols-5">
+        <div className="lg:col-span-3">
+          <Card pad={false}>
+            {centers.length === 0 ? (
+              <Empty title="No centres yet" hint="Create your first centre using the form." />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="tbl">
+                  <thead>
+                    <tr><th>Code</th><th>Centre</th><th>Manager</th><th>Students</th><th>Staff</th><th>Geofence</th><th></th></tr>
+                  </thead>
+                  <tbody>
+                    {centers.map((c) => (
+                      <tr key={c.id}>
+                        <td className="font-mono font-medium">{c.code}</td>
+                        <td>
+                          <div className="font-medium">{c.name}</div>
+                          <div className="text-[12px] text-[var(--muted)]">
+                            {[c.area, c.city].filter(Boolean).join(", ") || "—"}
+                          </div>
+                          {!c.is_active && <Badge tone="mute">Inactive</Badge>}
+                        </td>
+                        <td>
+                          <ManagerPicker centerId={c.id} managerId={c.manager_id}
+                            candidates={staff} />
+                        </td>
+                        <td className="tabular-nums">{byId.get(c.id)?.students ?? 0}</td>
+                        <td className="tabular-nums">{byId.get(c.id)?.staff ?? 0}</td>
+                        <td className="text-[13px] text-[var(--muted)]">
+                          {c.latitude == null
+                            ? <Badge tone="warn">Not pinned</Badge>
+                            : `${c.geofence_radius_m} m`}
+                        </td>
+                        <td>
+                          <Link href={`/manage/centers?edit=${c.id}`} className="btn btn-ghost btn-sm">Edit</Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </div>
+        <div className="lg:col-span-2">
+          <CenterForm center={editing} key={editing?.id ?? "new"} />
+        </div>
+      </div>
+    </>
+  );
+}

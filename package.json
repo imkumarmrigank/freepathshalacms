@@ -1,0 +1,41 @@
+{
+  "name": "freepathshala-cms",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "migrate": "node scripts/migrate.mjs",
+    "seed": "node scripts/seed.mjs",
+    "seed:demo": "node scripts/seed.mjs --demo",
+    "dev:setup": "node --env-file=.env.local scripts/migrate.mjs && node --env-file=.env.local scripts/seed.mjs --demo",
+    "reset": "node scripts/reset.mjs",
+    "close-register": "node scripts/close-register.mjs"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "jose": "^6.2.10",
+    "next": "16.3.4",
+    "pg": "^8.23.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.4",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

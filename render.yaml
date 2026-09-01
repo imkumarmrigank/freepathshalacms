@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: freepathshala-cms
+    runtime: node
+    plan: starter
+    region: oregon
+    branch: main
+    buildCommand: npm ci && npm run build
+    # Migrations run on every boot; they are tracked in schema_migrations and skip if applied.
+    startCommand: npm run migrate && npm start
+    healthCheckPath: /login
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL          # Neon pooled connection string
+        sync: false
+      - key: JWT_SECRET            # generated once, then kept across deploys
+        generateValue: true
+      - key: ENROLLMENT_PREFIX
+        value: FP
+      - key: CRON_SECRET
+        generateValue: true
+      - key: NODE_VERSION
+        value: "22.15.0"
+
+  # Nightly close-out: any past day left unmarked is recorded as absent.
+  # 18:30 UTC = 00:00 IST.
+  - type: cron
+    name: freepathshala-close-register
+    runtime: node
+    plan: starter
+    region: oregon
+    branch: main
+    schedule: "30 18 * * *"
+    buildCommand: npm ci
+    startCommand: node scripts/close-register.mjs
+    envVars:
+      - key: APP_URL
+        sync: false
+      - key: CRON_SECRET
+        fromService:
+          type: web
+          name: freepathshala-cms
+          envVarKey: CRON_SECRET
+      - key: NODE_VERSION
+        value: "22.15.0"
