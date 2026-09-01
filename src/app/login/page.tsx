@@ -23,7 +23,7 @@ export default async function LoginPage({
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       <div className="hidden flex-col justify-between bg-[var(--brand)] p-12 text-white lg:flex">
-        <div className="inline-flex rounded-[12px] bg-white px-4 py-3">
+        <div className="w-fit self-start rounded-[12px] bg-white px-5 py-3.5 shadow-sm">
           <Image src="/logo.png" alt="FreePathshala" width={500} height={153}
             className="h-auto w-[184px]" priority />
         </div>
