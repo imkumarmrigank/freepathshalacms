@@ -158,6 +158,31 @@ Migrations run from the start command, so a deploy applies any new SQL before th
 
 ---
 
+## The Android app
+
+`/get-app` serves a signed APK at `/downloads/freepathshala.apk`. It is a **TWA**
+(Trusted Web Activity): a thin native shell that renders this site through Chrome's engine, so
+there is no second codebase and no app-store release cycle — deploying the site updates the app.
+
+Geolocation keeps working, which a plain WebView wrapper would have made painful, and that
+matters because staff check-in is geofenced.
+
+`public/.well-known/assetlinks.json` pins the signing certificate's SHA-256 fingerprint. Android
+checks it to confirm the app owns this domain; when it matches, the app runs with no browser
+address bar. **If the app is ever re-signed with a different key, that fingerprint must be
+updated here or the app will show a Chrome URL bar.**
+
+Rebuilding the APK (needs the original keystore):
+
+```bash
+cd android && bubblewrap build --skipPwaValidation
+```
+
+Bump `appVersionCode` and `appVersionName` in `twa-manifest.json` first, or phones will refuse
+the update as a downgrade.
+
+---
+
 ## Schema
 
 `db/migrations/001_init.sql`
