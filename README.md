@@ -74,7 +74,20 @@ starts**; once submitted, the centre manager and the super admin can read it.
 centre manager records what is handed to each student. Stock in hand is received minus issued,
 and an issue larger than the stock is refused inside the transaction.
 
-**Reports** — attendance by class, centre summaries, PTM engagement, and a students CSV export.
+**Reports** — twelve reports, each previewed on screen and downloadable as a formatted `.xlsx`
+(or CSV). Pick a period with the week/month presets, then filter by centre, class, session or
+staff role. Non-admins are pinned to their own centre no matter what the query string says.
+
+| Group | Reports |
+|---|---|
+| Attendance | Student attendance summary · Student attendance register (day-by-day grid) · Staff attendance summary · Staff attendance day by day |
+| Students | Students by class and centre · Student roster · Admissions in the period |
+| Supplies | Supplies stock by centre · Supplies given to students |
+| PTM | PTM and follow-ups |
+| Teaching | Teaching plan progress · Timetable |
+
+Weekly and monthly views come from the date presets — "This week", "Last week", "This month",
+"Last month" — so the same report covers both.
 
 ## Roles
 
@@ -175,6 +188,9 @@ Two notes that matter when you add queries:
   both fail silently.
 - Adding a migration means dropping a new numbered `.sql` file into `db/migrations/`. Never edit
   one that has already been applied.
+- A new report is a row in `src/lib/report-meta.ts` plus a function in `src/lib/reports.ts`
+  returning `{ columns, rows }`. The page preview and the Excel export both read that shape, so
+  neither needs touching.
 
 Two Next.js rules that bite quietly here, both learned the hard way:
 

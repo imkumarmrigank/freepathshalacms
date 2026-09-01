@@ -1,0 +1,680 @@
+import "server-only";
+import { query } from "./db";
+import { reportByKey } from "./report-meta";
+import type { SessionUser } from "./auth";
+
+export type ReportColumn = { key: string; label: string; width?: number; numeric?: boolean };
+export type ReportRow = Record<string, string | number | null>;
+export type ReportResult = {
+  title: string;
+  subtitle: string;
+  columns: ReportColumn[];
+  rows: ReportRow[];
+};
+
+export type ReportParams = {
+  from: string;
+  to: string;
+  centerId: number | null;
+  classId: number | null;
+  sessionId: number;
+  role: string | null;
+};
+
+const COUNTED = "('present','late','half_day')";   // counts towards attendance
+const MARKED = "status <> 'holiday'";              // days that count in the denominator
+
+const pct = (num: number, den: number) => (den > 0 ? Math.round((num / den) * 1000) / 10 : 0);
+
+/** Every date in [from, to], capped so a huge range cannot blow up the register. */
+function datesBetween(from: string, to: string, cap = 62) {
+  const out: string[] = [];
+  const d = new Date(`${from}T00:00:00Z`);
+  const end = new Date(`${to}T00:00:00Z`);
+  while (d <= end && out.length < cap) {
+    out.push(d.toISOString().slice(0, 10));
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+  return out;
+}
+
+export async function runReport(
+  key: string,
+  p: ReportParams,
+  user: SessionUser,
+): Promise<ReportResult> {
+  const meta = reportByKey(key);
+  if (!meta) throw new Error("Unknown report.");
+  if (meta.roles && !meta.roles.includes(user.role))
+    throw new Error("You don’t have access to this report.");
+
+  // Non-admins can never widen the scope past their own centre.
+  const centerId = user.role === "super_admin" ? p.centerId : user.centerId;
+  const scoped = { ...p, centerId };
+  const period = `${p.from} to ${p.to}`;
+
+  switch (key) {
+    case "student-attendance-summary":   return studentAttendanceSummary(scoped, period);
+    case "student-attendance-register":  return studentAttendanceRegister(scoped, period);
+    case "staff-attendance-summary":     return staffAttendanceSummary(scoped, period);
+    case "staff-attendance-detail":      return staffAttendanceDetail(scoped, period);
+    case "students-by-class":            return studentsByClass(scoped);
+    case "student-roster":               return studentRoster(scoped);
+    case "admissions":                   return admissions(scoped, period);
+    case "supplies-stock":               return suppliesStock(scoped);
+    case "supplies-issued":              return suppliesIssued(scoped, period);
+    case "ptm-summary":                  return ptmSummary(scoped, period);
+    case "teaching-plan-progress":       return teachingPlanProgress(scoped);
+    case "timetable":                    return timetableReport(scoped);
+    default: throw new Error("Unknown report.");
+  }
+}
+
+/* ------------------------------------------------------------- attendance */
+
+async function studentAttendanceSummary(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.sessionId, p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND e.center_id = $${params.length}`; }
+  if (p.classId) { params.push(p.classId); where += ` AND e.class_level_id = $${params.length}`; }
+
+  const rows = await query<{
+    enrollment_no: string; student: string; class_name: string; center_name: string;
+    present: string; absent: string; late: string; half_day: string; leave: string; marked: string;
+  }>(
+    `SELECT s.enrollment_no,
+            trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
+            cl.name AS class_name, ce.name AS center_name,
+            count(a.*) FILTER (WHERE a.status = 'present')  AS present,
+            count(a.*) FILTER (WHERE a.status = 'absent')   AS absent,
+            count(a.*) FILTER (WHERE a.status = 'late')     AS late,
+            count(a.*) FILTER (WHERE a.status = 'half_day') AS half_day,
+            count(a.*) FILTER (WHERE a.status = 'leave')    AS leave,
+            count(a.*) FILTER (WHERE a.${MARKED})           AS marked
+       FROM enrollments e
+       JOIN students s ON s.id = e.student_id
+       JOIN class_levels cl ON cl.id = e.class_level_id
+       JOIN centers ce ON ce.id = e.center_id
+       LEFT JOIN student_attendance a
+         ON a.enrollment_id = e.id AND a.att_date BETWEEN $2 AND $3
+      WHERE e.session_id = $1 ${where}
+      GROUP BY s.enrollment_no, student, cl.name, cl.sequence, ce.name, ce.code
+      ORDER BY ce.code, cl.sequence, student`,
+    params,
+  );
+
+  return {
+    title: "Student attendance summary",
+    subtitle: period,
+    columns: [
+      { key: "enrollment_no", label: "Enrolment No", width: 16 },
+      { key: "student", label: "Student", width: 26 },
+      { key: "class_name", label: "Class", width: 12 },
+      { key: "center_name", label: "Centre", width: 18 },
+      { key: "present", label: "Present", numeric: true },
+      { key: "late", label: "Late", numeric: true },
+      { key: "half_day", label: "Half day", numeric: true },
+      { key: "leave", label: "Leave", numeric: true },
+      { key: "absent", label: "Absent", numeric: true },
+      { key: "marked", label: "Days marked", numeric: true, width: 14 },
+      { key: "attendance_pct", label: "Attendance %", numeric: true, width: 14 },
+    ],
+    rows: rows.map((r) => ({
+      ...r,
+      present: Number(r.present), absent: Number(r.absent), late: Number(r.late),
+      half_day: Number(r.half_day), leave: Number(r.leave), marked: Number(r.marked),
+      attendance_pct: pct(
+        Number(r.present) + Number(r.late) + Number(r.half_day),
+        Number(r.marked),
+      ),
+    })),
+  };
+}
+
+async function studentAttendanceRegister(p: ReportParams, period: string): Promise<ReportResult> {
+  const dates = datesBetween(p.from, p.to);
+  const params: unknown[] = [p.sessionId, dates[0], dates[dates.length - 1]];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND e.center_id = $${params.length}`; }
+  if (p.classId) { params.push(p.classId); where += ` AND e.class_level_id = $${params.length}`; }
+
+  const rows = await query<{
+    student_id: number; enrollment_no: string; student: string;
+    class_name: string; center_name: string; att_date: string | null; status: string | null;
+  }>(
+    `SELECT s.id AS student_id, s.enrollment_no,
+            trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
+            cl.name AS class_name, ce.name AS center_name,
+            a.att_date, a.status
+       FROM enrollments e
+       JOIN students s ON s.id = e.student_id
+       JOIN class_levels cl ON cl.id = e.class_level_id
+       JOIN centers ce ON ce.id = e.center_id
+       LEFT JOIN student_attendance a
+         ON a.enrollment_id = e.id AND a.att_date BETWEEN $2 AND $3
+      WHERE e.session_id = $1 ${where}
+      ORDER BY ce.code, cl.sequence, student`,
+    params,
+  );
+
+  const CODE: Record<string, string> = {
+    present: "P", absent: "A", late: "L", half_day: "H", leave: "Lv", holiday: "—",
+  };
+
+  const byStudent = new Map<number, ReportRow>();
+  for (const r of rows) {
+    let row = byStudent.get(r.student_id);
+    if (!row) {
+      row = {
+        enrollment_no: r.enrollment_no, student: r.student,
+        class_name: r.class_name, center_name: r.center_name,
+      };
+      for (const d of dates) row[d] = "";
+      byStudent.set(r.student_id, row);
+    }
+    if (r.att_date && r.status) row[r.att_date.slice(0, 10)] = CODE[r.status] ?? r.status;
+  }
+
+  return {
+    title: "Student attendance register",
+    subtitle: `${period} · P present, L late, H half day, Lv leave, A absent`,
+    columns: [
+      { key: "enrollment_no", label: "Enrolment No", width: 16 },
+      { key: "student", label: "Student", width: 26 },
+      { key: "class_name", label: "Class", width: 12 },
+      { key: "center_name", label: "Centre", width: 18 },
+      ...dates.map((d) => ({ key: d, label: d.slice(8) + "/" + d.slice(5, 7), width: 6 })),
+    ],
+    rows: [...byStudent.values()],
+  };
+}
+
+async function staffAttendanceSummary(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND u.center_id = $${params.length}`; }
+  if (p.role) { params.push(p.role); where += ` AND u.role = $${params.length}`; }
+
+  const rows = await query<{
+    name: string; role: string; center_name: string | null;
+    present: string; late: string; absent: string; leave: string; minutes: string;
+    avg_distance: string | null; overrides: string;
+  }>(
+    `SELECT u.name, u.role, c.name AS center_name,
+            count(a.*) FILTER (WHERE a.status = 'present') AS present,
+            count(a.*) FILTER (WHERE a.status = 'late')    AS late,
+            count(a.*) FILTER (WHERE a.status = 'absent')  AS absent,
+            count(a.*) FILTER (WHERE a.status = 'leave')   AS leave,
+            COALESCE(sum(a.worked_minutes), 0)             AS minutes,
+            round(avg(a.check_in_distance_m))              AS avg_distance,
+            count(a.*) FILTER (WHERE a.override_by IS NOT NULL) AS overrides
+       FROM users u
+       LEFT JOIN centers c ON c.id = u.center_id
+       LEFT JOIN staff_attendance a
+         ON a.user_id = u.id AND a.att_date BETWEEN $1 AND $2
+      WHERE u.is_active AND u.role IN ('teacher','center_manager') ${where}
+      GROUP BY u.name, u.role, c.name, c.code
+      ORDER BY c.code, u.role, u.name`,
+    params,
+  );
+
+  const LABEL: Record<string, string> = {
+    teacher: "Teacher", center_manager: "Centre Manager", super_admin: "Super Admin",
+  };
+
+  return {
+    title: "Staff attendance summary",
+    subtitle: period,
+    columns: [
+      { key: "name", label: "Staff", width: 24 },
+      { key: "role_label", label: "Role", width: 16 },
+      { key: "center_name", label: "Centre", width: 18 },
+      { key: "present", label: "Present", numeric: true },
+      { key: "late", label: "Late", numeric: true },
+      { key: "absent", label: "Absent", numeric: true },
+      { key: "leave", label: "Leave", numeric: true },
+      { key: "days_marked", label: "Days marked", numeric: true, width: 13 },
+      { key: "hours", label: "Hours", numeric: true },
+      { key: "avg_distance", label: "Avg distance (m)", numeric: true, width: 17 },
+      { key: "overrides", label: "Manual entries", numeric: true, width: 15 },
+    ],
+    rows: rows.map((r) => {
+      const present = Number(r.present), late = Number(r.late);
+      return {
+        name: r.name, role_label: LABEL[r.role] ?? r.role, center_name: r.center_name,
+        present, late, absent: Number(r.absent), leave: Number(r.leave),
+        days_marked: present + late + Number(r.absent) + Number(r.leave),
+        hours: Math.round((Number(r.minutes) / 60) * 10) / 10,
+        avg_distance: r.avg_distance === null ? null : Number(r.avg_distance),
+        overrides: Number(r.overrides),
+      };
+    }),
+  };
+}
+
+async function staffAttendanceDetail(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND a.center_id = $${params.length}`; }
+  if (p.role) { params.push(p.role); where += ` AND u.role = $${params.length}`; }
+
+  const rows = await query<{
+    att_date: string; name: string; role: string; center_name: string;
+    check_in: string | null; check_out: string | null; worked_minutes: number | null;
+    status: string; check_in_distance_m: number | null; within_geofence: boolean;
+    override_by_name: string | null; override_reason: string | null;
+  }>(
+    `SELECT a.att_date, u.name, u.role, c.name AS center_name,
+            to_char(a.check_in_at AT TIME ZONE 'Asia/Kolkata', 'HH12:MI AM')  AS check_in,
+            to_char(a.check_out_at AT TIME ZONE 'Asia/Kolkata', 'HH12:MI AM') AS check_out,
+            a.worked_minutes, a.status, a.check_in_distance_m, a.within_geofence,
+            o.name AS override_by_name, a.override_reason
+       FROM staff_attendance a
+       JOIN users u ON u.id = a.user_id
+       JOIN centers c ON c.id = a.center_id
+       LEFT JOIN users o ON o.id = a.override_by
+      WHERE a.att_date BETWEEN $1 AND $2 ${where}
+      ORDER BY a.att_date DESC, c.code, u.name`,
+    params,
+  );
+
+  return {
+    title: "Staff attendance — day by day",
+    subtitle: period,
+    columns: [
+      { key: "att_date", label: "Date", width: 13 },
+      { key: "name", label: "Staff", width: 24 },
+      { key: "center_name", label: "Centre", width: 18 },
+      { key: "check_in", label: "In", width: 11 },
+      { key: "check_out", label: "Out", width: 11 },
+      { key: "hours", label: "Hours", numeric: true },
+      { key: "check_in_distance_m", label: "Distance (m)", numeric: true, width: 13 },
+      { key: "status", label: "Status", width: 12 },
+      { key: "entry", label: "Entry", width: 16 },
+      { key: "override_reason", label: "Reason", width: 30 },
+    ],
+    rows: rows.map((r) => ({
+      att_date: r.att_date.slice(0, 10), name: r.name, center_name: r.center_name,
+      check_in: r.check_in, check_out: r.check_out,
+      hours: r.worked_minutes ? Math.round((r.worked_minutes / 60) * 10) / 10 : 0,
+      check_in_distance_m: r.check_in_distance_m,
+      status: r.status, entry: r.override_by_name ? `Manual · ${r.override_by_name}` : "Geofenced",
+      override_reason: r.override_reason,
+    })),
+  };
+}
+
+/* --------------------------------------------------------------- students */
+
+async function studentsByClass(p: ReportParams): Promise<ReportResult> {
+  const params: unknown[] = [p.sessionId];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND e.center_id = $${params.length}`; }
+
+  const rows = await query<{
+    center_name: string; class_name: string; total: string;
+    boys: string; girls: string; other: string; mid_session: string;
+  }>(
+    `SELECT ce.name AS center_name, cl.name AS class_name,
+            count(*) AS total,
+            count(*) FILTER (WHERE s.gender = 'male')   AS boys,
+            count(*) FILTER (WHERE s.gender = 'female') AS girls,
+            count(*) FILTER (WHERE s.gender IS NULL OR s.gender = 'other') AS other,
+            count(*) FILTER (WHERE e.source = 'mid_session') AS mid_session
+       FROM enrollments e
+       JOIN students s ON s.id = e.student_id
+       JOIN class_levels cl ON cl.id = e.class_level_id
+       JOIN centers ce ON ce.id = e.center_id
+      WHERE e.session_id = $1 AND e.status = 'active' AND s.status = 'active' ${where}
+      GROUP BY ce.name, ce.code, cl.name, cl.sequence
+      ORDER BY ce.code, cl.sequence`,
+    params,
+  );
+
+  return {
+    title: "Students by class and centre",
+    subtitle: "Active enrolments in the selected session",
+    columns: [
+      { key: "center_name", label: "Centre", width: 20 },
+      { key: "class_name", label: "Class", width: 14 },
+      { key: "total", label: "Students", numeric: true },
+      { key: "boys", label: "Boys", numeric: true },
+      { key: "girls", label: "Girls", numeric: true },
+      { key: "other", label: "Not recorded", numeric: true, width: 14 },
+      { key: "mid_session", label: "Joined mid-session", numeric: true, width: 19 },
+    ],
+    rows: rows.map((r) => ({
+      center_name: r.center_name, class_name: r.class_name,
+      total: Number(r.total), boys: Number(r.boys), girls: Number(r.girls),
+      other: Number(r.other), mid_session: Number(r.mid_session),
+    })),
+  };
+}
+
+async function studentRoster(p: ReportParams): Promise<ReportResult> {
+  const params: unknown[] = [p.sessionId];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND e.center_id = $${params.length}`; }
+  if (p.classId) { params.push(p.classId); where += ` AND e.class_level_id = $${params.length}`; }
+
+  const rows = await query<ReportRow>(
+    `SELECT s.enrollment_no, trim(s.first_name || ' ' || COALESCE(s.last_name,'')) AS student,
+            cl.name AS class_name, e.section, e.roll_no, ce.name AS center_name,
+            s.gender, s.dob::text AS dob, s.father_name, s.mother_name, s.primary_phone,
+            s.admission_date::text AS admission_date, e.source, s.status,
+            (SELECT round(100.0 * count(*) FILTER (WHERE a.status IN ${COUNTED})
+                    / NULLIF(count(*) FILTER (WHERE a.${MARKED}), 0), 1)
+               FROM student_attendance a WHERE a.enrollment_id = e.id) AS attendance_pct
+       FROM enrollments e
+       JOIN students s ON s.id = e.student_id
+       JOIN class_levels cl ON cl.id = e.class_level_id
+       JOIN centers ce ON ce.id = e.center_id
+      WHERE e.session_id = $1 ${where}
+      ORDER BY ce.code, cl.sequence, student`,
+    params,
+  );
+
+  return {
+    title: "Student roster",
+    subtitle: "Everyone enrolled in the selected session",
+    columns: [
+      { key: "enrollment_no", label: "Enrolment No", width: 16 },
+      { key: "student", label: "Student", width: 26 },
+      { key: "class_name", label: "Class", width: 12 },
+      { key: "section", label: "Section", width: 9 },
+      { key: "roll_no", label: "Roll", numeric: true },
+      { key: "center_name", label: "Centre", width: 18 },
+      { key: "gender", label: "Gender", width: 10 },
+      { key: "dob", label: "Date of birth", width: 14 },
+      { key: "father_name", label: "Father", width: 22 },
+      { key: "mother_name", label: "Mother", width: 22 },
+      { key: "primary_phone", label: "Phone", width: 14 },
+      { key: "admission_date", label: "Admitted", width: 13 },
+      { key: "source", label: "Admission type", width: 16 },
+      { key: "status", label: "Status", width: 12 },
+      { key: "attendance_pct", label: "Attendance %", numeric: true, width: 14 },
+    ],
+    rows,
+  };
+}
+
+async function admissions(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.sessionId, p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND e.center_id = $${params.length}`; }
+  if (p.classId) { params.push(p.classId); where += ` AND e.class_level_id = $${params.length}`; }
+
+  const rows = await query<ReportRow>(
+    `SELECT e.enrolled_on::text AS enrolled_on, s.enrollment_no,
+            trim(s.first_name || ' ' || COALESCE(s.last_name,'')) AS student,
+            cl.name AS class_name, ce.name AS center_name, e.source,
+            s.father_name, s.primary_phone, u.name AS admitted_by
+       FROM enrollments e
+       JOIN students s ON s.id = e.student_id
+       JOIN class_levels cl ON cl.id = e.class_level_id
+       JOIN centers ce ON ce.id = e.center_id
+       LEFT JOIN users u ON u.id = s.created_by
+      WHERE e.session_id = $1 AND e.enrolled_on BETWEEN $2 AND $3 ${where}
+      ORDER BY e.enrolled_on DESC, ce.code, cl.sequence`,
+    params,
+  );
+
+  return {
+    title: "Admissions in the period",
+    subtitle: period,
+    columns: [
+      { key: "enrolled_on", label: "Joined on", width: 13 },
+      { key: "enrollment_no", label: "Enrolment No", width: 16 },
+      { key: "student", label: "Student", width: 26 },
+      { key: "class_name", label: "Class", width: 12 },
+      { key: "center_name", label: "Centre", width: 18 },
+      { key: "source", label: "Type", width: 15 },
+      { key: "father_name", label: "Father", width: 22 },
+      { key: "primary_phone", label: "Phone", width: 14 },
+      { key: "admitted_by", label: "Admitted by", width: 20 },
+    ],
+    rows,
+  };
+}
+
+/* --------------------------------------------------------------- supplies */
+
+async function suppliesStock(p: ReportParams): Promise<ReportResult> {
+  const params: unknown[] = [];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where = ` AND c.id = $${params.length}`; }
+
+  const rows = await query<{
+    center_name: string; item: string; unit: string; category: string;
+    received: string; issued: string;
+  }>(
+    `SELECT c.name AS center_name, i.name AS item, i.unit, i.category,
+            COALESCE((SELECT sum(r.quantity) FROM center_supply_receipts r
+                       WHERE r.item_id = i.id AND r.center_id = c.id), 0) AS received,
+            COALESCE((SELECT sum(s.quantity) FROM student_supply_issues s
+                       WHERE s.item_id = i.id AND s.center_id = c.id), 0) AS issued
+       FROM centers c
+       CROSS JOIN supply_items i
+      WHERE c.is_active AND i.is_active ${where}
+      ORDER BY c.code, i.category, i.name`,
+    params,
+  );
+
+  return {
+    title: "Supplies stock by centre",
+    subtitle: "Received minus given out",
+    columns: [
+      { key: "center_name", label: "Centre", width: 20 },
+      { key: "item", label: "Item", width: 24 },
+      { key: "category", label: "Category", width: 14 },
+      { key: "unit", label: "Unit", width: 10 },
+      { key: "received", label: "Received", numeric: true },
+      { key: "issued", label: "Given out", numeric: true, width: 12 },
+      { key: "in_hand", label: "In hand", numeric: true },
+    ],
+    rows: rows.map((r) => ({
+      center_name: r.center_name, item: r.item, category: r.category, unit: r.unit,
+      received: Number(r.received), issued: Number(r.issued),
+      in_hand: Number(r.received) - Number(r.issued),
+    })),
+  };
+}
+
+async function suppliesIssued(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where = ` AND s.center_id = $${params.length}`; }
+
+  const rows = await query<ReportRow>(
+    `SELECT s.issued_on::text AS issued_on, c.name AS center_name,
+            st.enrollment_no, trim(st.first_name || ' ' || COALESCE(st.last_name,'')) AS student,
+            cl.name AS class_name, i.name AS item, i.unit, s.quantity,
+            u.name AS issued_by, s.remarks
+       FROM student_supply_issues s
+       JOIN supply_items i ON i.id = s.item_id
+       JOIN students st ON st.id = s.student_id
+       JOIN centers c ON c.id = s.center_id
+       LEFT JOIN enrollments e ON e.student_id = st.id AND e.session_id = s.session_id
+       LEFT JOIN class_levels cl ON cl.id = e.class_level_id
+       LEFT JOIN users u ON u.id = s.issued_by
+      WHERE s.issued_on BETWEEN $1 AND $2 ${where}
+      ORDER BY s.issued_on DESC, c.code, student`,
+    params,
+  );
+
+  return {
+    title: "Supplies given to students",
+    subtitle: period,
+    columns: [
+      { key: "issued_on", label: "Date", width: 13 },
+      { key: "center_name", label: "Centre", width: 18 },
+      { key: "enrollment_no", label: "Enrolment No", width: 16 },
+      { key: "student", label: "Student", width: 24 },
+      { key: "class_name", label: "Class", width: 12 },
+      { key: "item", label: "Item", width: 22 },
+      { key: "quantity", label: "Qty", numeric: true },
+      { key: "unit", label: "Unit", width: 10 },
+      { key: "issued_by", label: "Issued by", width: 20 },
+      { key: "remarks", label: "Remarks", width: 28 },
+    ],
+    rows,
+  };
+}
+
+/* -------------------------------------------------------------------- PTM */
+
+async function ptmSummary(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.sessionId, p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND i.center_id = $${params.length}`; }
+  if (p.classId) { params.push(p.classId); where += ` AND i.class_level_id = $${params.length}`; }
+
+  const rows = await query<ReportRow>(
+    `SELECT i.interaction_date::text AS interaction_date, ce.name AS center_name,
+            cl.name AS class_name, st.enrollment_no,
+            trim(st.first_name || ' ' || COALESCE(st.last_name,'')) AS student,
+            u.name AS mentor, i.parent_present, i.engagement, i.mode,
+            i.attendance_pct, i.marks_pct,
+            CASE WHEN i.follow_up_required THEN i.follow_up_status ELSE '—' END AS follow_up,
+            i.follow_up_date::text AS follow_up_date, i.concerns
+       FROM ptm_interactions i
+       JOIN students st ON st.id = i.student_id
+       JOIN centers ce ON ce.id = i.center_id
+       LEFT JOIN class_levels cl ON cl.id = i.class_level_id
+       LEFT JOIN users u ON u.id = i.mentor_id
+      WHERE i.session_id = $1 AND i.interaction_date BETWEEN $2 AND $3 ${where}
+      ORDER BY i.interaction_date DESC, ce.code`,
+    params,
+  );
+
+  return {
+    title: "PTM and follow-ups",
+    subtitle: period,
+    columns: [
+      { key: "interaction_date", label: "Date", width: 13 },
+      { key: "center_name", label: "Centre", width: 18 },
+      { key: "class_name", label: "Class", width: 12 },
+      { key: "enrollment_no", label: "Enrolment No", width: 16 },
+      { key: "student", label: "Student", width: 24 },
+      { key: "mentor", label: "Mentor", width: 20 },
+      { key: "parent_present", label: "Parent present", width: 15 },
+      { key: "engagement", label: "Engagement", width: 13 },
+      { key: "mode", label: "Mode", width: 12 },
+      { key: "attendance_pct", label: "Attendance %", numeric: true, width: 14 },
+      { key: "marks_pct", label: "Marks %", numeric: true, width: 11 },
+      { key: "follow_up", label: "Follow-up", width: 12 },
+      { key: "follow_up_date", label: "Follow-up on", width: 14 },
+      { key: "concerns", label: "Concerns", width: 34 },
+    ],
+    rows,
+  };
+}
+
+/* --------------------------------------------------------------- teaching */
+
+async function teachingPlanProgress(p: ReportParams): Promise<ReportResult> {
+  const params: unknown[] = [p.sessionId];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND pl.center_id = $${params.length}`; }
+  if (p.classId) { params.push(p.classId); where += ` AND pl.class_level_id = $${params.length}`; }
+
+  const rows = await query<{
+    title: string; subject: string | null; class_name: string; teacher: string;
+    center_name: string; status: string; submitted_at: string | null;
+    starts_on: string | null; ends_on: string | null;
+    topics: string; taught: string; issues: string;
+  }>(
+    `SELECT pl.title, pl.subject, cl.name AS class_name, u.name AS teacher,
+            ce.name AS center_name, pl.status,
+            to_char(pl.submitted_at AT TIME ZONE 'Asia/Kolkata', 'DD Mon YYYY') AS submitted_at,
+            pl.starts_on::text AS starts_on, pl.ends_on::text AS ends_on,
+            (SELECT count(*) FROM teaching_plan_topics t WHERE t.plan_id = pl.id) AS topics,
+            (SELECT count(*) FROM teaching_plan_topics t
+              WHERE t.plan_id = pl.id AND t.status = 'completed') AS taught,
+            (SELECT count(*) FROM teaching_plan_topics t
+              WHERE t.plan_id = pl.id AND t.issues_faced IS NOT NULL) AS issues
+       FROM teaching_plans pl
+       JOIN class_levels cl ON cl.id = pl.class_level_id
+       JOIN users u ON u.id = pl.teacher_id
+       JOIN centers ce ON ce.id = pl.center_id
+      WHERE pl.session_id = $1 ${where}
+      ORDER BY ce.code, cl.sequence, pl.created_at DESC`,
+    params,
+  );
+
+  return {
+    title: "Teaching plan progress",
+    subtitle: "Plans in the selected session",
+    columns: [
+      { key: "title", label: "Plan", width: 28 },
+      { key: "subject", label: "Subject", width: 16 },
+      { key: "class_name", label: "Class", width: 12 },
+      { key: "teacher", label: "Teacher", width: 22 },
+      { key: "center_name", label: "Centre", width: 18 },
+      { key: "status", label: "Status", width: 12 },
+      { key: "submitted_at", label: "Submitted", width: 14 },
+      { key: "starts_on", label: "Starts", width: 12 },
+      { key: "ends_on", label: "Ends", width: 12 },
+      { key: "topics", label: "Topics", numeric: true },
+      { key: "taught", label: "Taught", numeric: true },
+      { key: "progress_pct", label: "Progress %", numeric: true, width: 12 },
+      { key: "issues", label: "Issues logged", numeric: true, width: 14 },
+    ],
+    rows: rows.map((r) => ({
+      title: r.title, subject: r.subject, class_name: r.class_name, teacher: r.teacher,
+      center_name: r.center_name, status: r.status, submitted_at: r.submitted_at,
+      starts_on: r.starts_on, ends_on: r.ends_on,
+      topics: Number(r.topics), taught: Number(r.taught),
+      progress_pct: pct(Number(r.taught), Number(r.topics)),
+      issues: Number(r.issues),
+    })),
+  };
+}
+
+async function timetableReport(p: ReportParams): Promise<ReportResult> {
+  const params: unknown[] = [p.sessionId];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND t.center_id = $${params.length}`; }
+  if (p.classId) { params.push(p.classId); where += ` AND t.class_level_id = $${params.length}`; }
+
+  const rows = await query<{
+    center_name: string; class_name: string; day_of_week: number; period_no: number;
+    start_time: string; end_time: string; subject: string; teacher: string | null; room: string | null;
+  }>(
+    `SELECT ce.name AS center_name, cl.name AS class_name, t.day_of_week, t.period_no,
+            t.start_time::text AS start_time, t.end_time::text AS end_time,
+            t.subject, u.name AS teacher, t.room
+       FROM timetable_slots t
+       JOIN class_levels cl ON cl.id = t.class_level_id
+       JOIN centers ce ON ce.id = t.center_id
+       LEFT JOIN users u ON u.id = t.teacher_id
+      WHERE t.session_id = $1 ${where}
+      ORDER BY ce.code, cl.sequence, t.day_of_week, t.period_no`,
+    params,
+  );
+
+  const DAYS = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+  return {
+    title: "Timetable",
+    subtitle: "Weekly plan for the selected session",
+    columns: [
+      { key: "center_name", label: "Centre", width: 18 },
+      { key: "class_name", label: "Class", width: 12 },
+      { key: "day", label: "Day", width: 12 },
+      { key: "period_no", label: "Period", numeric: true },
+      { key: "start_time", label: "From", width: 10 },
+      { key: "end_time", label: "To", width: 10 },
+      { key: "subject", label: "Subject", width: 20 },
+      { key: "teacher", label: "Teacher", width: 22 },
+      { key: "room", label: "Room", width: 12 },
+    ],
+    rows: rows.map((r) => ({
+      center_name: r.center_name, class_name: r.class_name,
+      day: DAYS[r.day_of_week] ?? String(r.day_of_week),
+      period_no: r.period_no,
+      start_time: r.start_time.slice(0, 5), end_time: r.end_time.slice(0, 5),
+      subject: r.subject, teacher: r.teacher, room: r.room,
+    })),
+  };
+}
