@@ -7,9 +7,16 @@ const geist = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "FreePathshala CMS",
   description: "Student, attendance and parent-teacher management for FreePathshala centres",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "FreePathshala", statusBarStyle: "default" },
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1 };
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  // paints the Android status bar in the brand colour inside the app shell
+  themeColor: "#2f36a3",
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

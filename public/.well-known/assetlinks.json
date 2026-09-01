@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "org.freepathshala.cms",
+      "sha256_cert_fingerprints": [
+        "A4:82:C9:08:06:9C:83:46:73:CC:54:82:9E:81:4F:01:08:44:A6:DB:5D:1A:2E:CE:43:95:29:A8:69:DE:7C:4F"
+      ]
+    }
+  }
+]

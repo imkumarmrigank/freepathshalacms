@@ -67,6 +67,13 @@ export default async function LoginPage({
             </label>
             <button className="btn btn-primary mt-2 w-full" type="submit">Sign in</button>
           </form>
+
+          <p className="mt-6 text-center text-[13px] text-[var(--muted)]">
+            On a phone?{" "}
+            <a href="/get-app" className="font-medium text-[var(--brand)] hover:underline">
+              Get the Android app
+            </a>
+          </p>
         </div>
       </div>
     </div>

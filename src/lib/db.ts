@@ -46,8 +46,15 @@ function makePool() {
   return pool;
 }
 
-export const pool: Pool = global.__fpPool ?? makePool();
-if (process.env.NODE_ENV !== "production") global.__fpPool = pool;
+/**
+ * Built on first use, not at import. Next collects route metadata at build time,
+ * and a build machine has no database credentials — constructing the pool eagerly
+ * turned that into a build failure.
+ */
+export function getPool(): Pool {
+  if (!global.__fpPool) global.__fpPool = makePool();
+  return global.__fpPool;
+}
 
 /**
  * Errors that mean "this particular socket is dead", not "your query is wrong".
@@ -91,7 +98,7 @@ export async function query<T extends QueryResultRow = QueryResultRow>(
   text: string,
   params: unknown[] = [],
 ): Promise<T[]> {
-  const res = await withRetry(() => pool.query<T>(text, params as never[]));
+  const res = await withRetry(() => getPool().query<T>(text, params as never[]));
   return res.rows;
 }
 
@@ -111,7 +118,7 @@ export async function one<T extends QueryResultRow = QueryResultRow>(
  * than replayed — re-running an enrolment or a supply issue would double it.
  */
 export async function tx<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
-  const client = await withRetry(() => pool.connect());
+  const client = await withRetry(() => getPool().connect());
   try {
     await client.query("BEGIN");
     const out = await fn(client);
