@@ -2,11 +2,11 @@ services:
   - type: web
     name: freepathshala-cms
     runtime: node
-    plan: starter
-    region: oregon
+    plan: free            # free instances sleep after 15 min idle; upgrade to starter to keep warm
+    region: singapore
     branch: main
     buildCommand: npm ci && npm run build
-    # Migrations run on every boot; they are tracked in schema_migrations and skip if applied.
+    # Migrations run on every boot; schema_migrations makes already-applied files a no-op.
     startCommand: npm run migrate && npm start
     healthCheckPath: /login
     autoDeploy: true
@@ -22,24 +22,24 @@ services:
       - key: NODE_VERSION
         value: "22.15.0"
 
-  # Nightly close-out: any past day left unmarked is recorded as absent.
-  # 18:30 UTC = 00:00 IST.
-  - type: cron
-    name: freepathshala-close-register
-    runtime: node
-    plan: starter
-    region: oregon
-    branch: main
-    schedule: "30 18 * * *"
-    buildCommand: npm ci
-    startCommand: node scripts/close-register.mjs
-    envVars:
-      - key: APP_URL
-        sync: false
-      - key: CRON_SECRET
-        fromService:
-          type: web
-          name: freepathshala-cms
-          envVarKey: CRON_SECRET
-      - key: NODE_VERSION
-        value: "22.15.0"
+# Optional nightly close-out. Render cron jobs are a paid feature, so this is left
+# commented: the app already closes out unmarked days whenever the attendance page
+# is opened. Uncomment (and set APP_URL) if you want it to run unattended at midnight.
+#
+#  - type: cron
+#    name: freepathshala-close-register
+#    runtime: node
+#    plan: starter
+#    region: singapore
+#    branch: main
+#    schedule: "30 18 * * *"   # 00:00 IST
+#    buildCommand: npm ci
+#    startCommand: node scripts/close-register.mjs
+#    envVars:
+#      - key: APP_URL
+#        sync: false
+#      - key: CRON_SECRET
+#        fromService:
+#          type: web
+#          name: freepathshala-cms
+#          envVarKey: CRON_SECRET
