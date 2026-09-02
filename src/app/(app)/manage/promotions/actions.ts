@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { tx } from "@/lib/db";
+import { decideFor, resultsForSession } from "@/lib/promotion";
 
 export type PromotionResult = {
   error?: string;
@@ -10,12 +11,20 @@ export type PromotionResult = {
   retained?: number;
   graduated?: number;
   skipped?: number;
+  /** how many of those the marks decided, rather than a hand-set decision */
+  onResult?: number;
 };
 
 /**
  * Rolls every active enrolment of `from_session` forward into `to_session`.
  *
- *  · promote  -> next class by sequence (the default)
+ * The result decides: a child whose total reached the total of the pass marks
+ * moves up, and a child who fell short repeats the class. A decision set by hand
+ * on the student's page overrides that — retain and hold both stand, because a
+ * manager who has looked at the child knows something the marks do not. A child
+ * with no marks at all moves up; there is nothing to hold them back on.
+ *
+ *  · promote  -> next class by sequence
  *  · retain   -> same class again
  *  · hold     -> left out of the run entirely
  *  · no next class (terminal) -> the student graduates and leaves the roll
@@ -66,12 +75,24 @@ export async function runPromotion(_prev: unknown, form: FormData): Promise<Prom
         "SELECT id, sequence FROM class_levels WHERE is_active ORDER BY sequence",
       );
 
-      let promoted = 0, retained = 0, graduated = 0, skipped = 0;
+      const verdicts = await resultsForSession(c, fromId, centerId);
+
+      const { rows: runRow } = await c.query<{ id: number }>(
+        `INSERT INTO promotion_runs
+           (from_session_id, to_session_id, session_id, kind, center_id, run_by)
+         VALUES ($1,$2,$1,'session',$3,$4) RETURNING id`,
+        [fromId, toId, centerId, user.uid],
+      );
+      const runId = runRow[0].id;
+
+      let promoted = 0, retained = 0, graduated = 0, skipped = 0, onResult = 0;
 
       for (const e of enrollments) {
-        if (e.promotion_decision === "hold") { skipped++; continue; }
+        const { move, basis } = decideFor(e.promotion_decision, verdicts.get(e.student_id));
+        if (basis === "result") onResult++;
+        if (move === "hold") { skipped++; continue; }
 
-        const nextClass = e.promotion_decision === "retain"
+        const nextClass = move === "retain"
           ? { id: e.class_level_id }
           : classes.find((cl) => cl.sequence > e.class_sequence);
 
@@ -80,6 +101,11 @@ export async function runPromotion(_prev: unknown, form: FormData): Promise<Prom
           await c.query("UPDATE students SET status = 'graduated', updated_at = now() WHERE id = $1",
             [e.student_id]);
           await c.query("UPDATE enrollments SET status = 'graduated' WHERE id = $1", [e.id]);
+          await c.query(
+            `INSERT INTO promotion_moves (run_id, student_id, enrollment_id, session_id,
+                from_class_level_id, to_class_level_id, decision, basis, moved_by)
+             VALUES ($1,$2,$3,$4,$5,NULL,'graduated',$6,$7)`,
+            [runId, e.student_id, e.id, fromId, e.class_level_id, basis, user.uid]);
           graduated++;
           continue;
         }
@@ -90,20 +116,24 @@ export async function runPromotion(_prev: unknown, form: FormData): Promise<Prom
            VALUES ($1,$2,$3,$4,$5, (SELECT start_date FROM academic_sessions WHERE id = $2), $6)
            ON CONFLICT (student_id, session_id) DO NOTHING`,
           [e.student_id, toId, nextClass.id, e.center_id, e.section,
-           e.promotion_decision === "retain" ? "retained" : "promoted"],
+           move === "retain" ? "retained" : "promoted"],
         );
 
         if (ins.rowCount === 0) { skipped++; continue; }
         await c.query("UPDATE enrollments SET status = 'completed' WHERE id = $1", [e.id]);
-        if (e.promotion_decision === "retain") retained++; else promoted++;
+        await c.query(
+          `INSERT INTO promotion_moves (run_id, student_id, enrollment_id, session_id,
+              from_class_level_id, to_class_level_id, decision, basis, moved_by)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+          [runId, e.student_id, e.id, fromId, e.class_level_id, nextClass.id,
+           move === "retain" ? "retained" : "promoted", basis, user.uid]);
+        if (move === "retain") retained++; else promoted++;
       }
 
       await c.query(
-        `INSERT INTO promotion_runs
-           (from_session_id, to_session_id, center_id, promoted_count, retained_count,
-            graduated_count, skipped_count, run_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [fromId, toId, centerId, promoted, retained, graduated, skipped, user.uid],
+        `UPDATE promotion_runs SET promoted_count=$2, retained_count=$3,
+            graduated_count=$4, skipped_count=$5 WHERE id=$1`,
+        [runId, promoted, retained, graduated, skipped],
       );
 
       if (makeCurrent) {
@@ -112,7 +142,7 @@ export async function runPromotion(_prev: unknown, form: FormData): Promise<Prom
         await c.query("UPDATE academic_sessions SET is_locked = TRUE WHERE id = $1", [fromId]);
       }
 
-      return { promoted, retained, graduated, skipped, from: from.name, to: to.name };
+      return { promoted, retained, graduated, skipped, onResult, from: from.name, to: to.name };
     });
 
     revalidatePath("/manage/promotions");
@@ -120,7 +150,8 @@ export async function runPromotion(_prev: unknown, form: FormData): Promise<Prom
     revalidatePath("/dashboard");
     return {
       ok: `${result.from} → ${result.to}: ${result.promoted} promoted, ${result.retained} retained, ` +
-          `${result.graduated} graduated, ${result.skipped} skipped.`,
+          `${result.graduated} graduated, ${result.skipped} skipped ` +
+          `(${result.onResult} decided by result).`,
       ...result,
     };
   } catch (err) {

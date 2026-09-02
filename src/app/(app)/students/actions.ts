@@ -6,6 +6,7 @@ import { tx, query, one } from "@/lib/db";
 import { nextEnrollmentNo } from "@/lib/enrollment";
 import { currentSession } from "@/lib/queries";
 import { isGlobalRole, isTeaching, canMarkDropout } from "@/lib/roles";
+import { RECOMMENDERS, PTM_RECOMMENDER } from "@/lib/promotion-meta";
 
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
@@ -115,6 +116,69 @@ export async function changeClass(_prev: unknown, form: FormData) {
     [enrollmentId, classLevelId]);
   revalidatePath(`/students/${row.student_id}`);
   return { ok: "Class updated." };
+}
+
+/**
+ * Moves one child up a class inside the current session — the ready-now case,
+ * which does not wait for the year-end run. The move is recorded so their path
+ * through the year is still readable afterwards.
+ */
+export async function promoteNow(_prev: unknown, form: FormData) {
+  const user = await requireUser();
+  if (isTeaching(user.role)) return { error: "Only managers can promote a student." };
+
+  const enrollmentId = Number(form.get("enrollment_id"));
+  const reason = str(form, "reason");
+  const recommendedBy = str(form, "recommended_by");
+  const ptmId = form.get("ptm_interaction_id") ? Number(form.get("ptm_interaction_id")) : null;
+
+  if (!recommendedBy || !(RECOMMENDERS as readonly string[]).includes(recommendedBy))
+    return { error: "Say whose recommendation this is." };
+  if (recommendedBy === PTM_RECOMMENDER && !ptmId)
+    return { error: "Pick the parent meeting this came out of." };
+
+  const row = await one<{
+    center_id: number; student_id: number; session_id: number;
+    class_level_id: number; class_sequence: number; status: string;
+  }>(
+    `SELECT e.center_id, e.student_id, e.session_id, e.class_level_id, e.status,
+            cl.sequence AS class_sequence
+       FROM enrollments e JOIN class_levels cl ON cl.id = e.class_level_id
+      WHERE e.id = $1`, [enrollmentId]);
+  if (!row) return { error: "Enrolment not found." };
+  if (!canTouchCenter(user, row.center_id))
+    return { error: "This student belongs to another centre." };
+  if (row.status !== "active") return { error: "This enrolment is no longer active." };
+
+  const next = await one<{ id: number; name: string }>(
+    `SELECT id, name FROM class_levels
+      WHERE is_active AND sequence > $1 ORDER BY sequence LIMIT 1`,
+    [row.class_sequence]);
+  if (!next)
+    return { error: "This is the highest class — the child graduates at the end of the session." };
+
+  if (ptmId) {
+    const meeting = await one<{ id: number }>(
+      "SELECT id FROM ptm_interactions WHERE id = $1 AND student_id = $2",
+      [ptmId, row.student_id]);
+    if (!meeting) return { error: "That meeting is not this child's." };
+  }
+
+  await tx(async (c) => {
+    await c.query("UPDATE enrollments SET class_level_id = $2 WHERE id = $1",
+      [enrollmentId, next.id]);
+    await c.query(
+      `INSERT INTO promotion_moves (student_id, enrollment_id, session_id,
+          from_class_level_id, to_class_level_id, decision, basis, reason,
+          recommended_by, ptm_interaction_id, moved_by)
+       VALUES ($1,$2,$3,$4,$5,'promoted','manual',$6,$7,$8,$9)`,
+      [row.student_id, enrollmentId, row.session_id, row.class_level_id, next.id,
+       reason, recommendedBy, ptmId, user.uid]);
+  });
+
+  revalidatePath(`/students/${row.student_id}`);
+  revalidatePath("/students");
+  return { ok: `Moved up to ${next.name}.` };
 }
 
 /** Flag whether this student should move up at the end of the session. */

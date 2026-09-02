@@ -70,6 +70,23 @@ export default async function StudentPage({
     listClasses(),
   ]);
 
+  // every class change a promotion made, newest first
+  const moves = await query<{
+    id: number; decision: string; basis: string; reason: string | null;
+    recommended_by: string | null; moved_on: string;
+    from_class: string | null; to_class: string | null; moved_by_name: string | null;
+  }>(
+    `SELECT pm.id, pm.decision, pm.basis, pm.reason, pm.recommended_by, pm.moved_on,
+            f.name AS from_class, tcl.name AS to_class, u.name AS moved_by_name
+       FROM promotion_moves pm
+       LEFT JOIN class_levels f ON f.id = pm.from_class_level_id
+       LEFT JOIN class_levels tcl ON tcl.id = pm.to_class_level_id
+       LEFT JOIN users u ON u.id = pm.moved_by
+      WHERE pm.student_id = $1
+      ORDER BY pm.moved_on DESC, pm.id DESC LIMIT 12`,
+    [sid],
+  );
+
   // the live counselling referral, if the child has one
   const flag = await one<OpenFlag>(
     `SELECT f.id, f.status, f.urgency, f.reasons, f.note, f.raised_on,
@@ -95,6 +112,11 @@ export default async function StudentPage({
   );
 
   const currentEnr = enrollments.find((e) => e.is_current);
+  // the class directly above the one they are in, for the promote-now control
+  const ladder = classes.map((c) => c.id);
+  const atIndex = currentEnr ? ladder.indexOf(currentEnr.class_level_id) : -1;
+  const nextClassName = atIndex >= 0 && atIndex + 1 < classes.length
+    ? classes[atIndex + 1].name : null;
   const attPct = attendance && Number(attendance.total) > 0
     ? (Number(attendance.present) / Number(attendance.total)) * 100 : null;
 
@@ -291,12 +313,40 @@ export default async function StudentPage({
                 ))}
               </ol>
             )}
+            {moves.length > 0 && (
+              <div className="mt-4 border-t border-[var(--border)] pt-3">
+                <h3 className="label-cap mb-2">Promotions</h3>
+                <ul className="space-y-2">
+                  {moves.map((m) => (
+                    <li key={m.id} className="text-[12px] text-[var(--muted)]">
+                      <span className="font-medium text-[var(--text)]">
+                        {m.decision === "graduated"
+                          ? "Graduated"
+                          : `${m.from_class ?? "—"} → ${m.to_class ?? "—"}`}
+                      </span>
+                      {" · "}{fmtDate(m.moved_on)}
+                      {" · "}
+                      {m.basis === "result" ? "on the year's result"
+                        : m.basis === "no_result" ? "no marks on record"
+                        : m.recommended_by ?? "by hand"}
+                      {m.reason ? ` — ${m.reason}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {currentEnr && !isTeaching(user.role) && (
               <EnrollmentControls
                 enrollmentId={currentEnr.id}
                 classLevelId={currentEnr.class_level_id}
                 decision={currentEnr.promotion_decision}
                 classes={classes}
+                nextClassName={nextClassName}
+                meetings={interactions.map((i) => ({
+                  id: i.id,
+                  label: `${fmtDate(i.interaction_date)}${i.mentor ? ` · ${i.mentor}` : ""}`,
+                }))}
               />
             )}
           </Card>

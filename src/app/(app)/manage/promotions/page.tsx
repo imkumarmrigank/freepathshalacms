@@ -11,16 +11,40 @@ export default async function PromotionsPage() {
   const current = sessions.find((s) => s.is_current) ?? null;
   const next = current ? sessions.find((s) => s.sequence === current.sequence + 1) ?? null : null;
 
+  // The same rule the run itself applies: a child's total against the total of
+  // the pass marks on the papers they sat.
   const preview = current
-    ? await query<{ class_name: string; total: string; promote: string; retain: string; hold: string; terminal: boolean }>(
-        `SELECT cl.name AS class_name, cl.is_terminal AS terminal,
+    ? await query<{
+        class_name: string; total: string; passed: string; failed: string;
+        no_marks: string; retain: string; hold: string; terminal: boolean;
+      }>(
+        `WITH res AS (
+           SELECT m.student_id,
+                  count(*) AS papers,
+                  sum(CASE WHEN m.is_absent THEN 0
+                           ELSE COALESCE(m.marks_obtained, 0) END) AS obtained,
+                  sum(COALESCE(x.pass_marks, x.max_marks / 3.0)) AS pass_mark
+             FROM exam_marks m
+             JOIN exams x ON x.id = m.exam_id
+            WHERE x.session_id = $1 AND (m.marks_obtained IS NOT NULL OR m.is_absent)
+            GROUP BY m.student_id
+         )
+         SELECT cl.name AS class_name, cl.is_terminal AS terminal,
                 count(*) AS total,
-                count(*) FILTER (WHERE e.promotion_decision = 'promote') AS promote,
+                count(*) FILTER (WHERE e.promotion_decision = 'promote'
+                                   AND r.papers IS NOT NULL
+                                   AND r.obtained >= r.pass_mark) AS passed,
+                count(*) FILTER (WHERE e.promotion_decision = 'promote'
+                                   AND r.papers IS NOT NULL
+                                   AND r.obtained < r.pass_mark) AS failed,
+                count(*) FILTER (WHERE e.promotion_decision = 'promote'
+                                   AND r.papers IS NULL) AS no_marks,
                 count(*) FILTER (WHERE e.promotion_decision = 'retain') AS retain,
                 count(*) FILTER (WHERE e.promotion_decision = 'hold') AS hold
            FROM enrollments e
            JOIN class_levels cl ON cl.id = e.class_level_id
            JOIN students s ON s.id = e.student_id
+           LEFT JOIN res r ON r.student_id = e.student_id
           WHERE e.session_id = $1 AND e.status = 'active' AND s.status = 'active'
           GROUP BY cl.name, cl.sequence, cl.is_terminal
           ORDER BY cl.sequence`,
@@ -61,23 +85,33 @@ export default async function PromotionsPage() {
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">
           <Card pad={false}>
-            <h2 className="px-5 pb-3 pt-5 text-[15px] font-semibold">
+            <h2 className="px-5 pt-5 text-[15px] font-semibold">
               What will happen {current ? `to ${current.name}` : ""}
             </h2>
+            <p className="px-5 pb-3 pt-1 text-[13px] text-[var(--muted)]">
+              The result decides. A child whose total reached the total of the pass
+              marks on the papers they sat moves up; one who fell short repeats the
+              class. A child with no marks on record moves up — there is nothing to
+              hold them back on. Retain and hold set by hand on a student&rsquo;s page
+              override all of it.
+            </p>
             {preview.length === 0 ? (
               <Empty title="No active enrolments" hint="Nothing to promote yet." />
             ) : (
               <div className="overflow-x-auto">
                 <table className="tbl">
                   <thead>
-                    <tr><th>Class</th><th>Students</th><th>Promote</th><th>Retain</th><th>Hold</th><th>Outcome</th></tr>
+                    <tr><th>Class</th><th>Students</th><th>Passed</th><th>Fell short</th>
+                      <th>No marks</th><th>Retain set</th><th>Hold</th><th>Outcome</th></tr>
                   </thead>
                   <tbody>
                     {preview.map((r) => (
                       <tr key={r.class_name}>
                         <td className="font-medium">{r.class_name}</td>
                         <td className="tabular-nums">{r.total}</td>
-                        <td className="tabular-nums">{r.promote}</td>
+                        <td className="tabular-nums text-[var(--ok)]">{r.passed}</td>
+                        <td className="tabular-nums text-[var(--warn)]">{r.failed}</td>
+                        <td className="tabular-nums text-[var(--muted)]">{r.no_marks}</td>
                         <td className="tabular-nums">{r.retain}</td>
                         <td className="tabular-nums">{r.hold}</td>
                         <td className="text-[13px] text-[var(--muted)]">
