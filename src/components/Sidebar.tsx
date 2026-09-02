@@ -18,12 +18,13 @@ const MAIN: Item[] = [
   { href: "/timetable", label: "Timetable", icon: IconClock },
   { href: "/teaching-plans", label: "Teaching Plans", icon: IconBook },
   { href: "/exams", label: "Tests & Marks", icon: IconAward },
-  { href: "/progress-reports", label: "Progress Reports", icon: IconReport },
+  { href: "/progress-reports", label: "Progress Reports", icon: IconBook },
   { href: "/calendar", label: "Calendar", icon: IconCal },
   { href: "/ptm", label: "PTM Interactions", icon: IconChat },
   { href: "/follow-ups", label: "Follow-ups", icon: IconClock },
   { href: "/supplies", label: "Supplies", icon: IconBox, roles: ["super_admin", "mentor", "center_manager"] },
-  { href: "/reports", label: "Reports", icon: IconChart },
+  { href: "/statistics", label: "Statistics", icon: IconChart },
+  { href: "/reports", label: "Reports", icon: IconReport },
 ];
 
 const ADMIN: Item[] = [
