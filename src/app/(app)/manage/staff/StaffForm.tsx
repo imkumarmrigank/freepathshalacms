@@ -3,7 +3,7 @@ import { useActionState, useState } from "react";
 import { saveStaff } from "../actions";
 import { Card, Field } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
-import { CREATABLE_ROLES, ROLE_LABEL, type Role } from "@/lib/roles";
+import { CREATABLE_ROLES, ROLE_LABEL, needsCentre, type Role } from "@/lib/roles";
 
 export type Staff = {
   id: number; name: string; email: string; phone: string | null; role: string;
@@ -22,8 +22,7 @@ export default function StaffForm({
   const [state, action] = useActionState(saveStaff, null);
   const allowed = CREATABLE_ROLES[actorRole];
   const [role, setRole] = useState<string>(staff?.role ?? allowed[allowed.length - 1] ?? "teacher");
-  const centreless = role === "super_admin" || role === "admin"
-    || role === "mentor" || role === "backup_teacher";
+  const centreless = !needsCentre(role as Role);
 
   return (
     <Card>

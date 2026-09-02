@@ -61,6 +61,14 @@ export function canManageStaff(role: Role) {
   return CREATABLE_ROLES[role].length > 0;
 }
 
+/**
+ * Which roles belong to one centre. Admins and mentors span the organisation, and
+ * a backup teacher goes wherever they are assigned — none of them has a home centre.
+ */
+export function needsCentre(role: Role) {
+  return role === "center_manager" || role === "teacher";
+}
+
 /** Only the super admin opens a new centre; an admin maintains existing ones. */
 export function canCreateCentre(role: Role) {
   return role === "super_admin";
