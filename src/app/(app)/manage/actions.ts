@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { requireRole, requireUser, hashPassword, canTouchCenter } from "@/lib/auth";
-import { canCreateCentre, canCreateRole, canManageStaff, isGlobalRole, type Role, isTeaching } from "@/lib/roles";
+import { canCreateCentre, canCreateRole, canManageStaff, isGlobalRole, type Role, isTeaching, needsCentre } from "@/lib/roles";
 import { one, query } from "@/lib/db";
 import { GEOFENCE_DEFAULT_M, GEOFENCE_MAX_M, GEOFENCE_MIN_M } from "@/lib/geo";
 
@@ -97,10 +97,11 @@ export async function saveStaff(_prev: unknown, form: FormData) {
 
   // A centre manager works only inside their own centre; the rest may pick one.
   let centerId = isGlobalRole(actor.role) ? numOrNull(form, "center_id") : actor.centerId;
-  if (!isGlobalRole(role) && !centerId) return { error: "Pick a centre for this person." };
+  // Admins, mentors and backup teachers have no home centre — never ask them for one.
+  if (!needsCentre(role)) centerId = null;
+  if (needsCentre(role) && !centerId) return { error: "Pick a centre for this person." };
   if (centerId && !canTouchCenter(actor, centerId))
     return { error: "That centre is not one of yours." };
-  if (isGlobalRole(role)) centerId = null;
 
   const password = str(form, "password");
   if (!id && !password) return { error: "Set an initial password." };
