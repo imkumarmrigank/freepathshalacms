@@ -5,6 +5,7 @@ import Sidebar from "@/components/Sidebar";
 import { Avatar } from "@/components/ui";
 import { IconLogout } from "@/components/icons";
 import { destroySession, getSession } from "@/lib/auth";
+import { query } from "@/lib/db";
 import { ROLE_LABEL } from "@/lib/roles";
 import { fmtDate } from "@/lib/format";
 
@@ -17,6 +18,23 @@ async function logout() {
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getSession();
   if (!user) redirect("/login");
+
+  // A stand-in has no home centre — say where they are actually covering.
+  let scopeLabel = "All centres";
+  if (user.role === "backup_teacher") {
+    const covering = await query<{ center_name: string; teacher: string }>(
+      `SELECT c.name AS center_name, t.name AS teacher
+         FROM teacher_coverage tc
+         JOIN centers c ON c.id = tc.center_id
+         JOIN users t ON t.id = tc.covering_id
+        WHERE tc.backup_id = $1 AND tc.starts_on <= CURRENT_DATE
+          AND (tc.ends_on IS NULL OR tc.ends_on >= CURRENT_DATE)`,
+      [user.uid],
+    );
+    scopeLabel = covering.length === 0
+      ? "No cover assigned"
+      : covering.map((c) => `${c.center_name} · covering ${c.teacher}`).join("  ·  ");
+  }
 
   return (
     <div className="flex min-h-screen">
@@ -57,7 +75,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               className="h-auto w-[132px]" priority />
           </Link>
           <div className="hidden text-[13px] text-[var(--muted)] lg:block">
-            {user.centerName ? `${user.centerName}` : "All centres"}
+            {user.centerName ?? scopeLabel}
           </div>
           <div className="text-[13px] text-[var(--muted)]">{fmtDate(new Date())}</div>
         </header>
