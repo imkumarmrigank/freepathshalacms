@@ -32,7 +32,7 @@ export async function punch(_prev: unknown, form: FormData): Promise<Punch> {
   if (!center) return { error: "Your centre could not be found." };
 
   // Checking out is verified the same way as checking in — both must happen at the centre.
-  const geo = checkGeofence(center, lat, lng);
+  const geo = checkGeofence(center, lat, lng, kind === "out" ? "out" : "in");
   if (!geo.ok) return { error: geo.reason ?? "You are outside the centre's allowed area." };
 
   const day = today();

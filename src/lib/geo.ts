@@ -37,11 +37,15 @@ function readable(m: number) {
   return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${m} m`;
 }
 
-/** Is the punch inside the centre's geofence? */
+/**
+ * Is the punch inside the centre's geofence? The same rule gates arriving and
+ * leaving, so the caller says which one it is only to word the refusal.
+ */
 export function checkGeofence(
   center: { latitude: number | null; longitude: number | null; geofence_radius_m: number },
   lat: number,
   lng: number,
+  action: "in" | "out" = "in",
 ): GeoCheck {
   if (center.latitude == null || center.longitude == null) {
     return { ok: false, distance: -1, radius: center.geofence_radius_m,
@@ -62,7 +66,8 @@ export function checkGeofence(
   }
   return {
     ok: false, distance, radius,
-    reason: `You are ${readable(distance)} from the centre. Check-in is only possible ` +
-            `within ${radius} m, so move closer and try again.`,
+    reason: `You are ${readable(distance)} from the centre. Checking ` +
+            `${action === "out" ? "out" : "in"} is only possible within ${radius} m, ` +
+            "so move closer and try again.",
   };
 }
