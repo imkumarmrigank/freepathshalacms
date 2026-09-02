@@ -72,13 +72,21 @@ body {
 .btn-danger { background: var(--bad-soft); color: var(--bad); border-color: #f6cfcd; }
 .btn-sm { padding: 0.4375rem 0.8125rem; font-size: 0.8125rem; border-radius: 9px; }
 
-.input, .select, .textarea {
-  width: 100%; background: var(--surface); color: var(--text);
-  border: 1px solid var(--border-strong); border-radius: 9px;
-  padding: 0.5625rem 0.75rem; font-size: 0.875rem; outline: none;
-}
-.input:focus, .select:focus, .textarea:focus {
-  border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft);
+/*
+ * These live in the components layer on purpose. Unlayered CSS beats every
+ * layered utility no matter the specificity, so leaving `width: 100%` outside a
+ * layer made `.input w-20` (and `.select w-auto`) impossible to honour — the
+ * field would swallow the row and squeeze its neighbours to nothing.
+ */
+@layer components {
+  .input, .select, .textarea {
+    width: 100%; background: var(--surface); color: var(--text);
+    border: 1px solid var(--border-strong); border-radius: 9px;
+    padding: 0.5625rem 0.75rem; font-size: 0.875rem; outline: none;
+  }
+  .input:focus, .select:focus, .textarea:focus {
+    border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft);
+  }
 }
 .field { display: block; margin-bottom: 0.9375rem; }
 .field > span {

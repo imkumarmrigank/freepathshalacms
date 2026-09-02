@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import {
   IconGrid, IconUsers, IconChat, IconCal, IconChart, IconPin,
-  IconBuilding, IconLayers, IconArrowUp, IconCheck, IconClock, IconBook, IconBox, IconAward,
+  IconBuilding, IconLayers, IconArrowUp, IconCheck, IconClock, IconBook, IconBox, IconAward, IconReport,
 } from "./icons";
 import type { Role } from "@/lib/roles";
 
@@ -18,6 +18,7 @@ const MAIN: Item[] = [
   { href: "/timetable", label: "Timetable", icon: IconClock },
   { href: "/teaching-plans", label: "Teaching Plans", icon: IconBook },
   { href: "/exams", label: "Tests & Marks", icon: IconAward },
+  { href: "/progress-reports", label: "Progress Reports", icon: IconReport },
   { href: "/calendar", label: "Calendar", icon: IconCal },
   { href: "/ptm", label: "PTM Interactions", icon: IconChat },
   { href: "/follow-ups", label: "Follow-ups", icon: IconClock },

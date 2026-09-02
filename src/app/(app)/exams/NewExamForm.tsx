@@ -27,9 +27,16 @@ export default function NewExamForm({
   const update = (i: number, patch: Partial<Row>) =>
     setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
 
-  const addSuggested = (name: string) => {
+  const isChosen = (name: string) =>
+    rows.some((r) => r.subject.trim().toLowerCase() === name.toLowerCase());
+
+  const toggleSuggested = (name: string) => {
     setRows((rs) => {
-      if (rs.some((r) => r.subject.toLowerCase() === name.toLowerCase())) return rs;
+      const at = rs.findIndex((r) => r.subject.trim().toLowerCase() === name.toLowerCase());
+      if (at >= 0) {
+        const left = rs.filter((_, j) => j !== at);
+        return left.length ? left : [blank()];
+      }
       const empty = rs.findIndex((r) => r.subject.trim() === "");
       if (empty >= 0) return rs.map((r, j) => (j === empty ? { ...r, subject: name } : r));
       return [...rs, { ...blank(), subject: name }];
@@ -106,37 +113,54 @@ export default function NewExamForm({
           </button>
         </div>
 
-        <div className="mb-2 flex flex-wrap gap-1.5">
-          {COMMON_SUBJECTS.map((sname) => (
-            <button key={sname} type="button" onClick={() => addSuggested(sname)}
-              className="rounded-full border border-[var(--border-strong)] px-2.5 py-1 text-[12px] text-[var(--muted)] hover:border-[var(--brand)] hover:text-[var(--brand)]">
-              {sname}
-            </button>
-          ))}
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {COMMON_SUBJECTS.map((sname) => {
+            const on = isChosen(sname);
+            return (
+              <button key={sname} type="button" onClick={() => toggleSuggested(sname)}
+                aria-pressed={on}
+                className={`rounded-full border px-2.5 py-1 text-[12px] transition ${
+                  on
+                    ? "border-[var(--brand)] bg-[var(--brand)] text-white"
+                    : "border-[var(--border-strong)] text-[var(--muted)] hover:border-[var(--brand)] hover:text-[var(--brand)]"
+                }`}>
+                {on ? "✓ " : "+ "}{sname}
+              </button>
+            );
+          })}
         </div>
 
-        <div className="mb-4 space-y-2">
-          {rows.map((r, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <input className="input flex-1" name="subject_name" value={r.subject}
-                placeholder={`Subject ${i + 1}`}
-                onChange={(e) => update(i, { subject: e.target.value })} />
-              <input className="input w-20 text-right" name="subject_max" value={r.max}
-                inputMode="decimal" placeholder="max"
-                title="Leave blank to use the maximum above"
-                onChange={(e) => update(i, { max: e.target.value })} />
-              <input className="input w-20 text-right" name="subject_pass" value={r.pass}
-                inputMode="decimal" placeholder="pass"
-                title="Leave blank to use the pass mark above"
-                onChange={(e) => update(i, { pass: e.target.value })} />
-              <button type="button" aria-label="Remove subject"
-                className="px-1 text-[var(--faint)] hover:text-[var(--bad)]"
-                onClick={() => setRows((rs) => rs.length > 1 ? rs.filter((_, j) => j !== i) : rs)}>
-                ×
-              </button>
-            </div>
-          ))}
-          <p className="text-[12px] text-[var(--faint)]">
+        <div className="mb-4">
+          <div className="grid grid-cols-[minmax(0,1fr)_4.75rem_4.75rem_1.5rem] items-center gap-2 px-0.5 pb-1">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--faint)]">Subject</span>
+            <span className="text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--faint)]">Max</span>
+            <span className="text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--faint)]">Pass</span>
+            <span />
+          </div>
+          <div className="space-y-2">
+            {rows.map((r, i) => (
+              <div key={i}
+                className="grid grid-cols-[minmax(0,1fr)_4.75rem_4.75rem_1.5rem] items-center gap-2">
+                <input className="input" name="subject_name" value={r.subject}
+                  placeholder={`Subject ${i + 1}`}
+                  onChange={(e) => update(i, { subject: e.target.value })} />
+                <input className="input text-right" name="subject_max" value={r.max}
+                  inputMode="decimal" placeholder="—"
+                  title="Leave blank to use the maximum above"
+                  onChange={(e) => update(i, { max: e.target.value })} />
+                <input className="input text-right" name="subject_pass" value={r.pass}
+                  inputMode="decimal" placeholder="—"
+                  title="Leave blank to use the pass mark above"
+                  onChange={(e) => update(i, { pass: e.target.value })} />
+                <button type="button" aria-label={`Remove ${r.subject || `subject ${i + 1}`}`}
+                  className="justify-self-center text-[16px] leading-none text-[var(--faint)] hover:text-[var(--bad)]"
+                  onClick={() => setRows((rs) => rs.length > 1 ? rs.filter((_, j) => j !== i) : [blank()])}>
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[12px] text-[var(--faint)]">
             Leave max and pass blank to use the values above. Empty rows are ignored.
           </p>
         </div>
