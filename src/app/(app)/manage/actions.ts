@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { requireRole, requireUser, hashPassword } from "@/lib/auth";
-import { isGlobalRole, type Role } from "@/lib/roles";
+import { requireRole, requireUser, hashPassword, canTouchCenter } from "@/lib/auth";
+import { canCreateCentre, canCreateRole, canManageStaff, isGlobalRole, type Role } from "@/lib/roles";
 import { one, query } from "@/lib/db";
 
 const str = (f: FormData, k: string) => {
@@ -15,8 +15,11 @@ const numOrNull = (f: FormData, k: string) => {
 
 /* ------------------------------------------------------------------ centres */
 export async function saveCenter(_prev: unknown, form: FormData) {
-  await requireRole("super_admin", "mentor");
+  const actor = await requireRole("super_admin", "mentor");
   const id = numOrNull(form, "id");
+  // a mentor maintains the centres that exist; opening a new one is the admin's call
+  if (!id && !canCreateCentre(actor.role))
+    return { error: "Only the administrator can open a new centre." };
   const code = str(form, "code")?.toUpperCase();
   const name = str(form, "name");
   if (!code || !name) return { error: "Centre code and name are required." };
@@ -76,19 +79,23 @@ export async function assignManager(_prev: unknown, form: FormData) {
 /* -------------------------------------------------------------------- staff */
 export async function saveStaff(_prev: unknown, form: FormData) {
   const actor = await requireUser();
-  if (actor.role === "teacher") return { error: "You cannot manage staff." };
+  if (!canManageStaff(actor.role)) return { error: "You cannot manage staff." };
 
   const id = numOrNull(form, "id");
   const name = str(form, "name");
   const email = str(form, "email")?.toLowerCase();
-  let role = String(form.get("role") ?? "teacher");
+  const role = String(form.get("role") ?? "teacher") as Role;
   if (!name || !email) return { error: "Name and email are required." };
 
-  // A centre manager can only create teachers, and only inside their own centre.
-  let centerId = actor.role === "super_admin" ? numOrNull(form, "center_id") : actor.centerId;
-  if (actor.role === "center_manager") { role = "teacher"; centerId = actor.centerId; }
-  if (!isGlobalRole(role as Role) && !centerId) return { error: "Pick a centre for this person." };
-  if (isGlobalRole(role as Role)) centerId = null;
+  if (!canCreateRole(actor.role, role))
+    return { error: `You cannot ${id ? "assign" : "create"} the ${role.replace(/_/g, " ")} role.` };
+
+  // A centre manager works only inside their own centre; the rest may pick one.
+  let centerId = isGlobalRole(actor.role) ? numOrNull(form, "center_id") : actor.centerId;
+  if (!isGlobalRole(role) && !centerId) return { error: "Pick a centre for this person." };
+  if (centerId && !canTouchCenter(actor, centerId))
+    return { error: "That centre is not one of yours." };
+  if (isGlobalRole(role)) centerId = null;
 
   const password = str(form, "password");
   if (!id && !password) return { error: "Set an initial password." };
@@ -96,10 +103,12 @@ export async function saveStaff(_prev: unknown, form: FormData) {
 
   try {
     if (id) {
-      const target = await one<{ center_id: number | null }>(
-        "SELECT center_id FROM users WHERE id = $1", [id]);
+      const target = await one<{ center_id: number | null; role: Role }>(
+        "SELECT center_id, role FROM users WHERE id = $1", [id]);
       if (!target) return { error: "User not found." };
-      if (actor.role === "center_manager" && target.center_id !== actor.centerId)
+      if (!canCreateRole(actor.role, target.role))
+        return { error: `You cannot edit a ${target.role.replace(/_/g, " ")} account.` };
+      if (!canTouchCenter(actor, target.center_id))
         return { error: "That person is not at your centre." };
 
       await query(
@@ -124,6 +133,21 @@ export async function saveStaff(_prev: unknown, form: FormData) {
     const msg = err instanceof Error ? err.message : "Could not save.";
     return { error: msg.includes("users_email_key") ? `${email} is already registered.` : msg };
   }
+  // a mentor covers a set of centres; the super admin decides which
+  if (role === "mentor" && actor.role === "super_admin") {
+    const target = id ?? (await one<{ id: number }>(
+      "SELECT id FROM users WHERE lower(email) = lower($1)", [email]))?.id;
+    if (target) {
+      const wanted = form.getAll("mentor_center_id").map(Number).filter(Boolean);
+      await query("DELETE FROM mentor_centers WHERE user_id = $1", [target]);
+      for (const c of wanted) {
+        await query(
+          `INSERT INTO mentor_centers (user_id, center_id) VALUES ($1,$2)
+           ON CONFLICT DO NOTHING`, [target, c]);
+      }
+    }
+  }
+
   revalidatePath("/manage/staff");
   return { ok: id ? "Staff member updated." : "Staff member added." };
 }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requireUser, canTouchCenter } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { listClasses } from "@/lib/queries";
 import { Alert, Avatar, Badge, Card, Empty, Meter, PageHeader } from "@/components/ui";
@@ -34,7 +34,7 @@ export default async function StudentPage({
        JOIN centers c ON c.id = s.center_id WHERE s.id = $1`, [sid],
   );
   if (!student) notFound();
-  if (!isGlobalRole(user.role) && student.center_id !== user.centerId)
+  if (!canTouchCenter(user, student.center_id))
     return <Alert kind="bad">This student belongs to another centre.</Alert>;
 
   const [enrollments, attendance, interactions, classes] = await Promise.all([

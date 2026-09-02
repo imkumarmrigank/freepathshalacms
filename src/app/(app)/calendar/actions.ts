@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/auth";
+import { requireUser, canTouchCenter } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
 import { HOLIDAY_TYPES } from "@/lib/calendar-meta";
@@ -28,8 +28,13 @@ export async function saveEvent(_prev: unknown, form: FormData) {
 
   // A manager can only publish to their own centre; only an admin can post to all centres.
   let centerId: number | null;
-  if (isGlobalRole(user.role)) {
+  if (user.role === "super_admin") {
     centerId = form.get("center_id") ? Number(form.get("center_id")) : null;
+  } else if (user.role === "mentor") {
+    centerId = form.get("center_id") ? Number(form.get("center_id")) : (user.centerIds[0] ?? null);
+    // "all centres" is the administrator's to publish; a mentor names one of theirs
+    if (!centerId || !canTouchCenter(user, centerId))
+      return { error: "Choose one of the centres you cover." };
   } else {
     centerId = user.centerId;
   }
@@ -41,7 +46,7 @@ export async function saveEvent(_prev: unknown, form: FormData) {
     const existing = await one<{ center_id: number | null }>(
       "SELECT center_id FROM calendar_events WHERE id = $1", [id]);
     if (!existing) return { error: "Event not found." };
-    if (!isGlobalRole(user.role) && existing.center_id !== user.centerId)
+    if (!canTouchCenter(user, existing.center_id))
       return { error: "That event belongs to another centre." };
 
     await query(
@@ -76,7 +81,7 @@ export async function deleteEvent(_prev: unknown, form: FormData) {
   const existing = await one<{ center_id: number | null }>(
     "SELECT center_id FROM calendar_events WHERE id = $1", [id]);
   if (!existing) return { error: "Event not found." };
-  if (!isGlobalRole(user.role) && existing.center_id !== user.centerId)
+  if (!canTouchCenter(user, existing.center_id))
     return { error: "That event belongs to another centre." };
 
   await query("DELETE FROM calendar_events WHERE id = $1", [id]);

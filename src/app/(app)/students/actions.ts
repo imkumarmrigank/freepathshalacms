@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requireUser, canTouchCenter } from "@/lib/auth";
 import { tx, query, one } from "@/lib/db";
 import { nextEnrollmentNo } from "@/lib/enrollment";
 import { currentSession } from "@/lib/queries";
@@ -22,6 +22,7 @@ export async function createStudent(_prev: unknown, form: FormData) {
   const centerId = isGlobalRole(user.role)
     ? Number(form.get("center_id")) : user.centerId;
   if (!centerId) return { error: "Select a centre." };
+  if (!canTouchCenter(user, centerId)) return { error: "That centre is not one of yours." };
 
   const classLevelId = Number(form.get("class_level_id"));
   if (!classLevelId) return { error: "Select a class." };
@@ -72,7 +73,7 @@ export async function updateStudent(_prev: unknown, form: FormData) {
     "SELECT center_id FROM students WHERE id = $1", [id],
   );
   if (!existing) return { error: "Student not found." };
-  if (!isGlobalRole(user.role) && existing.center_id !== user.centerId)
+  if (!canTouchCenter(user, existing.center_id))
     return { error: "This student belongs to another centre." };
 
   await query(
@@ -99,7 +100,7 @@ export async function changeClass(_prev: unknown, form: FormData) {
   );
   if (!row) return { error: "Enrolment not found." };
   if (user.role === "teacher") return { error: "Only managers can move a student between classes." };
-  if (!isGlobalRole(user.role) && row.center_id !== user.centerId)
+  if (!canTouchCenter(user, row.center_id))
     return { error: "This student belongs to another centre." };
 
   await query("UPDATE enrollments SET class_level_id = $2 WHERE id = $1",
@@ -118,7 +119,7 @@ export async function setPromotionDecision(_prev: unknown, form: FormData) {
     "SELECT center_id, student_id FROM enrollments WHERE id = $1", [enrollmentId],
   );
   if (!row) return { error: "Enrolment not found." };
-  if (!isGlobalRole(user.role) && row.center_id !== user.centerId)
+  if (!canTouchCenter(user, row.center_id))
     return { error: "This student belongs to another centre." };
 
   await query("UPDATE enrollments SET promotion_decision = $2 WHERE id = $1",

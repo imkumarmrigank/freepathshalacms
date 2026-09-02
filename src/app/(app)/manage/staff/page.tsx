@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { allowedCenterIds, requireUser } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { centersForUser } from "@/lib/queries";
 import { Alert, Avatar, Badge, Card, Empty, PageHeader } from "@/components/ui";
-import { ROLE_LABEL, type Role } from "@/lib/roles";
+import { ROLE_LABEL, canManageStaff, type Role } from "@/lib/roles";
 import { fmtDateTime } from "@/lib/format";
 import StaffForm, { type Staff } from "./StaffForm";
 
@@ -11,7 +11,7 @@ export default async function StaffPage({
   searchParams,
 }: { searchParams: Promise<{ edit?: string }> }) {
   const user = await requireUser();
-  if (user.role === "teacher")
+  if (!canManageStaff(user.role))
     return <Alert kind="bad">You don’t have access to staff management.</Alert>;
 
   const { edit } = await searchParams;
@@ -32,6 +32,12 @@ export default async function StaffPage({
       ORDER BY u.role, u.name`,
     params,
   );
+
+  const editingMentorCentres = edit
+    ? (await query<{ center_id: number }>(
+        "SELECT center_id FROM mentor_centers WHERE user_id = $1", [Number(edit)])
+      ).map((r) => r.center_id)
+    : [];
 
   const editing = edit
     ? await one<Staff>(
@@ -95,7 +101,8 @@ export default async function StaffPage({
         </div>
         <div className="lg:col-span-2">
           <StaffForm staff={editing} centers={centers} key={editing?.id ?? "new"}
-            isAdmin={user.role === "super_admin"} ownCenterId={user.centerId} />
+            isAdmin={user.role === "super_admin"} ownCenterId={user.centerId}
+            actorRole={user.role} mentorCenterIds={editingMentorCentres} />
         </div>
       </div>
     </>

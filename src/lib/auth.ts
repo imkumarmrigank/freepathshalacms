@@ -16,6 +16,8 @@ export type SessionUser = {
   role: Role;
   centerId: number | null;
   centerName: string | null;
+  /** Centres a mentor covers. Empty for every other role. */
+  centerIds: number[];
 };
 
 function secret() {
@@ -56,6 +58,7 @@ export async function getSession(): Promise<SessionUser | null> {
       role: payload.role as Role,
       centerId: payload.centerId == null ? null : Number(payload.centerId),
       centerName: payload.centerName == null ? null : String(payload.centerName),
+      centerIds: Array.isArray(payload.centerIds) ? payload.centerIds.map(Number) : [],
     };
   } catch {
     return null;
@@ -81,12 +84,32 @@ export const isGlobal = (u: SessionUser) => isGlobalRole(u.role);
 export const canManageCenter = (u: SessionUser) =>
   isGlobalRole(u.role) || u.role === "center_manager";
 
+/** Every centre this user may act on, or null when unrestricted. */
+export function allowedCenterIds(u: SessionUser): number[] | null {
+  if (u.role === "super_admin") return null;
+  if (u.role === "mentor") return u.centerIds;
+  return u.centerId == null ? [] : [u.centerId];
+}
+
+/** May this user read or change something belonging to that centre? */
+export function canTouchCenter(u: SessionUser, centerId: number | null | undefined) {
+  if (centerId == null) return false;
+  const allowed = allowedCenterIds(u);
+  return allowed === null || allowed.includes(centerId);
+}
+
 /**
- * Centre scoping: super admins see everything (or a chosen centre),
- * managers and teachers are pinned to their own centre.
+ * Centre scoping: super admins see everything (or a chosen centre); a mentor
+ * works within the centres allotted to them; managers and teachers are pinned
+ * to their own.
  */
 export function scopedCenterId(u: SessionUser, requested?: number | null): number | null {
-  if (isGlobalRole(u.role)) return requested ?? null;
+  if (u.role === "super_admin") return requested ?? null;
+  if (u.role === "mentor") {
+    if (requested != null && u.centerIds.includes(requested)) return requested;
+    // never fall through to "no filter" — that would expose every centre
+    return u.centerIds[0] ?? -1;
+  }
   return u.centerId;
 }
 
@@ -104,9 +127,16 @@ export async function verifyLogin(email: string, password: string) {
   if (!row || !row.is_active) return null;
   if (!(await bcrypt.compare(password, row.password_hash))) return null;
   await query("UPDATE users SET last_login_at = now() WHERE id = $1", [row.id]);
+  // a mentor's reach is the centres allotted to them
+  const centerIds = row.role === "mentor"
+    ? (await query<{ center_id: number }>(
+        "SELECT center_id FROM mentor_centers WHERE user_id = $1", [row.id])
+      ).map((r) => r.center_id)
+    : [];
+
   return {
     uid: row.id, name: row.name, email: row.email, role: row.role,
-    centerId: row.center_id, centerName: row.center_name,
+    centerId: row.center_id, centerName: row.center_name, centerIds,
   } satisfies SessionUser;
 }
 

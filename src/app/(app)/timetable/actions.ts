@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/auth";
+import { requireUser, canTouchCenter } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
 import { isGlobalRole } from "@/lib/roles";
@@ -21,6 +21,7 @@ export async function saveSlot(_prev: unknown, form: FormData) {
   const centerId = isGlobalRole(user.role)
     ? Number(form.get("center_id")) : user.centerId;
   if (!centerId) return { error: "Pick a centre." };
+  if (!canTouchCenter(user, centerId)) return { error: "That centre is not one of yours." };
 
   const classLevelId = Number(form.get("class_level_id"));
   const dayOfWeek = Number(form.get("day_of_week"));
@@ -81,7 +82,7 @@ export async function deleteSlot(_prev: unknown, form: FormData) {
   const row = await one<{ center_id: number }>(
     "SELECT center_id FROM timetable_slots WHERE id = $1", [id]);
   if (!row) return { error: "Slot not found." };
-  if (!isGlobalRole(user.role) && row.center_id !== user.centerId)
+  if (!canTouchCenter(user, row.center_id))
     return { error: "That slot belongs to another centre." };
 
   await query("DELETE FROM timetable_slots WHERE id = $1", [id]);

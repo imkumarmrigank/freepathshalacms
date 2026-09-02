@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { requireRole, requireUser } from "@/lib/auth";
+import { requireRole, requireUser, canTouchCenter } from "@/lib/auth";
 import { canManageHqStock } from "@/lib/roles";
 import { one, query, tx } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
@@ -66,6 +66,7 @@ export async function recordReceipt(_prev: unknown, form: FormData) {
   const quantity = Number(form.get("quantity"));
 
   if (!itemId || !centerId) return { error: "Pick an item and a centre." };
+  if (!canTouchCenter(user, centerId)) return { error: "That centre is not one of yours." };
   if (!Number.isInteger(quantity) || quantity <= 0)
     return { error: "Quantity must be a whole number above zero." };
 

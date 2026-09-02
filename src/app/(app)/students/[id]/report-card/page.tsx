@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requireUser, canTouchCenter } from "@/lib/auth";
 import { currentSession, listSessions } from "@/lib/queries";
 import { loadReportCard } from "@/lib/report-card";
 import ReportCard from "@/components/ReportCard";
@@ -26,7 +26,7 @@ export default async function ReportCardPage({
 
   const data = await loadReportCard(Number(id), sessionId);
   if (!data) notFound();
-  if (!isGlobalRole(user.role) && data.student.center_id !== user.centerId)
+  if (!canTouchCenter(user, data.student.center_id))
     return <Alert kind="bad">This student belongs to another centre.</Alert>;
 
   return (

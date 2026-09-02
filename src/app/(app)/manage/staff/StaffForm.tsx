@@ -1,8 +1,9 @@
 "use client";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { saveStaff } from "../actions";
 import { Card, Field } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
+import { CREATABLE_ROLES, ROLE_LABEL, type Role } from "@/lib/roles";
 
 export type Staff = {
   id: number; name: string; email: string; phone: string | null; role: string;
@@ -10,14 +11,19 @@ export type Staff = {
 };
 
 export default function StaffForm({
-  staff, centers, isAdmin, ownCenterId,
+  staff, centers, isAdmin, ownCenterId, actorRole, mentorCenterIds = [],
 }: {
   staff?: Staff | null;
   centers: { id: number; code: string; name: string }[];
   isAdmin: boolean;
   ownCenterId: number | null;
+  actorRole: Role;
+  mentorCenterIds?: number[];
 }) {
   const [state, action] = useActionState(saveStaff, null);
+  const allowed = CREATABLE_ROLES[actorRole];
+  const [role, setRole] = useState<string>(staff?.role ?? allowed[allowed.length - 1] ?? "teacher");
+  const picksOwnCentres = role === "mentor" && actorRole === "super_admin";
 
   return (
     <Card>
@@ -31,26 +37,53 @@ export default function StaffForm({
         </Field>
         <Field label="Phone"><input className="input" name="phone" defaultValue={staff?.phone ?? ""} /></Field>
 
-        {isAdmin ? (
+        {allowed.length > 1 ? (
           <>
             <Field label="Role *">
-              <select className="select" name="role" defaultValue={staff?.role ?? "teacher"}>
-                <option value="teacher">Teacher</option>
-                <option value="center_manager">Centre manager</option>
-                <option value="mentor">Mentor</option>
-                <option value="super_admin">Super admin</option>
+              <select className="select" name="role" value={role}
+                onChange={(e) => setRole(e.target.value)}>
+                {allowed.map((r) => (
+                  <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+                ))}
               </select>
             </Field>
-            <Field label="Centre" hint="Leave blank for mentors and super admins — they work across all centres">
-              <select className="select" name="center_id" defaultValue={staff?.center_id ?? ""}>
-                <option value="">No centre</option>
-                {centers.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
-              </select>
-            </Field>
+
+            {picksOwnCentres ? (
+              <div className="field">
+                <span>Centres this mentor covers *</span>
+                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-2 rounded-[9px] border border-[var(--border-strong)] px-3 py-2.5">
+                  {centers.length === 0 && (
+                    <span className="text-[13px] text-[var(--muted)]">No centres yet.</span>
+                  )}
+                  {centers.map((c) => (
+                    <label key={c.id} className="flex items-center gap-1.5 text-[13px]">
+                      <input type="checkbox" name="mentor_center_id" value={c.id}
+                        className="h-4 w-4" defaultChecked={mentorCenterIds.includes(c.id)} />
+                      {c.code} · {c.name}
+                    </label>
+                  ))}
+                </div>
+                <span className="mt-1 block text-[12px] font-normal text-[var(--faint)]">
+                  A mentor can cover several centres, and sees only these.
+                </span>
+              </div>
+            ) : role === "super_admin" ? (
+              <p className="mb-4 rounded-[9px] bg-[var(--brand-soft)] px-3.5 py-2.5 text-[13px] text-[var(--brand)]">
+                A super admin works across every centre.
+              </p>
+            ) : (
+              <Field label="Centre *">
+                <select className="select" name="center_id" required
+                  defaultValue={staff?.center_id ?? ""}>
+                  <option value="">Select centre</option>
+                  {centers.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
+                </select>
+              </Field>
+            )}
           </>
         ) : (
           <>
-            <input type="hidden" name="role" value="teacher" />
+            <input type="hidden" name="role" value={allowed[0] ?? "teacher"} />
             <input type="hidden" name="center_id" value={ownCenterId ?? ""} />
             <p className="mb-4 rounded-[9px] bg-[var(--brand-soft)] px-3.5 py-2.5 text-[13px] text-[var(--brand)]">
               Teachers you add join your centre.

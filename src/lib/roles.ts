@@ -22,6 +22,33 @@ export function canAdminister(role: Role) {
   return role === "super_admin";
 }
 
+/**
+ * Which roles each actor may create.
+ *   super admin     -> anyone, including mentors
+ *   mentor          -> centre managers and teachers, at any centre
+ *   centre manager  -> teachers, at their own centre
+ *   teacher         -> nobody
+ */
+export const CREATABLE_ROLES: Record<Role, Role[]> = {
+  super_admin: ["super_admin", "mentor", "center_manager", "teacher"],
+  mentor: ["center_manager", "teacher"],
+  center_manager: ["teacher"],
+  teacher: [],
+};
+
+export function canCreateRole(actor: Role, target: Role) {
+  return CREATABLE_ROLES[actor].includes(target);
+}
+
+export function canManageStaff(role: Role) {
+  return CREATABLE_ROLES[role].length > 0;
+}
+
+/** Only the super admin opens a new centre; a mentor maintains existing ones. */
+export function canCreateCentre(role: Role) {
+  return role === "super_admin";
+}
+
 /** Centres, and the supply chain from HQ to centre to student. */
 export function canManageSupplies(role: Role) {
   return role === "super_admin" || role === "mentor" || role === "center_manager";

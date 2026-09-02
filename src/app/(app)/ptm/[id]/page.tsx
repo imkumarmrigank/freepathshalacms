@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requireUser, canTouchCenter } from "@/lib/auth";
 import { one } from "@/lib/db";
 import { Alert, Badge, Card, PageHeader } from "@/components/ui";
 import { fmtDate, fmtDateTime, pct, titleCase } from "@/lib/format";
@@ -39,7 +39,7 @@ export default async function InteractionPage({
     [Number(id)],
   );
   if (!row) notFound();
-  if (!isGlobalRole(user.role) && row.center_id !== user.centerId)
+  if (!canTouchCenter(user, row.center_id))
     return <Alert kind="bad">This record belongs to another centre.</Alert>;
 
   const name = `${row.student_first} ${row.student_last ?? ""}`.trim();

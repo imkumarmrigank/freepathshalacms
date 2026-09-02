@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requireUser, canTouchCenter } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
 import { PLAN_LEAD_DAYS, earliestPlanStart } from "@/lib/plan-meta";
@@ -25,7 +25,7 @@ async function canEditPlan(planId: number) {
   if (!plan) return { error: "Plan not found." } as const;
   if (user.role === "teacher" && plan.teacher_id !== user.uid)
     return { error: "This plan belongs to another teacher." } as const;
-  if (!isGlobalRole(user.role) && plan.center_id !== user.centerId)
+  if (!canTouchCenter(user, plan.center_id))
     return { error: "This plan belongs to another centre." } as const;
   return { user, plan } as const;
 }
@@ -74,6 +74,7 @@ export async function createPlan(_prev: unknown, form: FormData) {
       centerId = Number(form.get("center_id"));
   }
   if (!centerId) return { error: "Pick a centre for this plan." };
+  if (!canTouchCenter(user, centerId)) return { error: "That centre is not one of yours." };
 
   const row = await one<{ id: number }>(
     `INSERT INTO teaching_plans
@@ -203,7 +204,7 @@ export async function setAllocation(_prev: unknown, form: FormData) {
   const teacher = await one<{ center_id: number | null }>(
     "SELECT center_id FROM users WHERE id = $1", [teacherId]);
   if (!teacher) return { error: "Teacher not found." };
-  if (!isGlobalRole(user.role) && teacher.center_id !== user.centerId)
+  if (!canTouchCenter(user, teacher.center_id))
     return { error: "That teacher is not at your centre." };
   if (!teacher.center_id) return { error: "Assign the teacher to a centre first." };
 

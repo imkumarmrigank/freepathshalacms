@@ -46,7 +46,16 @@ export async function listCenters(activeOnly = true) {
 
 /** Centres this user is allowed to look at. */
 export async function centersForUser(u: SessionUser) {
-  if (isGlobalRole(u.role)) return listCenters();
+  if (u.role === "super_admin") return listCenters();
+  if (u.role === "mentor") {
+    if (u.centerIds.length === 0) return [];
+    return query<Center>(
+      `SELECT c.*, m.name AS manager_name FROM centers c
+         LEFT JOIN users m ON m.id = c.manager_id
+        WHERE c.id = ANY($1::bigint[]) ORDER BY c.code`,
+      [u.centerIds],
+    );
+  }
   if (!u.centerId) return [];
   return query<Center>(
     `SELECT c.*, m.name AS manager_name FROM centers c
@@ -68,9 +77,14 @@ export async function getCenter(id: number) {
  * Non-admins are always pinned to their own centre regardless of the query string.
  */
 export function resolveCenterId(u: SessionUser, requested?: string | number | null) {
-  if (!isGlobalRole(u.role)) return u.centerId;
   const n = Number(requested);
-  return Number.isFinite(n) && n > 0 ? n : null;
+  const asked = Number.isFinite(n) && n > 0 ? n : null;
+  if (u.role === "super_admin") return asked;
+  if (u.role === "mentor") {
+    if (asked != null && u.centerIds.includes(asked)) return asked;
+    return u.centerIds[0] ?? -1;   // -1 matches nothing, rather than everything
+  }
+  return u.centerId;
 }
 
 /** Adds `AND center_id = $n` only when a centre filter applies. */

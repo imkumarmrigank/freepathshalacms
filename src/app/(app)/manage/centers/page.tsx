@@ -1,6 +1,7 @@
 import { requireRole } from "@/lib/auth";
 import { query } from "@/lib/db";
-import { getCenter, listCenters } from "@/lib/queries";
+import { centersForUser, getCenter, listCenters } from "@/lib/queries";
+import { canCreateCentre } from "@/lib/roles";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import Link from "next/link";
 import CenterForm from "./CenterForm";
@@ -9,10 +10,11 @@ import ManagerPicker from "./ManagerPicker";
 export default async function CentersPage({
   searchParams,
 }: { searchParams: Promise<{ edit?: string }> }) {
-  await requireRole("super_admin", "mentor");
+  const user = await requireRole("super_admin", "mentor");
   const { edit } = await searchParams;
+  const canCreate = canCreateCentre(user.role);
   const [centers, editing, staff] = await Promise.all([
-    listCenters(false),
+    user.role === "super_admin" ? listCenters(false) : centersForUser(user),
     edit ? getCenter(Number(edit)) : Promise.resolve(null),
     query<{ id: number; name: string; email: string }>(
       "SELECT id, name, email FROM users WHERE role IN ('center_manager','teacher') AND is_active ORDER BY name",
@@ -78,7 +80,17 @@ export default async function CentersPage({
           </Card>
         </div>
         <div className="lg:col-span-2">
-          <CenterForm center={editing} key={editing?.id ?? "new"} />
+          {editing || canCreate ? (
+            <CenterForm center={editing} key={editing?.id ?? "new"} />
+          ) : (
+            <Card>
+              <h2 className="mb-2 text-[15px] font-semibold">Centres you cover</h2>
+              <p className="text-[13px] text-[var(--muted)]">
+                Choose Edit on a centre to update its details or move its geofence. Opening a new
+                centre is the administrator’s to do.
+              </p>
+            </Card>
+          )}
         </div>
       </div>
     </>

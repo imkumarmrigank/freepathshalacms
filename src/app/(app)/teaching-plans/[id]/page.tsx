@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requireUser, canTouchCenter } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { Alert, Badge, Card, Empty, Meter, PageHeader, StatCard } from "@/components/ui";
 import { fmtDate, fmtDateTime, titleCase } from "@/lib/format";
@@ -35,7 +35,7 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
     [planId],
   );
   if (!plan) notFound();
-  if (!isGlobalRole(user.role) && plan.center_id !== user.centerId)
+  if (!canTouchCenter(user, plan.center_id))
     return <Alert kind="bad">This plan belongs to another centre.</Alert>;
 
   const canEdit =

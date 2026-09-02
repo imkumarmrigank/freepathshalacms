@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requireUser, canTouchCenter } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { Alert, Badge, Card, Empty, PageHeader, StatCard } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
@@ -30,7 +30,7 @@ export default async function ExamPage({ params }: { params: Promise<{ id: strin
     [examId],
   );
   if (!exam) notFound();
-  if (!isGlobalRole(user.role) && exam.center_id !== user.centerId)
+  if (!canTouchCenter(user, exam.center_id))
     return <Alert kind="bad">This test belongs to another centre.</Alert>;
 
   // Teachers may only edit tests for a class they hold.

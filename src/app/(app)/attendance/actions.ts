@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/auth";
+import { requireUser, canTouchCenter } from "@/lib/auth";
 import { tx } from "@/lib/db";
 import { SAME_DAY_ONLY } from "@/lib/attendance";
 import { today } from "@/lib/format";
@@ -25,7 +25,7 @@ export async function saveAttendance(_prev: unknown, form: FormData) {
   const isPast = attDate < today();
   if (attDate > today())
     return { error: "You cannot mark attendance for a future date." };
-  if (!isGlobalRole(user.role) && centerId !== user.centerId)
+  if (!canTouchCenter(user, centerId))
     return { error: "You can only mark attendance for your own centre." };
 
   const entries: { enrollmentId: number; status: string }[] = [];
