@@ -883,12 +883,17 @@ async function ptmSummary(p: ReportParams, period: string): Promise<ReportResult
             u.name AS mentor, i.parent_present, i.engagement, i.mode,
             i.attendance_pct, i.marks_pct,
             CASE WHEN i.follow_up_required THEN i.follow_up_status ELSE '—' END AS follow_up,
-            i.follow_up_date::text AS follow_up_date, i.concerns
+            i.follow_up_date::text AS follow_up_date, i.concerns,
+            array_to_string(i.concern_tags, ', ') AS concern_tags,
+            array_to_string(i.commitment_tags, ', ') AS commitment_tags,
+            i.follow_up_priority, i.follow_up_owner, i.confidence, i.support_needed,
+            asg.name AS assigned_to
        FROM ptm_interactions i
        JOIN students st ON st.id = i.student_id
        JOIN centers ce ON ce.id = i.center_id
        LEFT JOIN class_levels cl ON cl.id = i.class_level_id
        LEFT JOIN users u ON u.id = i.mentor_id
+       LEFT JOIN users asg ON asg.id = i.follow_up_assignee_id
       WHERE i.session_id = $1 AND i.interaction_date BETWEEN $2 AND $3 ${where}
       ORDER BY i.interaction_date DESC, ce.code`,
     params,
@@ -909,9 +914,16 @@ async function ptmSummary(p: ReportParams, period: string): Promise<ReportResult
       { key: "mode", label: "Mode", width: 12 },
       { key: "attendance_pct", label: "Attendance %", numeric: true, width: 14 },
       { key: "marks_pct", label: "Marks %", numeric: true, width: 11 },
+      { key: "concern_tags", label: "Concerns discussed", width: 34 },
+      { key: "commitment_tags", label: "Parent commitments", width: 34 },
+      { key: "confidence", label: "Confidence", numeric: true, width: 12 },
       { key: "follow_up", label: "Follow-up", width: 12 },
+      { key: "follow_up_priority", label: "Priority", width: 11 },
       { key: "follow_up_date", label: "Follow-up on", width: 14 },
-      { key: "concerns", label: "Concerns", width: 34 },
+      { key: "follow_up_owner", label: "Owner", width: 16 },
+      { key: "assigned_to", label: "Assigned to", width: 20 },
+      { key: "concerns", label: "Other concern", width: 26 },
+      { key: "support_needed", label: "Support needed", width: 30 },
     ],
     rows,
   };

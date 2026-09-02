@@ -34,31 +34,64 @@ export async function recordInteraction(_prev: unknown, form: FormData) {
   if (!canTouchCenter(user, student.center_id))
     return { error: "This student belongs to another centre." };
 
-  const followUp = form.get("follow_up_required") === "on";
+  // the form's required questions, checked here and not only in the browser
+  const parentPresent = String(form.get("parent_present") ?? "");
+  const engagement = String(form.get("engagement") ?? "");
+  const priority = String(form.get("follow_up_priority") ?? "");
   const followUpDate = str(form, "follow_up_date");
-  if (followUp && !followUpDate) return { error: "Set a date for the follow-up." };
+  const confidence = form.get("confidence") ? Number(form.get("confidence")) : null;
+
+  if (!parentPresent) return { error: "Say who attended." };
+  if (!engagement) return { error: "Record the parent's engagement level." };
+  if (!priority) return { error: "Set the follow-up priority." };
+  if (!followUpDate) return { error: "Set the next follow-up date." };
+  if (confidence === null || confidence < 1 || confidence > 5)
+    return { error: "Rate your confidence in this family's progress from 1 to 5." };
+
+  const concernTags = form.getAll("concern_tags").map(String).filter(Boolean);
+  const commitmentTags = form.getAll("commitment_tags").map(String).filter(Boolean);
+  if (concernTags.length === 0) return { error: "Choose at least one concern discussed." };
+  if (commitmentTags.length === 0)
+    return { error: "Record at least one commitment the parent made." };
+
+  const interactionDate = str(form, "interaction_date") ?? new Date().toISOString().slice(0, 10);
+  if (interactionDate > new Date().toISOString().slice(0, 10))
+    return { error: "The interaction cannot be dated in the future." };
+
+  // whoever is named as the mentor, defaulting to the person filling this in
+  const mentorId = form.get("mentor_id") ? Number(form.get("mentor_id")) : user.uid;
+  const assigneeRaw = form.get("follow_up_assignee_id");
+  const assigneeId = assigneeRaw && String(assigneeRaw) !== "" ? Number(assigneeRaw) : mentorId;
+
+  // attendance is already known, so it is taken from the record rather than typed
+  const att = await one<{ present: string; marked: string }>(
+    `SELECT count(*) FILTER (WHERE status IN ('present','late','half_day')) AS present,
+            count(*) FILTER (WHERE status <> 'holiday') AS marked
+       FROM student_attendance WHERE student_id = $1 AND session_id = $2`,
+    [studentId, session.id],
+  );
+  const marked = Number(att?.marked ?? 0);
+  const attendancePct = marked > 0
+    ? Math.round((Number(att!.present) / marked) * 1000) / 10 : null;
 
   const row = await one<{ id: number }>(
     `INSERT INTO ptm_interactions
        (meeting_id, student_id, session_id, class_level_id, center_id, mentor_id,
-        interaction_date, mode, parent_present, engagement, attendance_pct, marks_pct,
-        discussion, concerns, action_items,
-        follow_up_required, follow_up_date, follow_up_mode, follow_up_assignee_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+        interaction_date, mode, parent_present, engagement, attendance_pct,
+        discussion, concerns, action_items, concern_tags, commitment_tags,
+        follow_up_required, follow_up_date, follow_up_priority, follow_up_owner,
+        follow_up_assignee_id, confidence, support_needed)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
+             TRUE,$17,$18,$19,$20,$21,$22)
      RETURNING id`,
     [num(form, "meeting_id"), studentId, session.id, student.class_level_id,
-     student.center_id, user.uid,
-     str(form, "interaction_date") ?? new Date().toISOString().slice(0, 10),
-     String(form.get("mode") ?? "in_person"),
-     String(form.get("parent_present") ?? "mother"),
-     String(form.get("engagement") ?? "neutral"),
-     num(form, "attendance_pct"), num(form, "marks_pct"),
+     student.center_id, mentorId,
+     interactionDate, String(form.get("mode") ?? "in_person"),
+     parentPresent, engagement, attendancePct,
      str(form, "discussion"), str(form, "concerns"), str(form, "action_items"),
-     followUp, followUp ? followUpDate : null,
-     followUp ? str(form, "follow_up_mode") : null,
-     // unassigned means it stays with whoever recorded it
-     followUp && form.get("follow_up_assignee_id")
-       ? Number(form.get("follow_up_assignee_id")) : user.uid],
+     concernTags, commitmentTags,
+     followUpDate, priority, str(form, "follow_up_owner"),
+     assigneeId, confidence, str(form, "support_needed")],
   );
 
   revalidatePath("/ptm");
