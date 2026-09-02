@@ -1,15 +1,15 @@
 import { notFound } from "next/navigation";
-import { requireUser, canTouchCenter } from "@/lib/auth";
+import { requireFeature, canTouchCenter, effectiveTeacherIds } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { Alert, Badge, Card, Empty, PageHeader, StatCard } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { EXAM_TYPE_LABEL, grade, percentage } from "@/lib/exam-meta";
 import MarksSheet, { type MarkRow } from "./MarksSheet";
 import PublishToggle from "./PublishToggle";
-import { isGlobalRole } from "@/lib/roles";
+import { isGlobalRole, isTeaching } from "@/lib/roles";
 
 export default async function ExamPage({ params }: { params: Promise<{ id: string }> }) {
-  const user = await requireUser();
+  const user = await requireFeature("exams");
   const { id } = await params;
   const examId = Number(id);
 
@@ -34,12 +34,12 @@ export default async function ExamPage({ params }: { params: Promise<{ id: strin
     return <Alert kind="bad">This test belongs to another centre.</Alert>;
 
   // Teachers may only edit tests for a class they hold.
-  let canEdit = user.role !== "teacher";
-  if (user.role === "teacher") {
+  let canEdit = !isTeaching(user.role);
+  if (isTeaching(user.role)) {
     const allotted = await one<{ id: number }>(
       `SELECT id FROM teacher_classes
-        WHERE user_id = $1 AND session_id = $2 AND class_level_id = $3`,
-      [user.uid, exam.session_id, exam.class_level_id],
+        WHERE user_id = ANY($1::bigint[]) AND session_id = $2 AND class_level_id = $3`,
+      [effectiveTeacherIds(user), exam.session_id, exam.class_level_id],
     );
     canEdit = Boolean(allotted);
   }

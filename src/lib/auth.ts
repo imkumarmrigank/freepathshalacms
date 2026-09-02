@@ -7,7 +7,7 @@ import { one, query } from "./db";
 
 export const COOKIE = "fp_session";
 export type { Role } from "./roles";
-import { isGlobalRole, type Role } from "./roles";
+import { can, isGlobalRole, type Feature, type Role } from "./roles";
 
 export type SessionUser = {
   uid: number;
@@ -16,8 +16,10 @@ export type SessionUser = {
   role: Role;
   centerId: number | null;
   centerName: string | null;
-  /** Centres a mentor covers. Empty for every other role. */
+  /** Centres a backup teacher is currently standing in at. Empty otherwise. */
   centerIds: number[];
+  /** Teachers this person is currently covering, whose classes they inherit. */
+  coveringIds: number[];
 };
 
 function secret() {
@@ -59,6 +61,7 @@ export async function getSession(): Promise<SessionUser | null> {
       centerId: payload.centerId == null ? null : Number(payload.centerId),
       centerName: payload.centerName == null ? null : String(payload.centerName),
       centerIds: Array.isArray(payload.centerIds) ? payload.centerIds.map(Number) : [],
+      coveringIds: Array.isArray(payload.coveringIds) ? payload.coveringIds.map(Number) : [],
     };
   } catch {
     return null;
@@ -69,6 +72,13 @@ export async function getSession(): Promise<SessionUser | null> {
 export async function requireUser(): Promise<SessionUser> {
   const u = await getSession();
   if (!u) redirect("/login");
+  return u;
+}
+
+/** Redirects unless this role holds the feature. The sidebar hides it; this refuses it. */
+export async function requireFeature(feature: Feature): Promise<SessionUser> {
+  const u = await requireUser();
+  if (!can(u.role, feature)) redirect("/dashboard?denied=1");
   return u;
 }
 
@@ -86,9 +96,17 @@ export const canManageCenter = (u: SessionUser) =>
 
 /** Every centre this user may act on, or null when unrestricted. */
 export function allowedCenterIds(u: SessionUser): number[] | null {
-  if (u.role === "super_admin") return null;
-  if (u.role === "mentor") return u.centerIds;
+  if (isGlobalRole(u.role)) return null;              // super admin, admin, mentor
+  if (u.role === "backup_teacher") return u.centerIds; // wherever they are covering
   return u.centerId == null ? [] : [u.centerId];
+}
+
+/**
+ * Whose class allocations this person acts under. A backup teacher inherits the
+ * classes of every teacher they are currently standing in for.
+ */
+export function effectiveTeacherIds(u: SessionUser): number[] {
+  return u.role === "backup_teacher" ? [u.uid, ...u.coveringIds] : [u.uid];
 }
 
 /** May this user read or change something belonging to that centre? */
@@ -104,8 +122,8 @@ export function canTouchCenter(u: SessionUser, centerId: number | null | undefin
  * to their own.
  */
 export function scopedCenterId(u: SessionUser, requested?: number | null): number | null {
-  if (u.role === "super_admin") return requested ?? null;
-  if (u.role === "mentor") {
+  if (isGlobalRole(u.role)) return requested ?? null;
+  if (u.role === "backup_teacher") {
     if (requested != null && u.centerIds.includes(requested)) return requested;
     // never fall through to "no filter" — that would expose every centre
     return u.centerIds[0] ?? -1;
@@ -127,16 +145,20 @@ export async function verifyLogin(email: string, password: string) {
   if (!row || !row.is_active) return null;
   if (!(await bcrypt.compare(password, row.password_hash))) return null;
   await query("UPDATE users SET last_login_at = now() WHERE id = $1", [row.id]);
-  // a mentor's reach is the centres allotted to them
-  const centerIds = row.role === "mentor"
-    ? (await query<{ center_id: number }>(
-        "SELECT center_id FROM mentor_centers WHERE user_id = $1", [row.id])
-      ).map((r) => r.center_id)
+  // A backup teacher's reach comes from the stand-ins they are currently on.
+  const coverage = row.role === "backup_teacher"
+    ? await query<{ center_id: number; covering_id: number }>(
+        `SELECT center_id, covering_id FROM teacher_coverage
+          WHERE backup_id = $1 AND starts_on <= CURRENT_DATE
+            AND (ends_on IS NULL OR ends_on >= CURRENT_DATE)`,
+        [row.id])
     : [];
 
   return {
     uid: row.id, name: row.name, email: row.email, role: row.role,
-    centerId: row.center_id, centerName: row.center_name, centerIds,
+    centerId: row.center_id, centerName: row.center_name,
+    centerIds: [...new Set(coverage.map((c) => c.center_id))],
+    coveringIds: [...new Set(coverage.map((c) => c.covering_id))],
   } satisfies SessionUser;
 }
 

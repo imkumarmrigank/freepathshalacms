@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requireFeature, effectiveTeacherIds } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { centersForUser, currentSession, listClasses, resolveCenterId } from "@/lib/queries";
 import { Alert, Badge, Card, Empty, Meter, PageHeader } from "@/components/ui";
@@ -7,12 +7,12 @@ import Filters from "@/components/Filters";
 import { fmtDate } from "@/lib/format";
 import NewPlanForm from "./NewPlanForm";
 import { PLAN_LEAD_DAYS } from "@/lib/plan-meta";
-import { isGlobalRole } from "@/lib/roles";
+import { isGlobalRole, isTeaching } from "@/lib/roles";
 
 export default async function TeachingPlansPage({
   searchParams,
 }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const user = await requireUser();
+  const user = await requireFeature("teachingPlans");
   const sp = await searchParams;
   const [centers, classes, session] = await Promise.all([
     centersForUser(user), listClasses(), currentSession(),
@@ -24,7 +24,7 @@ export default async function TeachingPlansPage({
   let where = "";
   if (centerId) { params.push(centerId); where += ` AND p.center_id = $${params.length}`; }
   if (sp.class) { params.push(Number(sp.class)); where += ` AND p.class_level_id = $${params.length}`; }
-  if (user.role === "teacher") { params.push(user.uid); where += ` AND p.teacher_id = $${params.length}`; }
+  if (isTeaching(user.role)) { params.push(user.uid); where += ` AND p.teacher_id = $${params.length}`; }
   if (sp.status) { params.push(sp.status); where += ` AND p.status = $${params.length}`; }
 
   const plans = await query<{
@@ -47,15 +47,15 @@ export default async function TeachingPlansPage({
   );
 
   // A teacher can only plan for classes they hold this session.
-  const myClasses = user.role === "teacher"
+  const myClasses = isTeaching(user.role)
     ? await query<{ id: number; name: string }>(
         `SELECT cl.id, cl.name FROM teacher_classes tc
            JOIN class_levels cl ON cl.id = tc.class_level_id
-          WHERE tc.user_id = $1 AND tc.session_id = $2 ORDER BY cl.sequence`,
-        [user.uid, session.id])
+          WHERE tc.user_id = ANY($1::bigint[]) AND tc.session_id = $2 ORDER BY cl.sequence`,
+        [effectiveTeacherIds(user), session.id])
     : classes;
 
-  const teachers = user.role !== "teacher"
+  const teachers = !isTeaching(user.role)
     ? await query<{ id: number; name: string }>(
         `SELECT id, name FROM users WHERE role = 'teacher' AND is_active
           ${centerId ? "AND center_id = $1" : ""} ORDER BY name`,
@@ -65,7 +65,7 @@ export default async function TeachingPlansPage({
   return (
     <>
       <PageHeader title="Teaching plans"
-        subtitle={user.role === "teacher"
+        subtitle={isTeaching(user.role)
           ? `Your plans for session ${session.name}`
           : `Plans across ${centerId ? user.centerName ?? "this centre" : "all centres"} · ${session.name}`} />
 
@@ -84,7 +84,7 @@ export default async function TeachingPlansPage({
           <Card pad={false}>
             {plans.length === 0 ? (
               <Empty title="No teaching plans yet"
-                hint={user.role === "teacher" && myClasses.length === 0
+                hint={isTeaching(user.role) && myClasses.length === 0
                   ? "You have not been allotted a class yet. Ask your centre manager."
                   : "Create a plan, list the topics, and tick them off as you teach them."} />
             ) : (
@@ -140,7 +140,7 @@ export default async function TeachingPlansPage({
           classes={myClasses}
           teachers={teachers}
           centers={centers}
-          isTeacher={user.role === "teacher"}
+          isTeacher={isTeaching(user.role)}
           isAdmin={isGlobalRole(user.role)}
         />
       </div>

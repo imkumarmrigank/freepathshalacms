@@ -1,18 +1,18 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requireFeature } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { centersForUser, resolveCenterId } from "@/lib/queries";
 import { Alert, Badge, Card, Empty, PageHeader, StatCard } from "@/components/ui";
 import { fmtDate, titleCase } from "@/lib/format";
 import { HqReceiptForm, IssueForm, ItemForm, ReceiptForm } from "./Forms";
-import { canManageHqStock } from "@/lib/roles";
+import { canManageHqStock, isTeaching } from "@/lib/roles";
 import { isGlobalRole } from "@/lib/roles";
 
 export default async function SuppliesPage({
   searchParams,
 }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const user = await requireUser();
-  if (user.role === "teacher")
+  const user = await requireFeature("supplies");
+  if (isTeaching(user.role))
     return <Alert kind="bad">You don’t have access to supplies.</Alert>;
 
   const sp = await searchParams;

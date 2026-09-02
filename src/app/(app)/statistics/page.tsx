@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth";
+import { requireFeature } from "@/lib/auth";
 import { centersForUser, currentSession, listSessions, resolveCenterId } from "@/lib/queries";
 import { Alert, PageHeader, StatCard } from "@/components/ui";
 import Filters from "@/components/Filters";
@@ -32,7 +32,7 @@ const OUTCOME_SERIES = [
 export default async function StatisticsPage({
   searchParams,
 }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const user = await requireUser();
+  const user = await requireFeature("statistics");
   const sp = await searchParams;
   const [centers, sessions, cur] = await Promise.all([
     centersForUser(user), listSessions(), currentSession(),

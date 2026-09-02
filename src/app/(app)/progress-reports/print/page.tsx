@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requireFeature } from "@/lib/auth";
 import { currentSession, listSessions, resolveCenterId } from "@/lib/queries";
 import { classProgress, loadReportCard, type ReportCardData } from "@/lib/report-card";
 import ReportCard from "@/components/ReportCard";
@@ -15,7 +15,7 @@ const MAX_CARDS = 80;
 export default async function PrintAllPage({
   searchParams,
 }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const user = await requireUser();
+  const user = await requireFeature("progressReports");
   const sp = await searchParams;
   const [sessions, cur] = await Promise.all([listSessions(), currentSession()]);
 

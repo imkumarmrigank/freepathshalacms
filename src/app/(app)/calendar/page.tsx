@@ -8,7 +8,7 @@ import { fmtDate, today } from "@/lib/format";
 import MonthGrid from "./MonthGrid";
 import EventForm from "./EventForm";
 import DeleteEvent from "./DeleteEvent";
-import { isGlobalRole } from "@/lib/roles";
+import { isGlobalRole, isTeaching } from "@/lib/roles";
 
 function monthBounds(month: string) {
   const [y, m] = month.split("-").map(Number);
@@ -39,7 +39,7 @@ export default async function CalendarPage({
     eventsBetween(today(), `${Number(today().slice(0, 4)) + 1}-12-31`, centerId),
   ]);
 
-  const canEdit = user.role !== "teacher";
+  const canEdit = !isTeaching(user.role);
   const keep = (m: string) =>
     `/calendar?month=${m}${sp.center ? `&center=${sp.center}` : ""}`;
 

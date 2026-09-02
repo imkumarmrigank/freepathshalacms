@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requireFeature, effectiveTeacherIds } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { centersForUser, currentSession, listClasses, resolveCenterId } from "@/lib/queries";
 import { Alert, Badge, Card, Empty, Meter, PageHeader } from "@/components/ui";
@@ -7,12 +7,12 @@ import Filters from "@/components/Filters";
 import { fmtDate } from "@/lib/format";
 import { EXAM_TYPE_LABEL, EXAM_TYPES } from "@/lib/exam-meta";
 import NewExamForm from "./NewExamForm";
-import { isGlobalRole } from "@/lib/roles";
+import { isGlobalRole, isTeaching } from "@/lib/roles";
 
 export default async function ExamsPage({
   searchParams,
 }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const user = await requireUser();
+  const user = await requireFeature("exams");
   const sp = await searchParams;
   const [centers, classes, session] = await Promise.all([
     centersForUser(user), listClasses(), currentSession(),
@@ -50,12 +50,12 @@ export default async function ExamsPage({
   );
 
   // A teacher only sets tests for the classes they hold.
-  const myClasses = user.role === "teacher"
+  const myClasses = isTeaching(user.role)
     ? await query<{ id: number; name: string }>(
         `SELECT cl.id, cl.name FROM teacher_classes tc
            JOIN class_levels cl ON cl.id = tc.class_level_id
-          WHERE tc.user_id = $1 AND tc.session_id = $2 ORDER BY cl.sequence`,
-        [user.uid, session.id])
+          WHERE tc.user_id = ANY($1::bigint[]) AND tc.session_id = $2 ORDER BY cl.sequence`,
+        [effectiveTeacherIds(user), session.id])
     : classes;
 
   // subjects of the same test sit together under one heading
@@ -157,7 +157,7 @@ export default async function ExamsPage({
         </div>
 
         <NewExamForm classes={myClasses} centers={centers}
-          isAdmin={isGlobalRole(user.role)} isTeacher={user.role === "teacher"} />
+          isAdmin={isGlobalRole(user.role)} isTeacher={isTeaching(user.role)} />
       </div>
     </>
   );

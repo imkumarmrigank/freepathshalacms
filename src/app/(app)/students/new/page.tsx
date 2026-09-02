@@ -2,7 +2,7 @@ import { requireUser } from "@/lib/auth";
 import { centersForUser, currentSession, listClasses } from "@/lib/queries";
 import { Alert, PageHeader } from "@/components/ui";
 import StudentForm from "./StudentForm";
-import { isGlobalRole } from "@/lib/roles";
+import { isGlobalRole, isTeaching } from "@/lib/roles";
 
 export default async function NewStudentPage() {
   const user = await requireUser();
@@ -10,7 +10,7 @@ export default async function NewStudentPage() {
     centersForUser(user), listClasses(), currentSession(),
   ]);
 
-  if (user.role === "teacher")
+  if (isTeaching(user.role))
     return (
       <Alert kind="bad">
         Only the centre manager can admit a student. Pass the details to your manager.

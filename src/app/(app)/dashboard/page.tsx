@@ -7,7 +7,7 @@ import { IconPlus } from "@/components/icons";
 import { fmtDate, fullName, today } from "@/lib/format";
 import { eventsBetween } from "@/lib/calendar";
 import { EVENT_LABEL, EVENT_TONE } from "@/lib/calendar-meta";
-import { isGlobalRole } from "@/lib/roles";
+import { isGlobalRole, isTeaching } from "@/lib/roles";
 
 const ENGAGEMENT_TONE: Record<string, string> = {
   attentive: "ok", neutral: "warn", resistant: "bad",
@@ -171,7 +171,7 @@ export default async function Dashboard({
         {!isGlobalRole(user.role) && (
           <Link href="/my-attendance" className="btn btn-ghost">My check-in</Link>
         )}
-        {user.role !== "teacher" && (
+        {!isTeaching(user.role) && (
           <Link href="/students/new" className="btn btn-ghost">Add student</Link>
         )}
       </div>

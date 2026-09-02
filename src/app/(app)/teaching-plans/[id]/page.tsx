@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireUser, canTouchCenter } from "@/lib/auth";
+import { requireFeature, canTouchCenter } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { Alert, Badge, Card, Empty, Meter, PageHeader, StatCard } from "@/components/ui";
 import { fmtDate, fmtDateTime, titleCase } from "@/lib/format";
@@ -7,10 +7,10 @@ import TopicRow, { type Topic } from "./TopicRow";
 import AddTopic from "./AddTopic";
 import SubmitPlan from "./SubmitPlan";
 import { PLAN_LEAD_DAYS } from "@/lib/plan-meta";
-import { isGlobalRole } from "@/lib/roles";
+import { isGlobalRole, isTeaching } from "@/lib/roles";
 
 export default async function PlanPage({ params }: { params: Promise<{ id: string }> }) {
-  const user = await requireUser();
+  const user = await requireFeature("teachingPlans");
   const { id } = await params;
   const planId = Number(id);
 
@@ -41,7 +41,7 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
   const canEdit =
     isGlobalRole(user.role) ||
     (user.role === "center_manager" && plan.center_id === user.centerId) ||
-    (user.role === "teacher" && plan.teacher_id === user.uid);
+    (isTeaching(user.role) && plan.teacher_id === user.uid);
 
   const topics = await query<Topic>(
     `SELECT t.id, t.sequence, t.topic, t.objective, t.planned_date, t.status,

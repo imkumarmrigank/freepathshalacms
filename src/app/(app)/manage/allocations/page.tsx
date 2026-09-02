@@ -3,10 +3,11 @@ import { query } from "@/lib/db";
 import { currentSession, listClasses, resolveCenterId } from "@/lib/queries";
 import { Alert, Card, Empty, PageHeader } from "@/components/ui";
 import AllocationRow from "./AllocationRow";
+import { isTeaching } from "@/lib/roles";
 
 export default async function AllocationsPage() {
   const user = await requireUser();
-  if (user.role === "teacher")
+  if (isTeaching(user.role))
     return <Alert kind="bad">You don’t have access to class allocation.</Alert>;
 
   const [classes, session] = await Promise.all([listClasses(), currentSession()]);

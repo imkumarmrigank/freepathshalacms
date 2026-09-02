@@ -1,10 +1,10 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireUser, canTouchCenter } from "@/lib/auth";
+import { requireUser, canTouchCenter, effectiveTeacherIds } from "@/lib/auth";
 import { one, query, tx } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
-import { isGlobalRole } from "@/lib/roles";
+import { isGlobalRole, isTeaching } from "@/lib/roles";
 
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
@@ -24,8 +24,8 @@ async function assertCanTouchClass(
   if (user.role === "center_manager") return null;
   const allotted = await one<{ id: number }>(
     `SELECT id FROM teacher_classes
-      WHERE user_id = $1 AND session_id = $2 AND class_level_id = $3`,
-    [user.uid, sessionId, classLevelId],
+      WHERE user_id = ANY($1::bigint[]) AND session_id = $2 AND class_level_id = $3`,
+    [effectiveTeacherIds(user), sessionId, classLevelId],
   );
   return allotted ? null : "You are not allotted to this class. Ask your centre manager.";
 }
@@ -216,7 +216,7 @@ export async function setExamStatus(_prev: unknown, form: FormData) {
 
 export async function deleteExam(_prev: unknown, form: FormData) {
   const user = await requireUser();
-  if (user.role === "teacher") return { error: "Ask your centre manager to delete a test." };
+  if (isTeaching(user.role)) return { error: "Ask your centre manager to delete a test." };
   const examId = Number(form.get("exam_id"));
   const exam = await one<{ center_id: number }>(
     "SELECT center_id FROM exams WHERE id = $1", [examId]);

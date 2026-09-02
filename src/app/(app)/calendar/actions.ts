@@ -4,7 +4,7 @@ import { requireUser, canTouchCenter } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
 import { HOLIDAY_TYPES } from "@/lib/calendar-meta";
-import { isGlobalRole } from "@/lib/roles";
+import { isGlobalRole, isTeaching } from "@/lib/roles";
 
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
@@ -15,7 +15,7 @@ const str = (f: FormData, k: string) => {
 
 export async function saveEvent(_prev: unknown, form: FormData) {
   const user = await requireUser();
-  if (user.role === "teacher")
+  if (isTeaching(user.role))
     return { error: "Only centre managers and admins can change the calendar." };
 
   const id = form.get("id") ? Number(form.get("id")) : null;
@@ -76,7 +76,7 @@ export async function saveEvent(_prev: unknown, form: FormData) {
 
 export async function deleteEvent(_prev: unknown, form: FormData) {
   const user = await requireUser();
-  if (user.role === "teacher") return { error: "Only managers and admins can do that." };
+  if (isTeaching(user.role)) return { error: "Only managers and admins can do that." };
   const id = Number(form.get("id"));
   const existing = await one<{ center_id: number | null }>(
     "SELECT center_id FROM calendar_events WHERE id = $1", [id]);

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requireFeature } from "@/lib/auth";
 import { centersForUser, currentSession, listClasses, listSessions, resolveCenterId } from "@/lib/queries";
 import { classProgress } from "@/lib/report-card";
 import { Alert, Avatar, Badge, Card, Empty, Meter, PageHeader } from "@/components/ui";
@@ -13,7 +13,7 @@ export const metadata = { title: "Progress reports · FreePathshala CMS" };
 export default async function ProgressReportsPage({
   searchParams,
 }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const user = await requireUser();
+  const user = await requireFeature("progressReports");
   const sp = await searchParams;
   const [centers, classes, sessions, cur] = await Promise.all([
     centersForUser(user), listClasses(), listSessions(), currentSession(),

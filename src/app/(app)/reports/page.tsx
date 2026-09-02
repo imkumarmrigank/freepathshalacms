@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requireFeature } from "@/lib/auth";
 import { centersForUser, currentSession, listClasses, listSessions } from "@/lib/queries";
 import { Alert, Card, Empty, PageHeader } from "@/components/ui";
 import { REPORTS } from "@/lib/report-meta";
@@ -13,7 +13,7 @@ const PREVIEW_ROWS = 60;
 export default async function ReportsPage({
   searchParams,
 }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const user = await requireUser();
+  const user = await requireFeature("reports");
   const sp = await searchParams;
   const [centers, classes, sessions, cur] = await Promise.all([
     centersForUser(user), listClasses(), listSessions(), currentSession(),

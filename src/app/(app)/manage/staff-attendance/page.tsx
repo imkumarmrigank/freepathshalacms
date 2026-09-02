@@ -4,7 +4,7 @@ import { centersForUser, resolveCenterId } from "@/lib/queries";
 import { Alert, Avatar, Badge, Card, Empty, PageHeader } from "@/components/ui";
 import Filters from "@/components/Filters";
 import { fmtDate, minutesToHours, titleCase, today } from "@/lib/format";
-import { ROLE_LABEL, type Role, isGlobalRole } from "@/lib/roles";
+import { ROLE_LABEL, type Role, isGlobalRole, isTeaching } from "@/lib/roles";
 import OverrideForm from "./OverrideForm";
 
 const TONE: Record<string, string> = {
@@ -15,7 +15,7 @@ export default async function StaffAttendancePage({
   searchParams,
 }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const user = await requireUser();
-  if (user.role === "teacher")
+  if (isTeaching(user.role))
     return <Alert kind="bad">You don’t have access to the staff register.</Alert>;
 
   const sp = await searchParams;

@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth";
+import { requireFeature } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { centersForUser, currentSession, listClasses, resolveCenterId } from "@/lib/queries";
 import { Alert, Card, Empty, PageHeader } from "@/components/ui";
@@ -13,7 +13,7 @@ import { isGlobalRole } from "@/lib/roles";
 export default async function AttendancePage({
   searchParams,
 }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const user = await requireUser();
+  const user = await requireFeature("attendance");
   const sp = await searchParams;
   const [centers, classes, session] = await Promise.all([
     centersForUser(user), listClasses(), currentSession(),

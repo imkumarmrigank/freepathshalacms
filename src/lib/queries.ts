@@ -46,8 +46,8 @@ export async function listCenters(activeOnly = true) {
 
 /** Centres this user is allowed to look at. */
 export async function centersForUser(u: SessionUser) {
-  if (u.role === "super_admin") return listCenters();
-  if (u.role === "mentor") {
+  if (isGlobalRole(u.role)) return listCenters();
+  if (u.role === "backup_teacher") {
     if (u.centerIds.length === 0) return [];
     return query<Center>(
       `SELECT c.*, m.name AS manager_name FROM centers c
@@ -79,8 +79,8 @@ export async function getCenter(id: number) {
 export function resolveCenterId(u: SessionUser, requested?: string | number | null) {
   const n = Number(requested);
   const asked = Number.isFinite(n) && n > 0 ? n : null;
-  if (u.role === "super_admin") return asked;
-  if (u.role === "mentor") {
+  if (isGlobalRole(u.role)) return asked;
+  if (u.role === "backup_teacher") {
     if (asked != null && u.centerIds.includes(asked)) return asked;
     return u.centerIds[0] ?? -1;   // -1 matches nothing, rather than everything
   }

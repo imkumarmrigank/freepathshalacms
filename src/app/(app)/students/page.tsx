@@ -5,7 +5,7 @@ import { centersForUser, currentSession, listClasses, listSessions, resolveCente
 import { Avatar, Badge, Card, Empty, Meter, PageHeader } from "@/components/ui";
 import Filters from "@/components/Filters";
 import { fmtDate, fullName } from "@/lib/format";
-import { isGlobalRole } from "@/lib/roles";
+import { isGlobalRole, isTeaching } from "@/lib/roles";
 
 const STATUS_TONE: Record<string, string> = {
   active: "ok", inactive: "mute", graduated: "info", transferred: "mute", dropped: "bad",
@@ -66,7 +66,7 @@ export default async function StudentsPage({
         title="Students"
         subtitle={`${rows.length} student${rows.length === 1 ? "" : "s"}${
           cur && sessionId === cur.id ? ` in ${cur.name}` : ""}`}
-        right={user.role !== "teacher"
+        right={!isTeaching(user.role)
           ? <Link href="/students/new" className="btn btn-primary">+ Add student</Link>
           : undefined}
       />
@@ -85,10 +85,10 @@ export default async function StudentsPage({
       <Card className="mt-4 overflow-hidden" pad={false}>
         {rows.length === 0 ? (
           <Empty title="No students found"
-            hint={user.role === "teacher"
+            hint={isTeaching(user.role)
               ? "Try a different filter. Your centre manager admits new students."
               : "Try a different filter, or add the first student for this centre."}
-            action={user.role !== "teacher"
+            action={!isTeaching(user.role)
               ? <Link href="/students/new" className="btn btn-primary btn-sm">Add student</Link>
               : undefined} />
         ) : (

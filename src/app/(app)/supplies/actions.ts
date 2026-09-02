@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { requireRole, requireUser, canTouchCenter } from "@/lib/auth";
-import { canManageHqStock } from "@/lib/roles";
+import { canManageHqStock, isTeaching } from "@/lib/roles";
 import { one, query, tx } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
 
@@ -111,7 +111,7 @@ export async function recordReceipt(_prev: unknown, form: FormData) {
 /* ------------------------------- centre -> student (manager or admin) */
 export async function issueToStudent(_prev: unknown, form: FormData) {
   const user = await requireUser();
-  if (user.role === "teacher")
+  if (isTeaching(user.role))
     return { error: "Only the centre manager can hand out supplies." };
 
   const itemId = Number(form.get("item_id"));

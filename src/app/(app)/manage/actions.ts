@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { requireRole, requireUser, hashPassword, canTouchCenter } from "@/lib/auth";
-import { canCreateCentre, canCreateRole, canManageStaff, isGlobalRole, type Role } from "@/lib/roles";
+import { canCreateCentre, canCreateRole, canManageStaff, isGlobalRole, type Role, isTeaching } from "@/lib/roles";
 import { one, query } from "@/lib/db";
 import { GEOFENCE_DEFAULT_M, GEOFENCE_MAX_M, GEOFENCE_MIN_M } from "@/lib/geo";
 
@@ -138,21 +138,6 @@ export async function saveStaff(_prev: unknown, form: FormData) {
     const msg = err instanceof Error ? err.message : "Could not save.";
     return { error: msg.includes("users_email_key") ? `${email} is already registered.` : msg };
   }
-  // a mentor covers a set of centres; the super admin decides which
-  if (role === "mentor" && actor.role === "super_admin") {
-    const target = id ?? (await one<{ id: number }>(
-      "SELECT id FROM users WHERE lower(email) = lower($1)", [email]))?.id;
-    if (target) {
-      const wanted = form.getAll("mentor_center_id").map(Number).filter(Boolean);
-      await query("DELETE FROM mentor_centers WHERE user_id = $1", [target]);
-      for (const c of wanted) {
-        await query(
-          `INSERT INTO mentor_centers (user_id, center_id) VALUES ($1,$2)
-           ON CONFLICT DO NOTHING`, [target, c]);
-      }
-    }
-  }
-
   revalidatePath("/manage/staff");
   return { ok: id ? "Staff member updated." : "Staff member added." };
 }
@@ -232,7 +217,7 @@ export async function saveClass(_prev: unknown, form: FormData) {
 /* ------------------------------------------- manager override on staff punch */
 export async function overrideStaffAttendance(_prev: unknown, form: FormData) {
   const actor = await requireUser();
-  if (actor.role === "teacher") return { error: "You cannot change staff attendance." };
+  if (isTeaching(actor.role)) return { error: "You cannot change staff attendance." };
   const userId = Number(form.get("user_id"));
   const attDate = String(form.get("att_date"));
   const status = String(form.get("status"));

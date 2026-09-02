@@ -1,3 +1,5 @@
+import type { Role } from "./roles";
+
 /** Report catalogue — shared by the page, the client filters and the export route. */
 export type ReportFilter = "dates" | "center" | "class" | "session" | "role";
 
@@ -8,7 +10,7 @@ export type ReportMeta = {
   description: string;
   filters: ReportFilter[];
   /** Only these roles may run it; omitted means everyone with reports access. */
-  roles?: ("super_admin" | "mentor" | "center_manager" | "teacher")[];
+  roles?: Role[];
 };
 
 export const REPORTS: ReportMeta[] = [
@@ -35,7 +37,7 @@ export const REPORTS: ReportMeta[] = [
     description:
       "Teachers and centre managers: days present, late, absent and hours logged over the period.",
     filters: ["dates", "center", "role"],
-    roles: ["super_admin", "mentor", "center_manager"],
+    roles: ["super_admin", "admin", "center_manager"],
   },
   {
     key: "staff-attendance-detail",
@@ -44,7 +46,7 @@ export const REPORTS: ReportMeta[] = [
     description:
       "Every punch in the period with times, hours, distance from the centre and any manual override.",
     filters: ["dates", "center", "role"],
-    roles: ["super_admin", "mentor", "center_manager"],
+    roles: ["super_admin", "admin", "center_manager"],
   },
   {
     key: "students-by-class",
@@ -74,7 +76,7 @@ export const REPORTS: ReportMeta[] = [
     group: "Supplies",
     description: "Received, given out and in hand for every item, centre by centre.",
     filters: ["center"],
-    roles: ["super_admin", "mentor", "center_manager"],
+    roles: ["super_admin", "admin", "center_manager"],
   },
   {
     key: "hq-stock",
@@ -83,7 +85,7 @@ export const REPORTS: ReportMeta[] = [
     description:
       "What has been received at headquarters, what has gone out to centres, and what is left.",
     filters: [],
-    roles: ["super_admin", "mentor"],
+    roles: ["super_admin", "admin"],
   },
   {
     key: "hq-receipts",
@@ -92,7 +94,7 @@ export const REPORTS: ReportMeta[] = [
     description:
       "Every consignment received at headquarters — item, quantity, supplier, invoice, unit cost and value.",
     filters: ["dates"],
-    roles: ["super_admin", "mentor"],
+    roles: ["super_admin", "admin"],
   },
   {
     key: "supplies-dispatched",
@@ -101,7 +103,7 @@ export const REPORTS: ReportMeta[] = [
     description:
       "Every dispatch from headquarters to a centre — date, centre, item, quantity, challan and value.",
     filters: ["dates", "center"],
-    roles: ["super_admin", "mentor"],
+    roles: ["super_admin", "admin"],
   },
   {
     key: "supplies-by-centre",
@@ -110,7 +112,7 @@ export const REPORTS: ReportMeta[] = [
     description:
       "For each centre and item: how much was sent, how much reached students, and what is still in hand.",
     filters: ["center"],
-    roles: ["super_admin", "mentor", "center_manager"],
+    roles: ["super_admin", "admin", "center_manager"],
   },
   {
     key: "supplies-issued",
@@ -118,7 +120,7 @@ export const REPORTS: ReportMeta[] = [
     group: "Supplies",
     description: "Every issue in the period — student, item, quantity and who handed it over.",
     filters: ["dates", "center"],
-    roles: ["super_admin", "mentor", "center_manager"],
+    roles: ["super_admin", "admin", "center_manager"],
   },
   {
     key: "exam-marks",

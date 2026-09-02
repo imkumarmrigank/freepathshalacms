@@ -33,12 +33,6 @@ export default async function StaffPage({
     params,
   );
 
-  const editingMentorCentres = edit
-    ? (await query<{ center_id: number }>(
-        "SELECT center_id FROM mentor_centers WHERE user_id = $1", [Number(edit)])
-      ).map((r) => r.center_id)
-    : [];
-
   const editing = edit
     ? await one<Staff>(
         "SELECT id, name, email, phone, role, center_id, designation, is_active FROM users WHERE id = $1",
@@ -78,7 +72,8 @@ export default async function StaffPage({
                         </td>
                         <td>
                           <div className="flex flex-wrap gap-1.5">
-                            <Badge tone={r.role === "super_admin" ? "info" : r.role === "mentor" ? "warn"
+                            <Badge tone={r.role === "super_admin" || r.role === "admin" ? "info"
+                              : r.role === "mentor" ? "warn"
                               : r.role === "center_manager" ? "ok" : "mute"}>
                               {ROLE_LABEL[r.role]}
                             </Badge>
@@ -102,7 +97,7 @@ export default async function StaffPage({
         <div className="lg:col-span-2">
           <StaffForm staff={editing} centers={centers} key={editing?.id ?? "new"}
             isAdmin={user.role === "super_admin"} ownCenterId={user.centerId}
-            actorRole={user.role} mentorCenterIds={editingMentorCentres} />
+            actorRole={user.role} />
         </div>
       </div>
     </>

@@ -51,9 +51,9 @@ export async function runReport(
     throw new Error("You don’t have access to this report.");
 
   // Non-admins can never widen the scope past their own centre.
-  const centerId = user.role === "super_admin"
+  const centerId = isGlobalRole(user.role)
     ? p.centerId
-    : user.role === "mentor"
+    : user.role === "backup_teacher"
       ? (p.centerId != null && user.centerIds.includes(p.centerId)
           ? p.centerId : user.centerIds[0] ?? -1)
       : user.centerId;

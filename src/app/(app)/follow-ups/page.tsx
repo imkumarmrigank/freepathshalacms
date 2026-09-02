@@ -4,6 +4,7 @@ import { query } from "@/lib/db";
 import { centersForUser, currentSession, resolveCenterId } from "@/lib/queries";
 import { Avatar, Badge, Card, Empty, PageHeader, StatCard } from "@/components/ui";
 import Filters from "@/components/Filters";
+import AssignFollowUp from "./AssignFollowUp";
 import { fmtDate, fullName, titleCase, today } from "@/lib/format";
 import { isGlobalRole } from "@/lib/roles";
 
@@ -25,11 +26,14 @@ export default async function FollowUpsPage({
     follow_up_date: string | null; follow_up_mode: string | null; follow_up_status: string;
     interaction_date: string; mentor: string | null; concerns: string | null;
     class_name: string | null; center_name: string;
+    center_id: number; assignee_id: number | null; assignee: string | null;
   }>(
     `SELECT i.id, s.first_name, s.last_name, s.enrollment_no, i.follow_up_date,
             i.follow_up_mode, i.follow_up_status, i.interaction_date, u.name AS mentor,
-            i.concerns, cl.name AS class_name, ce.name AS center_name
+            i.concerns, cl.name AS class_name, ce.name AS center_name,
+            i.center_id, i.follow_up_assignee_id AS assignee_id, asg.name AS assignee
        FROM ptm_interactions i
+       LEFT JOIN users asg ON asg.id = i.follow_up_assignee_id
        JOIN students s ON s.id = i.student_id
        JOIN centers ce ON ce.id = i.center_id
        LEFT JOIN users u ON u.id = i.mentor_id
@@ -46,6 +50,16 @@ export default async function FollowUpsPage({
     const in7 = new Date(); in7.setDate(in7.getDate() + 7);
     return d >= today() && d <= in7.toISOString().slice(0, 10);
   });
+
+  // anyone who can actually carry out a follow-up
+  const people = await query<{ id: number; name: string }>(
+    `SELECT u.id, u.name FROM users u
+      WHERE u.is_active AND u.role IN ('teacher','backup_teacher','center_manager')
+        ${centerId ? "AND (u.center_id = $1 OR u.role = 'backup_teacher')" : ""}
+      ORDER BY u.name`,
+    centerId ? [centerId] : [],
+  );
+  const canAssign = user.role !== "teacher" && user.role !== "backup_teacher";
 
   return (
     <>
@@ -81,7 +95,7 @@ export default async function FollowUpsPage({
               <thead>
                 <tr>
                   <th>Due</th><th>Student</th><th>Class</th><th>How</th>
-                  <th>Mentor</th><th>From PTM</th>
+                  <th>Assigned to</th><th>From PTM</th>
                 </tr>
               </thead>
               <tbody>
@@ -108,7 +122,16 @@ export default async function FollowUpsPage({
                       </td>
                       <td className="text-[var(--muted)]">{r.class_name ?? "—"}</td>
                       <td className="text-[var(--muted)]">{titleCase(r.follow_up_mode ?? "—")}</td>
-                      <td className="text-[var(--muted)]">{r.mentor ?? "—"}</td>
+                      <td>
+                        {canAssign && r.follow_up_status === "pending" ? (
+                          <AssignFollowUp id={r.id} assigneeId={r.assignee_id}
+                            people={people} />
+                        ) : (
+                          <span className="text-[13px] text-[var(--muted)]">
+                            {r.assignee ?? r.mentor ?? "—"}
+                          </span>
+                        )}
+                      </td>
                       <td className="text-[var(--muted)]">{fmtDate(r.interaction_date)}</td>
                     </tr>
                   );

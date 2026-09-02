@@ -1,11 +1,11 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireUser, canTouchCenter } from "@/lib/auth";
+import { requireUser, canTouchCenter, effectiveTeacherIds } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
 import { PLAN_LEAD_DAYS, earliestPlanStart } from "@/lib/plan-meta";
-import { isGlobalRole } from "@/lib/roles";
+import { isGlobalRole, isTeaching } from "@/lib/roles";
 
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
@@ -23,7 +23,7 @@ async function canEditPlan(planId: number) {
   const user = await requireUser();
   const plan = await loadPlan(planId);
   if (!plan) return { error: "Plan not found." } as const;
-  if (user.role === "teacher" && plan.teacher_id !== user.uid)
+  if (isTeaching(user.role) && plan.teacher_id !== user.uid)
     return { error: "This plan belongs to another teacher." } as const;
   if (!canTouchCenter(user, plan.center_id))
     return { error: "This plan belongs to another centre." } as const;
@@ -53,11 +53,11 @@ export async function createPlan(_prev: unknown, form: FormData) {
   // Teachers may only plan for a class they are allotted.
   let teacherId = user.uid;
   let centerId = user.centerId;
-  if (user.role === "teacher") {
+  if (isTeaching(user.role)) {
     const allotted = await one<{ id: number }>(
       `SELECT id FROM teacher_classes
-        WHERE user_id = $1 AND session_id = $2 AND class_level_id = $3`,
-      [user.uid, session.id, classLevelId],
+        WHERE user_id = ANY($1::bigint[]) AND session_id = $2 AND class_level_id = $3`,
+      [effectiveTeacherIds(user), session.id, classLevelId],
     );
     if (!allotted)
       return { error: "You are not allotted to this class. Ask your centre manager." };
@@ -196,7 +196,7 @@ export async function deleteTopic(_prev: unknown, form: FormData) {
 /* --------------------------------------------- teacher -> class allocation */
 export async function setAllocation(_prev: unknown, form: FormData) {
   const user = await requireUser();
-  if (user.role === "teacher") return { error: "Only managers can allot classes." };
+  if (isTeaching(user.role)) return { error: "Only managers can allot classes." };
   const session = await currentSession();
   if (!session) return { error: "No academic session is open." };
 

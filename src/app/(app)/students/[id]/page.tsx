@@ -7,10 +7,11 @@ import { Alert, Avatar, Badge, Card, Empty, Meter, PageHeader } from "@/componen
 import { IconPlus } from "@/components/icons";
 import { fmtDate, fullName, titleCase } from "@/lib/format";
 import { EXAM_TYPE_LABEL, grade, percentage } from "@/lib/exam-meta";
+import { canEditStudents } from "@/lib/roles";
 import type { Student } from "@/lib/types";
 import EditStudent from "./EditStudent";
 import EnrollmentControls from "./EnrollmentControls";
-import { isGlobalRole } from "@/lib/roles";
+import { isGlobalRole, isTeaching } from "@/lib/roles";
 
 const STATUS_TONE: Record<string, string> = {
   active: "ok", inactive: "mute", graduated: "info", transferred: "mute", dropped: "bad",
@@ -115,7 +116,7 @@ export default async function StudentPage({
         <div className="space-y-5 lg:col-span-2">
           <Card>
             <h2 className="mb-4 text-[15px] font-semibold">Profile</h2>
-            <EditStudent s={student} readOnly={false} />
+            <EditStudent s={student} readOnly={!canEditStudents(user.role)} />
           </Card>
 
           <Card pad={false}>
@@ -259,7 +260,7 @@ export default async function StudentPage({
                 ))}
               </ol>
             )}
-            {currentEnr && user.role !== "teacher" && (
+            {currentEnr && !isTeaching(user.role) && (
               <EnrollmentControls
                 enrollmentId={currentEnr.id}
                 classLevelId={currentEnr.class_level_id}

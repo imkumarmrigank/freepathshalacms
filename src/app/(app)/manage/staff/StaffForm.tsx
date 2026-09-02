@@ -11,19 +11,19 @@ export type Staff = {
 };
 
 export default function StaffForm({
-  staff, centers, isAdmin, ownCenterId, actorRole, mentorCenterIds = [],
+  staff, centers, isAdmin, ownCenterId, actorRole,
 }: {
   staff?: Staff | null;
   centers: { id: number; code: string; name: string }[];
   isAdmin: boolean;
   ownCenterId: number | null;
   actorRole: Role;
-  mentorCenterIds?: number[];
 }) {
   const [state, action] = useActionState(saveStaff, null);
   const allowed = CREATABLE_ROLES[actorRole];
   const [role, setRole] = useState<string>(staff?.role ?? allowed[allowed.length - 1] ?? "teacher");
-  const picksOwnCentres = role === "mentor" && actorRole === "super_admin";
+  const centreless = role === "super_admin" || role === "admin"
+    || role === "mentor" || role === "backup_teacher";
 
   return (
     <Card>
@@ -48,28 +48,13 @@ export default function StaffForm({
               </select>
             </Field>
 
-            {picksOwnCentres ? (
-              <div className="field">
-                <span>Centres this mentor covers *</span>
-                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-2 rounded-[9px] border border-[var(--border-strong)] px-3 py-2.5">
-                  {centers.length === 0 && (
-                    <span className="text-[13px] text-[var(--muted)]">No centres yet.</span>
-                  )}
-                  {centers.map((c) => (
-                    <label key={c.id} className="flex items-center gap-1.5 text-[13px]">
-                      <input type="checkbox" name="mentor_center_id" value={c.id}
-                        className="h-4 w-4" defaultChecked={mentorCenterIds.includes(c.id)} />
-                      {c.code} · {c.name}
-                    </label>
-                  ))}
-                </div>
-                <span className="mt-1 block text-[12px] font-normal text-[var(--faint)]">
-                  A mentor can cover several centres, and sees only these.
-                </span>
-              </div>
-            ) : role === "super_admin" ? (
+            {centreless ? (
               <p className="mb-4 rounded-[9px] bg-[var(--brand-soft)] px-3.5 py-2.5 text-[13px] text-[var(--brand)]">
-                A super admin works across every centre.
+                {role === "backup_teacher"
+                  ? "A backup teacher is not attached to a centre — they work at whichever centre they are assigned to cover, under Backup Cover."
+                  : role === "mentor"
+                    ? "A mentor works across every centre, on parent meetings, follow-ups and progress reports."
+                    : "This role works across every centre."}
               </p>
             ) : (
               <Field label="Centre *">

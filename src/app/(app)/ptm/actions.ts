@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { requireUser, canTouchCenter } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
-import { isGlobalRole } from "@/lib/roles";
+import { isGlobalRole, isTeaching } from "@/lib/roles";
 
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
@@ -43,8 +43,8 @@ export async function recordInteraction(_prev: unknown, form: FormData) {
        (meeting_id, student_id, session_id, class_level_id, center_id, mentor_id,
         interaction_date, mode, parent_present, engagement, attendance_pct, marks_pct,
         discussion, concerns, action_items,
-        follow_up_required, follow_up_date, follow_up_mode)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+        follow_up_required, follow_up_date, follow_up_mode, follow_up_assignee_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
      RETURNING id`,
     [num(form, "meeting_id"), studentId, session.id, student.class_level_id,
      student.center_id, user.uid,
@@ -55,7 +55,10 @@ export async function recordInteraction(_prev: unknown, form: FormData) {
      num(form, "attendance_pct"), num(form, "marks_pct"),
      str(form, "discussion"), str(form, "concerns"), str(form, "action_items"),
      followUp, followUp ? followUpDate : null,
-     followUp ? str(form, "follow_up_mode") : null],
+     followUp ? str(form, "follow_up_mode") : null,
+     // unassigned means it stays with whoever recorded it
+     followUp && form.get("follow_up_assignee_id")
+       ? Number(form.get("follow_up_assignee_id")) : user.uid],
   );
 
   revalidatePath("/ptm");
@@ -84,9 +87,39 @@ export async function closeFollowUp(_prev: unknown, form: FormData) {
   return { ok: status === "done" ? "Follow-up closed." : "Follow-up cancelled." };
 }
 
+/** Hand an open follow-up to a teacher, or take it back. */
+export async function assignFollowUp(_prev: unknown, form: FormData) {
+  const user = await requireUser();
+  const id = Number(form.get("id"));
+  const raw = String(form.get("follow_up_assignee_id") ?? "");
+  const assignee = raw === "" ? null : Number(raw);
+
+  const row = await one<{ center_id: number }>(
+    "SELECT center_id FROM ptm_interactions WHERE id = $1", [id]);
+  if (!row) return { error: "Interaction not found." };
+  if (!canTouchCenter(user, row.center_id))
+    return { error: "This record belongs to another centre." };
+
+  if (assignee !== null) {
+    const target = await one<{ role: string; center_id: number | null }>(
+      "SELECT role, center_id FROM users WHERE id = $1 AND is_active", [assignee]);
+    if (!target) return { error: "That person could not be found." };
+    if (!["teacher", "backup_teacher", "center_manager"].includes(target.role))
+      return { error: "Follow-ups are assigned to teachers and centre managers." };
+    if (target.center_id !== row.center_id && target.role !== "backup_teacher")
+      return { error: "That teacher is at another centre." };
+  }
+
+  await query("UPDATE ptm_interactions SET follow_up_assignee_id = $2 WHERE id = $1",
+    [id, assignee]);
+  revalidatePath("/follow-ups");
+  revalidatePath(`/ptm/${id}`);
+  return { ok: assignee === null ? "Follow-up left with you." : "Follow-up assigned." };
+}
+
 export async function scheduleMeeting(_prev: unknown, form: FormData) {
   const user = await requireUser();
-  if (user.role === "teacher") return { error: "Only managers can schedule PTM days." };
+  if (isTeaching(user.role)) return { error: "Only managers can schedule PTM days." };
   const session = await currentSession();
   if (!session) return { error: "No academic session is open." };
 

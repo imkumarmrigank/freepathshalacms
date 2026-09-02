@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { effectiveTeacherIds, requireFeature } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { centersForUser, currentSession, listClasses, resolveCenterId } from "@/lib/queries";
 import { Alert, Card, Empty, PageHeader } from "@/components/ui";
 import SlotForm from "./SlotForm";
 import { TEACHING_DAYS } from "@/lib/timetable-meta";
 import DeleteSlot from "./DeleteSlot";
-import { isGlobalRole } from "@/lib/roles";
+import { isGlobalRole, isTeaching } from "@/lib/roles";
 
 type Slot = {
   id: number; class_level_id: number; class_name: string; day_of_week: number;
@@ -17,7 +17,7 @@ type Slot = {
 export default async function TimetablePage({
   searchParams,
 }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const user = await requireUser();
+  const user = await requireFeature("timetable");
   const sp = await searchParams;
   const [centers, classes, session] = await Promise.all([
     centersForUser(user), listClasses(), currentSession(),
@@ -25,15 +25,19 @@ export default async function TimetablePage({
   if (!session) return <Alert kind="warn">No academic session is open.</Alert>;
 
   const centerId = resolveCenterId(user, sp.center) ?? (centers.length === 1 ? centers[0].id : null);
-  const canEdit = user.role !== "teacher";
+  const canEdit = !isTeaching(user.role);
   // Teachers land on their own week; managers look at one class at a time.
-  const view = sp.view ?? (user.role === "teacher" ? "mine" : "class");
+  const view = sp.view ?? (isTeaching(user.role) ? "mine" : "class");
   const classId = Number(sp.class) || null;
 
   const params: unknown[] = [session.id];
   let where = "";
   if (centerId) { params.push(centerId); where += ` AND t.center_id = $${params.length}`; }
-  if (view === "mine") { params.push(user.uid); where += ` AND t.teacher_id = $${params.length}`; }
+  if (view === "mine") {
+    // a stand-in sees the periods of whoever they are covering
+    params.push(effectiveTeacherIds(user));
+    where += ` AND t.teacher_id = ANY($${params.length}::bigint[])`;
+  }
   else if (classId) { params.push(classId); where += ` AND t.class_level_id = $${params.length}`; }
 
   const slots = view === "class" && !classId ? [] : await query<Slot>(

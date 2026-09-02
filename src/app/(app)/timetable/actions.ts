@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser, canTouchCenter } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
-import { isGlobalRole } from "@/lib/roles";
+import { isGlobalRole, isTeaching } from "@/lib/roles";
 
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
@@ -12,7 +12,7 @@ const str = (f: FormData, k: string) => {
 
 export async function saveSlot(_prev: unknown, form: FormData) {
   const user = await requireUser();
-  if (user.role === "teacher")
+  if (isTeaching(user.role))
     return { error: "Only centre managers and admins can change the timetable." };
 
   const session = await currentSession();
@@ -77,7 +77,7 @@ export async function saveSlot(_prev: unknown, form: FormData) {
 
 export async function deleteSlot(_prev: unknown, form: FormData) {
   const user = await requireUser();
-  if (user.role === "teacher") return { error: "Only managers can change the timetable." };
+  if (isTeaching(user.role)) return { error: "Only managers can change the timetable." };
   const id = Number(form.get("id"));
   const row = await one<{ center_id: number }>(
     "SELECT center_id FROM timetable_slots WHERE id = $1", [id]);

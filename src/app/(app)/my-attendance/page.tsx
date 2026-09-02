@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth";
+import { requireFeature } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { Alert, Badge, Card, Empty, PageHeader, StatCard } from "@/components/ui";
 import { fmtDate, minutesToHours, today, titleCase } from "@/lib/format";
@@ -10,7 +10,7 @@ const TONE: Record<string, string> = {
 };
 
 export default async function MyAttendancePage() {
-  const user = await requireUser();
+  const user = await requireFeature("ownCheckIn");
   if (!user.centerId)
     return <Alert kind="warn">You are not assigned to a centre, so check-in is unavailable.</Alert>;
 

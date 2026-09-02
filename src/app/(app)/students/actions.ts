@@ -5,7 +5,7 @@ import { requireUser, canTouchCenter } from "@/lib/auth";
 import { tx, query, one } from "@/lib/db";
 import { nextEnrollmentNo } from "@/lib/enrollment";
 import { currentSession } from "@/lib/queries";
-import { isGlobalRole } from "@/lib/roles";
+import { isGlobalRole, isTeaching } from "@/lib/roles";
 
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
@@ -14,7 +14,7 @@ const str = (f: FormData, k: string) => {
 
 export async function createStudent(_prev: unknown, form: FormData) {
   const user = await requireUser();
-  if (user.role === "teacher")
+  if (isTeaching(user.role))
     return { error: "Only the centre manager can admit a student." };
   const session = await currentSession();
   if (!session) return { error: "No current academic session. Ask an admin to open one." };
@@ -99,7 +99,7 @@ export async function changeClass(_prev: unknown, form: FormData) {
     "SELECT center_id, student_id FROM enrollments WHERE id = $1", [enrollmentId],
   );
   if (!row) return { error: "Enrolment not found." };
-  if (user.role === "teacher") return { error: "Only managers can move a student between classes." };
+  if (isTeaching(user.role)) return { error: "Only managers can move a student between classes." };
   if (!canTouchCenter(user, row.center_id))
     return { error: "This student belongs to another centre." };
 
@@ -112,7 +112,7 @@ export async function changeClass(_prev: unknown, form: FormData) {
 /** Flag whether this student should move up at the end of the session. */
 export async function setPromotionDecision(_prev: unknown, form: FormData) {
   const user = await requireUser();
-  if (user.role === "teacher") return { error: "Only managers can set promotion decisions." };
+  if (isTeaching(user.role)) return { error: "Only managers can set promotion decisions." };
   const enrollmentId = Number(form.get("enrollment_id"));
   const decision = String(form.get("promotion_decision"));
   const row = await one<{ center_id: number; student_id: number }>(
