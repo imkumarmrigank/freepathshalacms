@@ -1,6 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { requireRole, requireUser, hashPassword } from "@/lib/auth";
+import { isGlobalRole, type Role } from "@/lib/roles";
 import { one, query } from "@/lib/db";
 
 const str = (f: FormData, k: string) => {
@@ -14,7 +15,7 @@ const numOrNull = (f: FormData, k: string) => {
 
 /* ------------------------------------------------------------------ centres */
 export async function saveCenter(_prev: unknown, form: FormData) {
-  await requireRole("super_admin");
+  await requireRole("super_admin", "mentor");
   const id = numOrNull(form, "id");
   const code = str(form, "code")?.toUpperCase();
   const name = str(form, "name");
@@ -58,7 +59,7 @@ export async function saveCenter(_prev: unknown, form: FormData) {
 }
 
 export async function assignManager(_prev: unknown, form: FormData) {
-  await requireRole("super_admin");
+  await requireRole("super_admin", "mentor");
   const centerId = Number(form.get("center_id"));
   const userId = numOrNull(form, "manager_id");
   if (userId) {
@@ -86,8 +87,8 @@ export async function saveStaff(_prev: unknown, form: FormData) {
   // A centre manager can only create teachers, and only inside their own centre.
   let centerId = actor.role === "super_admin" ? numOrNull(form, "center_id") : actor.centerId;
   if (actor.role === "center_manager") { role = "teacher"; centerId = actor.centerId; }
-  if (role !== "super_admin" && !centerId) return { error: "Pick a centre for this person." };
-  if (role === "super_admin") centerId = null;
+  if (!isGlobalRole(role as Role) && !centerId) return { error: "Pick a centre for this person." };
+  if (isGlobalRole(role as Role)) centerId = null;
 
   const password = str(form, "password");
   if (!id && !password) return { error: "Set an initial password." };

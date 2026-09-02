@@ -7,6 +7,7 @@ import Filters from "@/components/Filters";
 import { fmtDate } from "@/lib/format";
 import { EXAM_TYPE_LABEL, EXAM_TYPES } from "@/lib/exam-meta";
 import NewExamForm from "./NewExamForm";
+import { isGlobalRole } from "@/lib/roles";
 
 export default async function ExamsPage({
   searchParams,
@@ -78,7 +79,7 @@ export default async function ExamsPage({
         subtitle={`Monthly, quarterly, half yearly and yearly results · session ${session.name}`} />
 
       <Filters
-        centers={user.role === "super_admin" ? centers : []}
+        centers={isGlobalRole(user.role) ? centers : []}
         classes={classes}
         current={sp}
         extra={[{ name: "type", label: "All types",
@@ -156,7 +157,7 @@ export default async function ExamsPage({
         </div>
 
         <NewExamForm classes={myClasses} centers={centers}
-          isAdmin={user.role === "super_admin"} isTeacher={user.role === "teacher"} />
+          isAdmin={isGlobalRole(user.role)} isTeacher={user.role === "teacher"} />
       </div>
     </>
   );

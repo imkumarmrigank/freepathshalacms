@@ -6,6 +6,7 @@ import { fmtDate } from "@/lib/format";
 import { EXAM_TYPE_LABEL, grade, percentage } from "@/lib/exam-meta";
 import MarksSheet, { type MarkRow } from "./MarksSheet";
 import PublishToggle from "./PublishToggle";
+import { isGlobalRole } from "@/lib/roles";
 
 export default async function ExamPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -29,7 +30,7 @@ export default async function ExamPage({ params }: { params: Promise<{ id: strin
     [examId],
   );
   if (!exam) notFound();
-  if (user.role !== "super_admin" && exam.center_id !== user.centerId)
+  if (!isGlobalRole(user.role) && exam.center_id !== user.centerId)
     return <Alert kind="bad">This test belongs to another centre.</Alert>;
 
   // Teachers may only edit tests for a class they hold.

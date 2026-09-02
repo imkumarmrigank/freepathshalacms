@@ -4,7 +4,7 @@ import { centersForUser, resolveCenterId } from "@/lib/queries";
 import { Alert, Avatar, Badge, Card, Empty, PageHeader } from "@/components/ui";
 import Filters from "@/components/Filters";
 import { fmtDate, minutesToHours, titleCase, today } from "@/lib/format";
-import { ROLE_LABEL, type Role } from "@/lib/roles";
+import { ROLE_LABEL, type Role, isGlobalRole } from "@/lib/roles";
 import OverrideForm from "./OverrideForm";
 
 const TONE: Record<string, string> = {
@@ -57,7 +57,7 @@ export default async function StaffAttendancePage({
         subtitle={`${present} of ${rows.length} checked in on ${fmtDate(date)}`} />
 
       <Filters
-        centers={user.role === "super_admin" ? centers : []}
+        centers={isGlobalRole(user.role) ? centers : []}
         current={sp}
         extra={[]}
       />

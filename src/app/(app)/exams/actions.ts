@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { one, query, tx } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
+import { isGlobalRole } from "@/lib/roles";
 
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
@@ -17,7 +18,7 @@ async function assertCanTouchClass(
   classLevelId: number,
   centerId: number,
 ) {
-  if (user.role === "super_admin") return null;
+  if (isGlobalRole(user.role)) return null;
   if (centerId !== user.centerId) return "That class is at another centre.";
   if (user.role === "center_manager") return null;
   const allotted = await one<{ id: number }>(
@@ -76,7 +77,7 @@ export async function createExam(_prev: unknown, form: FormData) {
 
   if (papers.length === 0) return { error: "Add at least one subject." };
 
-  const centerId = user.role === "super_admin"
+  const centerId = isGlobalRole(user.role)
     ? Number(form.get("center_id")) || null
     : user.centerId;
   if (!centerId) return { error: "Pick a centre." };
@@ -218,7 +219,7 @@ export async function deleteExam(_prev: unknown, form: FormData) {
   const exam = await one<{ center_id: number }>(
     "SELECT center_id FROM exams WHERE id = $1", [examId]);
   if (!exam) return { error: "Test not found." };
-  if (user.role !== "super_admin" && exam.center_id !== user.centerId)
+  if (!isGlobalRole(user.role) && exam.center_id !== user.centerId)
     return { error: "That test belongs to another centre." };
 
   await query("DELETE FROM exams WHERE id = $1", [examId]);

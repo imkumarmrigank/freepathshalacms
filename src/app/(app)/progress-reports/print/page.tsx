@@ -5,6 +5,7 @@ import { classProgress, loadReportCard, type ReportCardData } from "@/lib/report
 import ReportCard from "@/components/ReportCard";
 import { Alert } from "@/components/ui";
 import PrintButton from "../../students/[id]/report-card/PrintButton";
+import { isGlobalRole } from "@/lib/roles";
 
 export const metadata = { title: "Report cards · FreePathshala" };
 
@@ -31,7 +32,7 @@ export default async function PrintAllPage({
     capped.map((r) => loadReportCard(r.student_id, sessionId)),
   )).filter((c): c is ReportCardData => c !== null)
     // a non-admin must not print another centre's students
-    .filter((c) => user.role === "super_admin" || c.student.center_id === user.centerId);
+    .filter((c) => isGlobalRole(user.role) || c.student.center_id === user.centerId);
 
   const back = new URLSearchParams({
     session: String(sessionId),

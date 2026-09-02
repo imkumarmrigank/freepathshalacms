@@ -6,6 +6,7 @@ import { Alert, Card, Empty, PageHeader } from "@/components/ui";
 import SlotForm from "./SlotForm";
 import { TEACHING_DAYS } from "@/lib/timetable-meta";
 import DeleteSlot from "./DeleteSlot";
+import { isGlobalRole } from "@/lib/roles";
 
 type Slot = {
   id: number; class_level_id: number; class_name: string; day_of_week: number;
@@ -86,7 +87,7 @@ export default async function TimetablePage({
 
       <form className="mb-4 flex flex-wrap items-end gap-2">
         <input type="hidden" name="view" value={view} />
-        {user.role === "super_admin" && (
+        {isGlobalRole(user.role) && (
           <label>
             <span className="mb-1.5 block text-[13px] font-medium text-[var(--muted)]">Centre</span>
             <select className="select w-auto" name="center" defaultValue={sp.center ?? ""}>
@@ -163,7 +164,7 @@ export default async function TimetablePage({
 
         {canEdit && (
           <SlotForm classes={classes} teachers={teachers} centers={centers}
-            isAdmin={user.role === "super_admin"} defaultClassId={classId}
+            isAdmin={isGlobalRole(user.role)} defaultClassId={classId}
             defaultCenterId={centerId} />
         )}
       </div>

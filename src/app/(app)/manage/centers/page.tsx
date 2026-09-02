@@ -9,7 +9,7 @@ import ManagerPicker from "./ManagerPicker";
 export default async function CentersPage({
   searchParams,
 }: { searchParams: Promise<{ edit?: string }> }) {
-  await requireRole("super_admin");
+  await requireRole("super_admin", "mentor");
   const { edit } = await searchParams;
   const [centers, editing, staff] = await Promise.all([
     listCenters(false),

@@ -7,6 +7,7 @@ import { IconPlus } from "@/components/icons";
 import { fmtDate, fullName, today } from "@/lib/format";
 import { eventsBetween } from "@/lib/calendar";
 import { EVENT_LABEL, EVENT_TONE } from "@/lib/calendar-meta";
+import { isGlobalRole } from "@/lib/roles";
 
 const ENGAGEMENT_TONE: Record<string, string> = {
   attentive: "ok", neutral: "warn", resistant: "bad",
@@ -26,7 +27,7 @@ export default async function Dashboard({
     return (
       <Alert kind="warn">
         No academic session is marked as current.{" "}
-        {user.role === "super_admin"
+        {isGlobalRole(user.role)
           ? <Link className="underline" href="/manage/sessions">Create one to get started.</Link>
           : "Ask your administrator to open the new session."}
       </Alert>
@@ -167,7 +168,7 @@ export default async function Dashboard({
         </Link>
         <Link href="/ptm" className="btn btn-ghost">View Interaction History</Link>
         <Link href="/attendance" className="btn btn-ghost">Mark student attendance</Link>
-        {user.role !== "super_admin" && (
+        {!isGlobalRole(user.role) && (
           <Link href="/my-attendance" className="btn btn-ghost">My check-in</Link>
         )}
         {user.role !== "teacher" && (

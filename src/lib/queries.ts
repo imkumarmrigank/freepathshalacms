@@ -1,6 +1,7 @@
 import "server-only";
 import { one, query } from "./db";
 import type { SessionUser } from "./auth";
+import { isGlobalRole } from "./roles";
 
 export type Center = {
   id: number; code: string; name: string; area: string | null; city: string | null;
@@ -45,7 +46,7 @@ export async function listCenters(activeOnly = true) {
 
 /** Centres this user is allowed to look at. */
 export async function centersForUser(u: SessionUser) {
-  if (u.role === "super_admin") return listCenters();
+  if (isGlobalRole(u.role)) return listCenters();
   if (!u.centerId) return [];
   return query<Center>(
     `SELECT c.*, m.name AS manager_name FROM centers c
@@ -67,7 +68,7 @@ export async function getCenter(id: number) {
  * Non-admins are always pinned to their own centre regardless of the query string.
  */
 export function resolveCenterId(u: SessionUser, requested?: string | number | null) {
-  if (u.role !== "super_admin") return u.centerId;
+  if (!isGlobalRole(u.role)) return u.centerId;
   const n = Number(requested);
   return Number.isFinite(n) && n > 0 ? n : null;
 }

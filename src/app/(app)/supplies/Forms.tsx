@@ -1,20 +1,66 @@
 "use client";
 import { useActionState } from "react";
-import { issueToStudent, recordReceipt, saveItem } from "./actions";
+import { issueToStudent, recordHqReceipt, recordReceipt, saveItem } from "./actions";
 import { Card, Field } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
 
 type Item = { id: number; name: string; unit: string };
 
+export function HqReceiptForm({ items }: { items: (Item & { hqAvailable: number })[] }) {
+  const [state, action] = useActionState(recordHqReceipt, null);
+  return (
+    <Card>
+      <h2 className="mb-1 text-[15px] font-semibold">Goods received at headquarters</h2>
+      <p className="mb-4 text-[13px] text-[var(--muted)]">
+        Everything starts here. Stock has to be received at headquarters before it can be
+        dispatched to a centre.
+      </p>
+      <form action={action}>
+        <FormMessage state={state} />
+        <Field label="Item *">
+          <select className="select" name="item_id" required defaultValue="">
+            <option value="">Select item</option>
+            {items.map((i) => (
+              <option key={i.id} value={i.id}>
+                {i.name} — {i.hqAvailable} {i.unit}{i.hqAvailable === 1 ? "" : "s"} at HQ
+              </option>
+            ))}
+          </select>
+        </Field>
+        <div className="grid grid-cols-2 gap-x-4">
+          <Field label="Quantity *">
+            <input className="input" type="number" name="quantity" min={1} step={1} required />
+          </Field>
+          <Field label="Received on">
+            <input className="input" type="date" name="received_on"
+              max={new Date().toISOString().slice(0, 10)}
+              defaultValue={new Date().toISOString().slice(0, 10)} />
+          </Field>
+          <Field label="Supplier"><input className="input" name="supplier" /></Field>
+          <Field label="Invoice no."><input className="input" name="invoice_no" /></Field>
+        </div>
+        <Field label="Unit cost (₹)">
+          <input className="input" type="number" name="unit_cost" min={0} step="0.01" />
+        </Field>
+        <Field label="Remarks"><textarea className="textarea" name="remarks" rows={2} /></Field>
+        <Submit>Record goods in</Submit>
+      </form>
+    </Card>
+  );
+}
+
 export function ReceiptForm({
   items, centers,
-}: { items: Item[]; centers: { id: number; code: string; name: string }[] }) {
+}: {
+  items: (Item & { hqAvailable: number })[];
+  centers: { id: number; code: string; name: string }[];
+}) {
   const [state, action] = useActionState(recordReceipt, null);
   return (
     <Card>
-      <h2 className="mb-1 text-[15px] font-semibold">Send stock to a centre</h2>
+      <h2 className="mb-1 text-[15px] font-semibold">Dispatch stock to a centre</h2>
       <p className="mb-4 text-[13px] text-[var(--muted)]">
-        Record what was dispatched from HQ. This is what the centre can then hand out.
+        Comes out of headquarters stock, and becomes what the centre can hand out.
       </p>
       <form action={action}>
         <FormMessage state={state} />
@@ -27,14 +73,18 @@ export function ReceiptForm({
         <Field label="Item *">
           <select className="select" name="item_id" required defaultValue="">
             <option value="">Select item</option>
-            {items.map((i) => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}
+            {items.map((i) => (
+              <option key={i.id} value={i.id} disabled={i.hqAvailable <= 0}>
+                {i.name} — {i.hqAvailable} {i.unit}{i.hqAvailable === 1 ? "" : "s"} at HQ
+              </option>
+            ))}
           </select>
         </Field>
         <div className="grid grid-cols-2 gap-x-4">
           <Field label="Quantity *">
             <input className="input" type="number" name="quantity" min={1} step={1} required />
           </Field>
-          <Field label="Received on">
+          <Field label="Dispatched on">
             <input className="input" type="date" name="received_on"
               max={new Date().toISOString().slice(0, 10)}
               defaultValue={new Date().toISOString().slice(0, 10)} />

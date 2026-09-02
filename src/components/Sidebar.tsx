@@ -22,15 +22,15 @@ const MAIN: Item[] = [
   { href: "/calendar", label: "Calendar", icon: IconCal },
   { href: "/ptm", label: "PTM Interactions", icon: IconChat },
   { href: "/follow-ups", label: "Follow-ups", icon: IconClock },
-  { href: "/supplies", label: "Supplies", icon: IconBox, roles: ["super_admin", "center_manager"] },
+  { href: "/supplies", label: "Supplies", icon: IconBox, roles: ["super_admin", "mentor", "center_manager"] },
   { href: "/reports", label: "Reports", icon: IconChart },
 ];
 
 const ADMIN: Item[] = [
-  { href: "/manage/centers", label: "Centres", icon: IconBuilding, roles: ["super_admin"] },
+  { href: "/manage/centers", label: "Centres", icon: IconBuilding, roles: ["super_admin", "mentor"] },
   { href: "/manage/staff", label: "Staff", icon: IconUsers, roles: ["super_admin", "center_manager"] },
   { href: "/manage/allocations", label: "Class Allocation", icon: IconLayers, roles: ["super_admin", "center_manager"] },
-  { href: "/manage/staff-attendance", label: "Staff Attendance", icon: IconPin, roles: ["super_admin", "center_manager"] },
+  { href: "/manage/staff-attendance", label: "Staff Attendance", icon: IconPin, roles: ["super_admin", "mentor", "center_manager"] },
   { href: "/manage/sessions", label: "Sessions", icon: IconLayers, roles: ["super_admin"] },
   { href: "/manage/classes", label: "Classes", icon: IconLayers, roles: ["super_admin"] },
   { href: "/manage/promotions", label: "Promotions", icon: IconArrowUp, roles: ["super_admin"] },

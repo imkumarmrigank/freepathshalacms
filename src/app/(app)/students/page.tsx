@@ -5,6 +5,7 @@ import { centersForUser, currentSession, listClasses, listSessions, resolveCente
 import { Avatar, Badge, Card, Empty, Meter, PageHeader } from "@/components/ui";
 import Filters from "@/components/Filters";
 import { fmtDate, fullName } from "@/lib/format";
+import { isGlobalRole } from "@/lib/roles";
 
 const STATUS_TONE: Record<string, string> = {
   active: "ok", inactive: "mute", graduated: "info", transferred: "mute", dropped: "bad",
@@ -71,7 +72,7 @@ export default async function StudentsPage({
       />
 
       <Filters
-        centers={user.role === "super_admin" ? centers : []}
+        centers={isGlobalRole(user.role) ? centers : []}
         classes={classes}
         sessions={sessions}
         current={{ ...sp, session: String(sessionId ?? "") }}

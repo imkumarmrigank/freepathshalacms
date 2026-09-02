@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
 import { PLAN_LEAD_DAYS, earliestPlanStart } from "@/lib/plan-meta";
+import { isGlobalRole } from "@/lib/roles";
 
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
@@ -24,7 +25,7 @@ async function canEditPlan(planId: number) {
   if (!plan) return { error: "Plan not found." } as const;
   if (user.role === "teacher" && plan.teacher_id !== user.uid)
     return { error: "This plan belongs to another teacher." } as const;
-  if (user.role !== "super_admin" && plan.center_id !== user.centerId)
+  if (!isGlobalRole(user.role) && plan.center_id !== user.centerId)
     return { error: "This plan belongs to another centre." } as const;
   return { user, plan } as const;
 }
@@ -69,7 +70,7 @@ export async function createPlan(_prev: unknown, form: FormData) {
       teacherId = chosen;
       centerId = t.center_id;
     }
-    if (user.role === "super_admin" && form.get("center_id"))
+    if (isGlobalRole(user.role) && form.get("center_id"))
       centerId = Number(form.get("center_id"));
   }
   if (!centerId) return { error: "Pick a centre for this plan." };
@@ -202,7 +203,7 @@ export async function setAllocation(_prev: unknown, form: FormData) {
   const teacher = await one<{ center_id: number | null }>(
     "SELECT center_id FROM users WHERE id = $1", [teacherId]);
   if (!teacher) return { error: "Teacher not found." };
-  if (user.role !== "super_admin" && teacher.center_id !== user.centerId)
+  if (!isGlobalRole(user.role) && teacher.center_id !== user.centerId)
     return { error: "That teacher is not at your centre." };
   if (!teacher.center_id) return { error: "Assign the teacher to a centre first." };
 

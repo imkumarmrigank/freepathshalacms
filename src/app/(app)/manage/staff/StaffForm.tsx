@@ -37,10 +37,11 @@ export default function StaffForm({
               <select className="select" name="role" defaultValue={staff?.role ?? "teacher"}>
                 <option value="teacher">Teacher</option>
                 <option value="center_manager">Centre manager</option>
+                <option value="mentor">Mentor</option>
                 <option value="super_admin">Super admin</option>
               </select>
             </Field>
-            <Field label="Centre" hint="Leave blank only for super admins">
+            <Field label="Centre" hint="Leave blank for mentors and super admins — they work across all centres">
               <select className="select" name="center_id" defaultValue={staff?.center_id ?? ""}>
                 <option value="">No centre</option>
                 {centers.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}

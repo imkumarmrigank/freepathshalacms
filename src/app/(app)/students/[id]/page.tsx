@@ -10,6 +10,7 @@ import { EXAM_TYPE_LABEL, grade, percentage } from "@/lib/exam-meta";
 import type { Student } from "@/lib/types";
 import EditStudent from "./EditStudent";
 import EnrollmentControls from "./EnrollmentControls";
+import { isGlobalRole } from "@/lib/roles";
 
 const STATUS_TONE: Record<string, string> = {
   active: "ok", inactive: "mute", graduated: "info", transferred: "mute", dropped: "bad",
@@ -33,7 +34,7 @@ export default async function StudentPage({
        JOIN centers c ON c.id = s.center_id WHERE s.id = $1`, [sid],
   );
   if (!student) notFound();
-  if (user.role !== "super_admin" && student.center_id !== user.centerId)
+  if (!isGlobalRole(user.role) && student.center_id !== user.centerId)
     return <Alert kind="bad">This student belongs to another centre.</Alert>;
 
   const [enrollments, attendance, interactions, classes] = await Promise.all([

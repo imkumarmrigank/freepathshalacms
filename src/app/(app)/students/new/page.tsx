@@ -2,6 +2,7 @@ import { requireUser } from "@/lib/auth";
 import { centersForUser, currentSession, listClasses } from "@/lib/queries";
 import { Alert, PageHeader } from "@/components/ui";
 import StudentForm from "./StudentForm";
+import { isGlobalRole } from "@/lib/roles";
 
 export default async function NewStudentPage() {
   const user = await requireUser();
@@ -27,7 +28,7 @@ export default async function NewStudentPage() {
       <StudentForm
         centers={centers}
         classes={classes}
-        showCenter={user.role === "super_admin"}
+        showCenter={isGlobalRole(user.role)}
         defaultCenterId={user.centerId}
         sessionName={session.name}
         sessionStart={session.start_date}

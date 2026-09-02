@@ -2,6 +2,7 @@ import "server-only";
 import { query } from "./db";
 import { reportByKey } from "./report-meta";
 import type { SessionUser } from "./auth";
+import { isGlobalRole } from "./roles";
 
 export type ReportColumn = { key: string; label: string; width?: number; numeric?: boolean };
 export type ReportRow = Record<string, string | number | null>;
@@ -49,7 +50,7 @@ export async function runReport(
     throw new Error("You don’t have access to this report.");
 
   // Non-admins can never widen the scope past their own centre.
-  const centerId = user.role === "super_admin" ? p.centerId : user.centerId;
+  const centerId = isGlobalRole(user.role) ? p.centerId : user.centerId;
   const scoped = { ...p, centerId };
   const period = `${p.from} to ${p.to}`;
 
@@ -62,6 +63,7 @@ export async function runReport(
     case "student-roster":               return studentRoster(scoped);
     case "admissions":                   return admissions(scoped, period);
     case "supplies-stock":               return suppliesStock(scoped);
+    case "hq-stock":                     return hqStock();
     case "supplies-issued":              return suppliesIssued(scoped, period);
     case "exam-marks":                   return examMarks(scoped, period);
     case "exam-summary":                 return examSummary(scoped, period);
@@ -478,6 +480,45 @@ async function suppliesStock(p: ReportParams): Promise<ReportResult> {
       center_name: r.center_name, item: r.item, category: r.category, unit: r.unit,
       received: Number(r.received), issued: Number(r.issued),
       in_hand: Number(r.received) - Number(r.issued),
+    })),
+  };
+}
+
+async function hqStock(): Promise<ReportResult> {
+  const rows = await query<{
+    item: string; category: string; unit: string;
+    received: string; dispatched: string; to_students: string;
+  }>(
+    `SELECT i.name AS item, i.category, i.unit,
+            COALESCE((SELECT sum(h.quantity) FROM hq_supply_receipts h
+                       WHERE h.item_id = i.id), 0) AS received,
+            COALESCE((SELECT sum(r.quantity) FROM center_supply_receipts r
+                       WHERE r.item_id = i.id), 0) AS dispatched,
+            COALESCE((SELECT sum(s.quantity) FROM student_supply_issues s
+                       WHERE s.item_id = i.id), 0) AS to_students
+       FROM supply_items i WHERE i.is_active
+      ORDER BY i.category, i.name`,
+  );
+
+  return {
+    title: "Headquarters stock",
+    subtitle: "The whole chain — received at HQ, sent to centres, given to students",
+    columns: [
+      { key: "item", label: "Item", width: 24 },
+      { key: "category", label: "Category", width: 14 },
+      { key: "unit", label: "Unit", width: 10 },
+      { key: "received", label: "Received at HQ", numeric: true, width: 15 },
+      { key: "dispatched", label: "Sent to centres", numeric: true, width: 16 },
+      { key: "at_hq", label: "In hand at HQ", numeric: true, width: 15 },
+      { key: "to_students", label: "Given to students", numeric: true, width: 17 },
+      { key: "at_centres", label: "In hand at centres", numeric: true, width: 18 },
+    ],
+    rows: rows.map((r) => ({
+      item: r.item, category: r.category, unit: r.unit,
+      received: Number(r.received), dispatched: Number(r.dispatched),
+      at_hq: Number(r.received) - Number(r.dispatched),
+      to_students: Number(r.to_students),
+      at_centres: Number(r.dispatched) - Number(r.to_students),
     })),
   };
 }

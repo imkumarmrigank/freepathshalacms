@@ -6,6 +6,7 @@ import { Avatar, Badge, Card, Empty, PageHeader } from "@/components/ui";
 import Filters from "@/components/Filters";
 import { IconPlus } from "@/components/icons";
 import { fmtDate, fullName, titleCase } from "@/lib/format";
+import { isGlobalRole } from "@/lib/roles";
 
 const TONE: Record<string, string> = { attentive: "ok", neutral: "warn", resistant: "bad" };
 
@@ -63,7 +64,7 @@ export default async function PtmPage({
         } />
 
       <Filters
-        centers={user.role === "super_admin" ? centers : []}
+        centers={isGlobalRole(user.role) ? centers : []}
         classes={classes}
         current={sp}
         searchPlaceholder="Search student or mentor"

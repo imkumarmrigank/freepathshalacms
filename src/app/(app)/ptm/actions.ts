@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
+import { isGlobalRole } from "@/lib/roles";
 
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
@@ -30,7 +31,7 @@ export async function recordInteraction(_prev: unknown, form: FormData) {
     [studentId, session.id],
   );
   if (!student) return { error: "Student not found." };
-  if (user.role !== "super_admin" && student.center_id !== user.centerId)
+  if (!isGlobalRole(user.role) && student.center_id !== user.centerId)
     return { error: "This student belongs to another centre." };
 
   const followUp = form.get("follow_up_required") === "on";
@@ -71,7 +72,7 @@ export async function closeFollowUp(_prev: unknown, form: FormData) {
     "SELECT center_id FROM ptm_interactions WHERE id = $1", [id],
   );
   if (!row) return { error: "Interaction not found." };
-  if (user.role !== "super_admin" && row.center_id !== user.centerId)
+  if (!isGlobalRole(user.role) && row.center_id !== user.centerId)
     return { error: "This record belongs to another centre." };
 
   await query(
@@ -89,7 +90,7 @@ export async function scheduleMeeting(_prev: unknown, form: FormData) {
   const session = await currentSession();
   if (!session) return { error: "No academic session is open." };
 
-  const centerId = user.role === "super_admin" ? Number(form.get("center_id")) : user.centerId;
+  const centerId = isGlobalRole(user.role) ? Number(form.get("center_id")) : user.centerId;
   if (!centerId) return { error: "Select a centre." };
 
   await query(

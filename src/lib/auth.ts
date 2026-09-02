@@ -6,7 +6,8 @@ import bcrypt from "bcryptjs";
 import { one, query } from "./db";
 
 export const COOKIE = "fp_session";
-export type Role = "super_admin" | "center_manager" | "teacher";
+export type { Role } from "./roles";
+import { isGlobalRole, type Role } from "./roles";
 
 export type SessionUser = {
   uid: number;
@@ -75,15 +76,17 @@ export async function requireRole(...roles: Role[]): Promise<SessionUser> {
 }
 
 export const isAdmin = (u: SessionUser) => u.role === "super_admin";
+/** Works across every centre rather than being pinned to one. */
+export const isGlobal = (u: SessionUser) => isGlobalRole(u.role);
 export const canManageCenter = (u: SessionUser) =>
-  u.role === "super_admin" || u.role === "center_manager";
+  isGlobalRole(u.role) || u.role === "center_manager";
 
 /**
  * Centre scoping: super admins see everything (or a chosen centre),
  * managers and teachers are pinned to their own centre.
  */
 export function scopedCenterId(u: SessionUser, requested?: number | null): number | null {
-  if (u.role === "super_admin") return requested ?? null;
+  if (isGlobalRole(u.role)) return requested ?? null;
   return u.centerId;
 }
 

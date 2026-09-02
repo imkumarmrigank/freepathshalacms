@@ -8,7 +8,7 @@ export type ReportMeta = {
   description: string;
   filters: ReportFilter[];
   /** Only these roles may run it; omitted means everyone with reports access. */
-  roles?: ("super_admin" | "center_manager" | "teacher")[];
+  roles?: ("super_admin" | "mentor" | "center_manager" | "teacher")[];
 };
 
 export const REPORTS: ReportMeta[] = [
@@ -35,7 +35,7 @@ export const REPORTS: ReportMeta[] = [
     description:
       "Teachers and centre managers: days present, late, absent and hours logged over the period.",
     filters: ["dates", "center", "role"],
-    roles: ["super_admin", "center_manager"],
+    roles: ["super_admin", "mentor", "center_manager"],
   },
   {
     key: "staff-attendance-detail",
@@ -44,7 +44,7 @@ export const REPORTS: ReportMeta[] = [
     description:
       "Every punch in the period with times, hours, distance from the centre and any manual override.",
     filters: ["dates", "center", "role"],
-    roles: ["super_admin", "center_manager"],
+    roles: ["super_admin", "mentor", "center_manager"],
   },
   {
     key: "students-by-class",
@@ -74,7 +74,16 @@ export const REPORTS: ReportMeta[] = [
     group: "Supplies",
     description: "Received, given out and in hand for every item, centre by centre.",
     filters: ["center"],
-    roles: ["super_admin", "center_manager"],
+    roles: ["super_admin", "mentor", "center_manager"],
+  },
+  {
+    key: "hq-stock",
+    label: "Headquarters stock",
+    group: "Supplies",
+    description:
+      "What has been received at headquarters, what has gone out to centres, and what is left.",
+    filters: [],
+    roles: ["super_admin", "mentor"],
   },
   {
     key: "supplies-issued",
@@ -82,7 +91,7 @@ export const REPORTS: ReportMeta[] = [
     group: "Supplies",
     description: "Every issue in the period — student, item, quantity and who handed it over.",
     filters: ["dates", "center"],
-    roles: ["super_admin", "center_manager"],
+    roles: ["super_admin", "mentor", "center_manager"],
   },
   {
     key: "exam-marks",

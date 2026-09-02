@@ -6,6 +6,7 @@ import { Alert, Avatar, Badge, Card, Empty, Meter, PageHeader } from "@/componen
 import Filters from "@/components/Filters";
 import { fullName } from "@/lib/format";
 import { grade, percentage } from "@/lib/exam-meta";
+import { isGlobalRole } from "@/lib/roles";
 
 export const metadata = { title: "Progress reports · FreePathshala CMS" };
 
@@ -50,7 +51,7 @@ export default async function ProgressReportsPage({
       />
 
       <Filters
-        centers={user.role === "super_admin" ? centers : []}
+        centers={isGlobalRole(user.role) ? centers : []}
         classes={classes}
         sessions={sessions}
         current={{ ...sp, session: String(sessionId) }}

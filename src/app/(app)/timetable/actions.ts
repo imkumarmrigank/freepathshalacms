@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
+import { isGlobalRole } from "@/lib/roles";
 
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
@@ -17,7 +18,7 @@ export async function saveSlot(_prev: unknown, form: FormData) {
   const session = await currentSession();
   if (!session) return { error: "No academic session is open." };
 
-  const centerId = user.role === "super_admin"
+  const centerId = isGlobalRole(user.role)
     ? Number(form.get("center_id")) : user.centerId;
   if (!centerId) return { error: "Pick a centre." };
 
@@ -80,7 +81,7 @@ export async function deleteSlot(_prev: unknown, form: FormData) {
   const row = await one<{ center_id: number }>(
     "SELECT center_id FROM timetable_slots WHERE id = $1", [id]);
   if (!row) return { error: "Slot not found." };
-  if (user.role !== "super_admin" && row.center_id !== user.centerId)
+  if (!isGlobalRole(user.role) && row.center_id !== user.centerId)
     return { error: "That slot belongs to another centre." };
 
   await query("DELETE FROM timetable_slots WHERE id = $1", [id]);

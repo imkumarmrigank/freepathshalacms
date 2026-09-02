@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { tx, query, one } from "@/lib/db";
 import { nextEnrollmentNo } from "@/lib/enrollment";
 import { currentSession } from "@/lib/queries";
+import { isGlobalRole } from "@/lib/roles";
 
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
@@ -18,7 +19,7 @@ export async function createStudent(_prev: unknown, form: FormData) {
   const session = await currentSession();
   if (!session) return { error: "No current academic session. Ask an admin to open one." };
 
-  const centerId = user.role === "super_admin"
+  const centerId = isGlobalRole(user.role)
     ? Number(form.get("center_id")) : user.centerId;
   if (!centerId) return { error: "Select a centre." };
 
@@ -71,7 +72,7 @@ export async function updateStudent(_prev: unknown, form: FormData) {
     "SELECT center_id FROM students WHERE id = $1", [id],
   );
   if (!existing) return { error: "Student not found." };
-  if (user.role !== "super_admin" && existing.center_id !== user.centerId)
+  if (!isGlobalRole(user.role) && existing.center_id !== user.centerId)
     return { error: "This student belongs to another centre." };
 
   await query(
@@ -98,7 +99,7 @@ export async function changeClass(_prev: unknown, form: FormData) {
   );
   if (!row) return { error: "Enrolment not found." };
   if (user.role === "teacher") return { error: "Only managers can move a student between classes." };
-  if (user.role !== "super_admin" && row.center_id !== user.centerId)
+  if (!isGlobalRole(user.role) && row.center_id !== user.centerId)
     return { error: "This student belongs to another centre." };
 
   await query("UPDATE enrollments SET class_level_id = $2 WHERE id = $1",
@@ -117,7 +118,7 @@ export async function setPromotionDecision(_prev: unknown, form: FormData) {
     "SELECT center_id, student_id FROM enrollments WHERE id = $1", [enrollmentId],
   );
   if (!row) return { error: "Enrolment not found." };
-  if (user.role !== "super_admin" && row.center_id !== user.centerId)
+  if (!isGlobalRole(user.role) && row.center_id !== user.centerId)
     return { error: "This student belongs to another centre." };
 
   await query("UPDATE enrollments SET promotion_decision = $2 WHERE id = $1",

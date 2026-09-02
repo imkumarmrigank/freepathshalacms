@@ -7,6 +7,7 @@ import ReportCard from "@/components/ReportCard";
 import { Alert } from "@/components/ui";
 import { fullName } from "@/lib/format";
 import PrintButton from "./PrintButton";
+import { isGlobalRole } from "@/lib/roles";
 
 export const metadata = { title: "Progress report · FreePathshala" };
 
@@ -25,7 +26,7 @@ export default async function ReportCardPage({
 
   const data = await loadReportCard(Number(id), sessionId);
   if (!data) notFound();
-  if (user.role !== "super_admin" && data.student.center_id !== user.centerId)
+  if (!isGlobalRole(user.role) && data.student.center_id !== user.centerId)
     return <Alert kind="bad">This student belongs to another centre.</Alert>;
 
   return (

@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
 import { HOLIDAY_TYPES } from "@/lib/calendar-meta";
+import { isGlobalRole } from "@/lib/roles";
 
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
@@ -27,7 +28,7 @@ export async function saveEvent(_prev: unknown, form: FormData) {
 
   // A manager can only publish to their own centre; only an admin can post to all centres.
   let centerId: number | null;
-  if (user.role === "super_admin") {
+  if (isGlobalRole(user.role)) {
     centerId = form.get("center_id") ? Number(form.get("center_id")) : null;
   } else {
     centerId = user.centerId;
@@ -40,7 +41,7 @@ export async function saveEvent(_prev: unknown, form: FormData) {
     const existing = await one<{ center_id: number | null }>(
       "SELECT center_id FROM calendar_events WHERE id = $1", [id]);
     if (!existing) return { error: "Event not found." };
-    if (user.role !== "super_admin" && existing.center_id !== user.centerId)
+    if (!isGlobalRole(user.role) && existing.center_id !== user.centerId)
       return { error: "That event belongs to another centre." };
 
     await query(
@@ -75,7 +76,7 @@ export async function deleteEvent(_prev: unknown, form: FormData) {
   const existing = await one<{ center_id: number | null }>(
     "SELECT center_id FROM calendar_events WHERE id = $1", [id]);
   if (!existing) return { error: "Event not found." };
-  if (user.role !== "super_admin" && existing.center_id !== user.centerId)
+  if (!isGlobalRole(user.role) && existing.center_id !== user.centerId)
     return { error: "That event belongs to another centre." };
 
   await query("DELETE FROM calendar_events WHERE id = $1", [id]);

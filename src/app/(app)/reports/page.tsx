@@ -6,6 +6,7 @@ import { REPORTS } from "@/lib/report-meta";
 import { runReport, type ReportParams, type ReportResult } from "@/lib/reports";
 import { IconDownload } from "@/components/icons";
 import ReportPicker from "./ReportPicker";
+import { isGlobalRole } from "@/lib/roles";
 
 const PREVIEW_ROWS = 60;
 
@@ -77,7 +78,7 @@ export default async function ReportsPage({
         centers={centers}
         classes={classes}
         sessions={sessions}
-        showCenter={user.role === "super_admin"}
+        showCenter={isGlobalRole(user.role)}
         current={{ ...sp, report: reportKey, from: params.from, to: params.to,
           session: String(params.sessionId) }}
       />

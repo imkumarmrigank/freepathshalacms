@@ -8,6 +8,7 @@ import { fmtDate, today } from "@/lib/format";
 import { closeRegisterUpToYesterday } from "@/lib/attendance";
 import { holidayOn } from "@/lib/calendar";
 import { EVENT_LABEL } from "@/lib/calendar-meta";
+import { isGlobalRole } from "@/lib/roles";
 
 export default async function AttendancePage({
   searchParams,
@@ -60,7 +61,7 @@ export default async function AttendancePage({
 
       <Card className="mb-4">
         <AttendancePicker
-          centers={user.role === "super_admin" ? centers : []}
+          centers={isGlobalRole(user.role) ? centers : []}
           classes={classes}
           defaults={{ center: String(centerId ?? ""), class: String(classId ?? ""), date: attDate }}
         />

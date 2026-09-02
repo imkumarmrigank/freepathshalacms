@@ -72,7 +72,8 @@ export default async function StaffPage({
                         </td>
                         <td>
                           <div className="flex flex-wrap gap-1.5">
-                            <Badge tone={r.role === "super_admin" ? "info" : r.role === "center_manager" ? "ok" : "mute"}>
+                            <Badge tone={r.role === "super_admin" ? "info" : r.role === "mentor" ? "warn"
+                              : r.role === "center_manager" ? "ok" : "mute"}>
                               {ROLE_LABEL[r.role]}
                             </Badge>
                             {r.is_manager && <Badge tone="info" dot={false}>Centre head</Badge>}

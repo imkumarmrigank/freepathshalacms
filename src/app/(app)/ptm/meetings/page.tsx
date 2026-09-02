@@ -4,6 +4,7 @@ import { centersForUser, currentSession, listClasses, resolveCenterId } from "@/
 import { Alert, Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { fmtDate, titleCase } from "@/lib/format";
 import ScheduleForm from "./ScheduleForm";
+import { isGlobalRole } from "@/lib/roles";
 
 export default async function MeetingsPage() {
   const user = await requireUser();
@@ -77,7 +78,7 @@ export default async function MeetingsPage() {
           </Card>
         </div>
         {user.role !== "teacher" && (
-          <ScheduleForm centers={centers} classes={classes} showCenter={user.role === "super_admin"} />
+          <ScheduleForm centers={centers} classes={classes} showCenter={isGlobalRole(user.role)} />
         )}
       </div>
     </>

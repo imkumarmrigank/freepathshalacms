@@ -8,6 +8,7 @@ import { fmtDate, today } from "@/lib/format";
 import MonthGrid from "./MonthGrid";
 import EventForm from "./EventForm";
 import DeleteEvent from "./DeleteEvent";
+import { isGlobalRole } from "@/lib/roles";
 
 function monthBounds(month: string) {
   const [y, m] = month.split("-").map(Number);
@@ -46,7 +47,7 @@ export default async function CalendarPage({
     <>
       <PageHeader
         title="School calendar"
-        subtitle={user.role === "super_admin" && !centerId
+        subtitle={isGlobalRole(user.role) && !centerId
           ? "Holidays, PTM days, exams and events across all centres"
           : `Holidays, PTM days, exams and events at ${user.centerName ?? "this centre"}`}
         right={
@@ -58,7 +59,7 @@ export default async function CalendarPage({
         }
       />
 
-      {user.role === "super_admin" && centers.length > 0 && (
+      {isGlobalRole(user.role) && centers.length > 0 && (
         <form className="mb-4 flex items-end gap-2">
           <input type="hidden" name="month" value={month} />
           <label>
@@ -120,7 +121,7 @@ export default async function CalendarPage({
         </div>
 
         {canEdit && (
-          <EventForm centers={centers} isAdmin={user.role === "super_admin"}
+          <EventForm centers={centers} isAdmin={isGlobalRole(user.role)}
             centerName={user.centerName} defaultDate={today()} />
         )}
       </div>

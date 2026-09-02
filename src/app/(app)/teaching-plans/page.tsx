@@ -7,6 +7,7 @@ import Filters from "@/components/Filters";
 import { fmtDate } from "@/lib/format";
 import NewPlanForm from "./NewPlanForm";
 import { PLAN_LEAD_DAYS } from "@/lib/plan-meta";
+import { isGlobalRole } from "@/lib/roles";
 
 export default async function TeachingPlansPage({
   searchParams,
@@ -69,7 +70,7 @@ export default async function TeachingPlansPage({
           : `Plans across ${centerId ? user.centerName ?? "this centre" : "all centres"} · ${session.name}`} />
 
       <Filters
-        centers={user.role === "super_admin" ? centers : []}
+        centers={isGlobalRole(user.role) ? centers : []}
         classes={classes}
         current={sp}
         extra={[{ name: "status", label: "All statuses", options: [
@@ -140,7 +141,7 @@ export default async function TeachingPlansPage({
           teachers={teachers}
           centers={centers}
           isTeacher={user.role === "teacher"}
-          isAdmin={user.role === "super_admin"}
+          isAdmin={isGlobalRole(user.role)}
         />
       </div>
     </>

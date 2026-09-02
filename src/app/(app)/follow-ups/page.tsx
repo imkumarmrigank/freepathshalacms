@@ -5,6 +5,7 @@ import { centersForUser, currentSession, resolveCenterId } from "@/lib/queries";
 import { Avatar, Badge, Card, Empty, PageHeader, StatCard } from "@/components/ui";
 import Filters from "@/components/Filters";
 import { fmtDate, fullName, titleCase, today } from "@/lib/format";
+import { isGlobalRole } from "@/lib/roles";
 
 export default async function FollowUpsPage({
   searchParams,
@@ -60,7 +61,7 @@ export default async function FollowUpsPage({
       </div>
 
       <Filters
-        centers={user.role === "super_admin" ? centers : []}
+        centers={isGlobalRole(user.role) ? centers : []}
         current={sp}
         extra={[{ name: "status", label: "Pending",
           options: [

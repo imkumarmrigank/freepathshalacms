@@ -7,6 +7,7 @@ import TopicRow, { type Topic } from "./TopicRow";
 import AddTopic from "./AddTopic";
 import SubmitPlan from "./SubmitPlan";
 import { PLAN_LEAD_DAYS } from "@/lib/plan-meta";
+import { isGlobalRole } from "@/lib/roles";
 
 export default async function PlanPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -34,11 +35,11 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
     [planId],
   );
   if (!plan) notFound();
-  if (user.role !== "super_admin" && plan.center_id !== user.centerId)
+  if (!isGlobalRole(user.role) && plan.center_id !== user.centerId)
     return <Alert kind="bad">This plan belongs to another centre.</Alert>;
 
   const canEdit =
-    user.role === "super_admin" ||
+    isGlobalRole(user.role) ||
     (user.role === "center_manager" && plan.center_id === user.centerId) ||
     (user.role === "teacher" && plan.teacher_id === user.uid);
 
