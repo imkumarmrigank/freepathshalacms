@@ -27,10 +27,10 @@ export default async function ExamsPage({
 
   const exams = await query<{
     id: number; title: string; subject: string; exam_type: string; exam_date: string;
-    max_marks: string; class_name: string; center_name: string; status: string;
-    teacher: string | null; entered: string; roster: string; average: string | null;
+    term_label: string | null; max_marks: string; class_name: string; center_name: string;
+    status: string; teacher: string | null; entered: string; roster: string; average: string | null;
   }>(
-    `SELECT e.id, e.title, e.subject, e.exam_type, e.exam_date, e.max_marks,
+    `SELECT e.id, e.title, e.subject, e.exam_type, e.exam_date, e.term_label, e.max_marks,
             cl.name AS class_name, ce.name AS center_name, e.status, u.name AS teacher,
             (SELECT count(*) FROM exam_marks m
               WHERE m.exam_id = e.id AND (m.marks_obtained IS NOT NULL OR m.is_absent)) AS entered,
@@ -44,7 +44,7 @@ export default async function ExamsPage({
        JOIN centers ce ON ce.id = e.center_id
        LEFT JOIN users u ON u.id = e.created_by
       WHERE e.session_id = $1 ${where}
-      ORDER BY e.exam_date DESC, e.id DESC`,
+      ORDER BY e.exam_date DESC, e.class_level_id, COALESCE(e.term_label, e.title), e.subject`,
     params,
   );
 
@@ -56,6 +56,21 @@ export default async function ExamsPage({
           WHERE tc.user_id = $1 AND tc.session_id = $2 ORDER BY cl.sequence`,
         [user.uid, session.id])
     : classes;
+
+  // subjects of the same test sit together under one heading
+  type Group = { key: string; title: string; type: string; date: string;
+                 className: string; centerName: string; rows: typeof exams };
+  const groups: Group[] = [];
+  for (const e of exams) {
+    const key = `${e.exam_type}||${(e.term_label ?? e.title).toLowerCase()}||${e.class_name}||${e.center_name}`;
+    let g = groups.find((x) => x.key === key);
+    if (!g) {
+      g = { key, title: e.term_label ?? e.title, type: e.exam_type, date: e.exam_date,
+            className: e.class_name, centerName: e.center_name, rows: [] };
+      groups.push(g);
+    }
+    g.rows.push(e);
+  }
 
   return (
     <>
@@ -81,24 +96,33 @@ export default async function ExamsPage({
                 <table className="tbl">
                   <thead>
                     <tr>
-                      <th>Test</th><th>Class</th><th>Date</th>
+                      <th>Subject</th><th>Class</th><th>Date</th>
                       <th>Marks entered</th><th>Average</th><th>Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {exams.map((e) => {
+                    {groups.flatMap((g) => [
+                      <tr key={g.key} className="bg-[#fafaff]">
+                        <td colSpan={6} className="py-2">
+                          <span className="text-[13px] font-semibold">{g.title}</span>
+                          <span className="ml-2 text-[12px] text-[var(--muted)]">
+                            {EXAM_TYPE_LABEL[g.type] ?? g.type} · {g.className} · {g.centerName}
+                            {" · "}{g.rows.length} subject{g.rows.length === 1 ? "" : "s"}
+                          </span>
+                        </td>
+                      </tr>,
+                      ...g.rows.map((e) => {
                       const entered = Number(e.entered), roster = Number(e.roster);
                       const avgPct = e.average === null
                         ? null : (Number(e.average) / Number(e.max_marks)) * 100;
                       return (
                         <tr key={e.id}>
-                          <td>
+                          <td className="pl-8">
                             <Link href={`/exams/${e.id}`} className="font-medium hover:text-[var(--brand)]">
-                              {e.title}
+                              {e.subject}
                             </Link>
                             <div className="text-[12px] text-[var(--muted)]">
-                              {e.subject} · {EXAM_TYPE_LABEL[e.exam_type] ?? e.exam_type}
-                              {" · out of "}{Number(e.max_marks)}
+                              out of {Number(e.max_marks)}
                             </div>
                           </td>
                           <td className="text-[var(--muted)]">{e.class_name}</td>
@@ -122,7 +146,8 @@ export default async function ExamsPage({
                           </td>
                         </tr>
                       );
-                    })}
+                      }),
+                    ])}
                   </tbody>
                 </table>
               </div>

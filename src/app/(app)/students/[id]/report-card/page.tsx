@@ -61,19 +61,21 @@ export default async function ReportCardPage({
     [studentId, sessionId],
   );
 
+  // Every paper set for this student's class — a test covers all subjects, so the
+  // report groups them back together under the test they belong to.
   const marks = await query<{
     title: string; subject: string; exam_type: string; exam_date: string;
-    max_marks: string; pass_marks: string | null;
+    term_label: string | null; max_marks: string; pass_marks: string | null;
     marks_obtained: string | null; is_absent: boolean;
   }>(
-    `SELECT x.title, x.subject, x.exam_type, x.exam_date, x.max_marks, x.pass_marks,
+    `SELECT x.title, x.subject, x.exam_type, x.exam_date, x.term_label,
+            x.max_marks, x.pass_marks,
             m.marks_obtained, COALESCE(m.is_absent, FALSE) AS is_absent
        FROM exams x
        LEFT JOIN exam_marks m ON m.exam_id = x.id AND m.student_id = $1
       WHERE x.session_id = $2 AND x.center_id = $3
         AND x.class_level_id = (SELECT class_level_id FROM enrollments
                                  WHERE student_id = $1 AND session_id = $2)
-        AND (m.marks_obtained IS NOT NULL OR m.is_absent)
       ORDER BY x.exam_date, x.subject`,
     [studentId, sessionId, student.center_id],
   );
@@ -85,21 +87,40 @@ export default async function ReportCardPage({
     [studentId, sessionId],
   );
 
-  const scored = marks.filter((m) => !m.is_absent && m.marks_obtained !== null);
-  const totalObtained = scored.reduce((n, m) => n + Number(m.marks_obtained), 0);
-  const totalMax = scored.reduce((n, m) => n + Number(m.max_marks), 0);
-  const overallPct = totalMax > 0 ? percentage(totalObtained, totalMax) : null;
+  type Paper = {
+    subject: string; max: number; obtained: number | null; isAbsent: boolean;
+    pass: number | null;
+  };
+  type Test = {
+    key: string; title: string; type: string; date: string;
+    papers: Paper[]; obtained: number; max: number; graded: number;
+  };
 
-  // subtotals per term, which is how a report card is normally read
-  const byType = new Map<string, { obtained: number; max: number; count: number }>();
-  for (const m of scored) {
-    const k = m.exam_type;
-    const acc = byType.get(k) ?? { obtained: 0, max: 0, count: 0 };
-    acc.obtained += Number(m.marks_obtained);
-    acc.max += Number(m.max_marks);
-    acc.count += 1;
-    byType.set(k, acc);
+  // One block per test: same type + term label = the same test across subjects.
+  const tests = new Map<string, Test>();
+  for (const m of marks) {
+    const key = `${m.exam_type}||${(m.term_label ?? m.title).toLowerCase()}`;
+    let t = tests.get(key);
+    if (!t) {
+      t = { key, title: m.term_label ?? m.title, type: m.exam_type, date: m.exam_date,
+            papers: [], obtained: 0, max: 0, graded: 0 };
+      tests.set(key, t);
+    }
+    const obtained = m.is_absent || m.marks_obtained === null ? null : Number(m.marks_obtained);
+    t.papers.push({
+      subject: m.subject, max: Number(m.max_marks), obtained,
+      isAbsent: m.is_absent, pass: m.pass_marks === null ? null : Number(m.pass_marks),
+    });
+    // only graded papers count towards a total, so a pending subject cannot drag it down
+    if (obtained !== null) { t.obtained += obtained; t.max += Number(m.max_marks); t.graded += 1; }
+    if (m.exam_date < t.date) t.date = m.exam_date;
   }
+  const testList = [...tests.values()].sort((a, b) => a.date.localeCompare(b.date));
+
+  const totalObtained = testList.reduce((n, t) => n + t.obtained, 0);
+  const totalMax = testList.reduce((n, t) => n + t.max, 0);
+  const overallPct = totalMax > 0 ? percentage(totalObtained, totalMax) : null;
+  const anyGraded = testList.some((t) => t.graded > 0);
 
   const attPct = attendance && Number(attendance.marked) > 0
     ? Math.round((Number(attendance.present) / Number(attendance.marked)) * 1000) / 10
@@ -188,45 +209,112 @@ export default async function ReportCardPage({
 
         {/* --------------------------------------------------------------- marks */}
         <h2 className="mb-2 mt-6 text-[14px] font-semibold">Test results</h2>
-        {marks.length === 0 ? (
+        {!anyGraded ? (
           <p className="rounded-[9px] bg-[#fafaff] px-3.5 py-3 text-[13px] text-[var(--muted)]">
             No test results have been recorded for this session yet.
           </p>
         ) : (
           <>
+            {testList.filter((t) => t.graded > 0).map((t) => {
+              const pct = t.max > 0 ? percentage(t.obtained, t.max) : null;
+              return (
+                <div key={t.key} className="mb-5">
+                  <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-2">
+                    <h3 className="text-[13px] font-semibold">
+                      {t.title}
+                      <span className="ml-2 font-normal text-[var(--muted)]">
+                        {EXAM_TYPE_LABEL[t.type] ?? t.type} · {fmtDate(t.date)}
+                      </span>
+                    </h3>
+                    <span className="text-[12px] text-[var(--muted)]">
+                      {t.papers.length} subject{t.papers.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  <table className="w-full border-collapse text-[12.5px]">
+                    <thead>
+                      <tr className="bg-[#fafaff]">
+                        {["Subject", "Max", "Obtained", "%", "Grade"].map((h, i) => (
+                          <th key={h}
+                            className={`border border-[#e5e7eb] px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--muted)] ${
+                              i >= 1 ? "text-right" : "text-left"}`}>
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {t.papers.map((paper) => {
+                        const sp = paper.obtained === null
+                          ? null : percentage(paper.obtained, paper.max);
+                        const failed = paper.pass !== null && paper.obtained !== null
+                          && paper.obtained < paper.pass;
+                        return (
+                          <tr key={paper.subject}>
+                            <td className="border border-[#e5e7eb] px-2.5 py-1.5">{paper.subject}</td>
+                            <td className="border border-[#e5e7eb] px-2.5 py-1.5 text-right tabular-nums">
+                              {paper.max}
+                            </td>
+                            <td className={`border border-[#e5e7eb] px-2.5 py-1.5 text-right tabular-nums ${
+                              failed ? "text-[var(--bad)]" : ""}`}>
+                              {paper.isAbsent
+                                ? "Absent"
+                                : paper.obtained === null
+                                  ? <span className="text-[var(--faint)]">Not graded</span>
+                                  : paper.obtained}
+                            </td>
+                            <td className="border border-[#e5e7eb] px-2.5 py-1.5 text-right tabular-nums">
+                              {sp === null ? "—" : `${sp}%`}
+                            </td>
+                            <td className="border border-[#e5e7eb] px-2.5 py-1.5 text-right font-medium">
+                              {sp === null ? "—" : grade(sp)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      <tr className="bg-[#fafaff] font-semibold">
+                        <td className="border border-[#e5e7eb] px-2.5 py-1.5">Total</td>
+                        <td className="border border-[#e5e7eb] px-2.5 py-1.5 text-right tabular-nums">{t.max}</td>
+                        <td className="border border-[#e5e7eb] px-2.5 py-1.5 text-right tabular-nums">{t.obtained}</td>
+                        <td className="border border-[#e5e7eb] px-2.5 py-1.5 text-right tabular-nums">
+                          {pct === null ? "—" : `${pct}%`}
+                        </td>
+                        <td className="border border-[#e5e7eb] px-2.5 py-1.5 text-right">
+                          {pct === null ? "—" : grade(pct)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })}
+
+            <h2 className="mb-2 mt-6 text-[14px] font-semibold">Overall</h2>
             <table className="w-full border-collapse text-[12.5px]">
               <thead>
                 <tr className="bg-[#fafaff]">
-                  {["Test", "Subject", "Type", "Date", "Max", "Obtained", "%", "Grade"].map((h, i) => (
+                  {["Test", "Type", "Date", "Obtained", "Out of", "%", "Grade"].map((h, i) => (
                     <th key={h}
                       className={`border border-[#e5e7eb] px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--muted)] ${
-                        i >= 4 ? "text-right" : "text-left"}`}>
+                        i >= 3 ? "text-right" : "text-left"}`}>
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {marks.map((m, i) => {
-                  const obtained = m.is_absent || m.marks_obtained === null
-                    ? null : Number(m.marks_obtained);
-                  const pct = obtained === null ? null : percentage(obtained, Number(m.max_marks));
+                {testList.filter((t) => t.graded > 0).map((t) => {
+                  const pct = t.max > 0 ? percentage(t.obtained, t.max) : null;
                   return (
-                    <tr key={i}>
-                      <td className="border border-[#e5e7eb] px-2.5 py-1.5">{m.title}</td>
-                      <td className="border border-[#e5e7eb] px-2.5 py-1.5">{m.subject}</td>
+                    <tr key={t.key}>
+                      <td className="border border-[#e5e7eb] px-2.5 py-1.5">{t.title}</td>
                       <td className="border border-[#e5e7eb] px-2.5 py-1.5">
-                        {EXAM_TYPE_LABEL[m.exam_type] ?? m.exam_type}
+                        {EXAM_TYPE_LABEL[t.type] ?? t.type}
                       </td>
                       <td className="whitespace-nowrap border border-[#e5e7eb] px-2.5 py-1.5">
-                        {fmtDate(m.exam_date)}
+                        {fmtDate(t.date)}
                       </td>
-                      <td className="border border-[#e5e7eb] px-2.5 py-1.5 text-right tabular-nums">
-                        {Number(m.max_marks)}
-                      </td>
-                      <td className="border border-[#e5e7eb] px-2.5 py-1.5 text-right tabular-nums">
-                        {m.is_absent ? "Absent" : obtained}
-                      </td>
+                      <td className="border border-[#e5e7eb] px-2.5 py-1.5 text-right tabular-nums">{t.obtained}</td>
+                      <td className="border border-[#e5e7eb] px-2.5 py-1.5 text-right tabular-nums">{t.max}</td>
                       <td className="border border-[#e5e7eb] px-2.5 py-1.5 text-right tabular-nums">
                         {pct === null ? "—" : `${pct}%`}
                       </td>
@@ -237,9 +325,11 @@ export default async function ReportCardPage({
                   );
                 })}
                 <tr className="bg-[#fafaff] font-semibold">
-                  <td className="border border-[#e5e7eb] px-2.5 py-1.5" colSpan={4}>Total</td>
-                  <td className="border border-[#e5e7eb] px-2.5 py-1.5 text-right tabular-nums">{totalMax}</td>
+                  <td className="border border-[#e5e7eb] px-2.5 py-1.5" colSpan={3}>
+                    Grand total
+                  </td>
                   <td className="border border-[#e5e7eb] px-2.5 py-1.5 text-right tabular-nums">{totalObtained}</td>
+                  <td className="border border-[#e5e7eb] px-2.5 py-1.5 text-right tabular-nums">{totalMax}</td>
                   <td className="border border-[#e5e7eb] px-2.5 py-1.5 text-right tabular-nums">
                     {overallPct === null ? "—" : `${overallPct}%`}
                   </td>
@@ -249,46 +339,6 @@ export default async function ReportCardPage({
                 </tr>
               </tbody>
             </table>
-
-            {byType.size > 1 && (
-              <>
-                <h2 className="mb-2 mt-5 text-[14px] font-semibold">Summary by term</h2>
-                <table className="w-full border-collapse text-[12.5px]">
-                  <thead>
-                    <tr className="bg-[#fafaff]">
-                      {["Term", "Tests", "Obtained", "Out of", "%", "Grade"].map((h, i) => (
-                        <th key={h}
-                          className={`border border-[#e5e7eb] px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--muted)] ${
-                            i >= 1 ? "text-right" : "text-left"}`}>
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...byType.entries()].map(([type, v]) => {
-                      const p = percentage(v.obtained, v.max);
-                      return (
-                        <tr key={type}>
-                          <td className="border border-[#e5e7eb] px-2.5 py-1.5">
-                            {EXAM_TYPE_LABEL[type] ?? type}
-                          </td>
-                          <td className="border border-[#e5e7eb] px-2.5 py-1.5 text-right tabular-nums">{v.count}</td>
-                          <td className="border border-[#e5e7eb] px-2.5 py-1.5 text-right tabular-nums">{v.obtained}</td>
-                          <td className="border border-[#e5e7eb] px-2.5 py-1.5 text-right tabular-nums">{v.max}</td>
-                          <td className="border border-[#e5e7eb] px-2.5 py-1.5 text-right tabular-nums">
-                            {p === null ? "—" : `${p}%`}
-                          </td>
-                          <td className="border border-[#e5e7eb] px-2.5 py-1.5 text-right font-medium">
-                            {p === null ? "—" : grade(p)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </>
-            )}
           </>
         )}
 

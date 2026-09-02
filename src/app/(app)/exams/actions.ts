@@ -28,25 +28,53 @@ async function assertCanTouchClass(
   return allotted ? null : "You are not allotted to this class. Ask your centre manager.";
 }
 
+/**
+ * One test covers every subject, so this writes one paper per subject. They share
+ * a title, type, date and term label, which is what groups them back together on
+ * the progress report.
+ */
 export async function createExam(_prev: unknown, form: FormData) {
   const user = await requireUser();
   const session = await currentSession();
   if (!session) return { error: "No academic session is open." };
 
   const title = str(form, "title");
-  const subject = str(form, "subject");
   const classLevelId = Number(form.get("class_level_id"));
   const examDate = str(form, "exam_date");
-  const maxMarks = Number(form.get("max_marks"));
-  const passRaw = str(form, "pass_marks");
-  const passMarks = passRaw === null ? null : Number(passRaw);
+  const defaultMax = Number(form.get("max_marks"));
+  const defaultPassRaw = str(form, "pass_marks");
+  const defaultPass = defaultPassRaw === null ? null : Number(defaultPassRaw);
 
-  if (!title || !subject || !classLevelId || !examDate)
-    return { error: "Title, subject, class and date are all required." };
-  if (!Number.isFinite(maxMarks) || maxMarks <= 0)
+  if (!title || !classLevelId || !examDate)
+    return { error: "Title, class and date are all required." };
+  if (!Number.isFinite(defaultMax) || defaultMax <= 0)
     return { error: "Maximum marks must be greater than zero." };
-  if (passMarks !== null && (!Number.isFinite(passMarks) || passMarks < 0 || passMarks > maxMarks))
-    return { error: "Pass marks must be between zero and the maximum." };
+
+  const names = form.getAll("subject_name").map((v) => String(v).trim());
+  const maxes = form.getAll("subject_max").map((v) => String(v).trim());
+  const passes = form.getAll("subject_pass").map((v) => String(v).trim());
+
+  type Paper = { subject: string; max: number; pass: number | null };
+  const papers: Paper[] = [];
+  const seen = new Set<string>();
+
+  for (let i = 0; i < names.length; i++) {
+    const subject = names[i];
+    if (subject === "") continue;                       // blank rows are just unused slots
+    const key = subject.toLowerCase();
+    if (seen.has(key)) return { error: `${subject} is listed twice.` };
+    seen.add(key);
+
+    const max = maxes[i] ? Number(maxes[i]) : defaultMax;
+    const pass = passes[i] ? Number(passes[i]) : defaultPass;
+    if (!Number.isFinite(max) || max <= 0)
+      return { error: `Maximum marks for ${subject} must be greater than zero.` };
+    if (pass !== null && (!Number.isFinite(pass) || pass < 0 || pass > max))
+      return { error: `Pass marks for ${subject} must be between zero and ${max}.` };
+    papers.push({ subject, max, pass });
+  }
+
+  if (papers.length === 0) return { error: "Add at least one subject." };
 
   const centerId = user.role === "super_admin"
     ? Number(form.get("center_id")) || null
@@ -56,16 +84,34 @@ export async function createExam(_prev: unknown, form: FormData) {
   const denied = await assertCanTouchClass(user, session.id, classLevelId, centerId);
   if (denied) return { error: denied };
 
-  const row = await one<{ id: number }>(
-    `INSERT INTO exams (title, exam_type, subject, center_id, session_id, class_level_id,
-        exam_date, max_marks, pass_marks, term_label, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
-    [title, String(form.get("exam_type") ?? "monthly"), subject, centerId, session.id,
-     classLevelId, examDate, maxMarks, passMarks, str(form, "term_label"), user.uid],
-  );
+  const examType = String(form.get("exam_type") ?? "monthly");
+  // the label is what ties the subjects together, so never leave it empty
+  const termLabel = str(form, "term_label") ?? title;
+
+  let firstId = 0;
+  try {
+    firstId = await tx(async (c) => {
+      let first = 0;
+      for (const paper of papers) {
+        const { rows } = await c.query<{ id: number }>(
+          `INSERT INTO exams (title, exam_type, subject, center_id, session_id, class_level_id,
+              exam_date, max_marks, pass_marks, term_label, created_by)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+          [title, examType, paper.subject, centerId, session.id, classLevelId,
+           examDate, paper.max, paper.pass, termLabel, user.uid],
+        );
+        if (!first) first = rows[0].id;
+      }
+      return first;
+    });
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not create the test." };
+  }
 
   revalidatePath("/exams");
-  redirect(`/exams/${row!.id}`);
+  redirect(papers.length === 1
+    ? `/exams/${firstId}`
+    : `/exams?term=${encodeURIComponent(termLabel)}`);
 }
 
 /** Saves the whole class's marks in one go. */
