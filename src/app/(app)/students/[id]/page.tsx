@@ -4,7 +4,9 @@ import { requireUser } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { listClasses } from "@/lib/queries";
 import { Alert, Avatar, Badge, Card, Empty, Meter, PageHeader } from "@/components/ui";
+import { IconPlus } from "@/components/icons";
 import { fmtDate, fullName, titleCase } from "@/lib/format";
+import { EXAM_TYPE_LABEL, grade, percentage } from "@/lib/exam-meta";
 import type { Student } from "@/lib/types";
 import EditStudent from "./EditStudent";
 import EnrollmentControls from "./EnrollmentControls";
@@ -63,6 +65,19 @@ export default async function StudentPage({
     listClasses(),
   ]);
 
+  const marks = await query<{
+    exam_id: number; title: string; subject: string; exam_type: string; exam_date: string;
+    max_marks: string; marks_obtained: string | null; is_absent: boolean;
+  }>(
+    `SELECT x.id AS exam_id, x.title, x.subject, x.exam_type, x.exam_date, x.max_marks,
+            m.marks_obtained, COALESCE(m.is_absent, FALSE) AS is_absent
+       FROM exam_marks m
+       JOIN exams x ON x.id = m.exam_id
+      WHERE m.student_id = $1
+      ORDER BY x.exam_date DESC LIMIT 12`,
+    [sid],
+  );
+
   const currentEnr = enrollments.find((e) => e.is_current);
   const attPct = attendance && Number(attendance.total) > 0
     ? (Number(attendance.present) / Number(attendance.total)) * 100 : null;
@@ -85,8 +100,11 @@ export default async function StudentPage({
         right={
           <>
             <Badge tone={STATUS_TONE[student.status]}>{titleCase(student.status)}</Badge>
+            <Link href={`/students/${student.id}/report-card`} className="btn btn-ghost btn-sm">
+              Progress report
+            </Link>
             <Link href={`/ptm/new?student=${student.id}`} className="btn btn-primary btn-sm">
-              Record interaction
+              <IconPlus className="h-3.5 w-3.5" /> Record Parent Interaction
             </Link>
           </>
         }
@@ -100,10 +118,71 @@ export default async function StudentPage({
           </Card>
 
           <Card pad={false}>
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5">
+              <h2 className="text-[15px] font-semibold">Test results</h2>
+              <Link href={`/students/${student.id}/report-card`}
+                className="text-[13px] text-[var(--brand)] hover:underline">
+                Printable progress report →
+              </Link>
+            </div>
+            {marks.length === 0 ? (
+              <Empty title="No marks recorded yet"
+                hint="Results appear here once a teacher enters them against a test." />
+            ) : (
+              <div className="mt-3 overflow-x-auto">
+                <table className="tbl">
+                  <thead>
+                    <tr><th>Test</th><th>Subject</th><th>Date</th>
+                      <th className="text-right">Marks</th><th className="text-right">Grade</th></tr>
+                  </thead>
+                  <tbody>
+                    {marks.map((m) => {
+                      const obtained = m.is_absent || m.marks_obtained === null
+                        ? null : Number(m.marks_obtained);
+                      const pct = obtained === null
+                        ? null : percentage(obtained, Number(m.max_marks));
+                      return (
+                        <tr key={m.exam_id}>
+                          <td>
+                            <Link href={`/exams/${m.exam_id}`} className="font-medium hover:text-[var(--brand)]">
+                              {m.title}
+                            </Link>
+                            <div className="text-[12px] text-[var(--muted)]">
+                              {EXAM_TYPE_LABEL[m.exam_type] ?? m.exam_type}
+                            </div>
+                          </td>
+                          <td className="text-[var(--muted)]">{m.subject}</td>
+                          <td className="whitespace-nowrap text-[var(--muted)]">{fmtDate(m.exam_date)}</td>
+                          <td className="whitespace-nowrap text-right tabular-nums">
+                            {m.is_absent
+                              ? <Badge tone="mute">Absent</Badge>
+                              : <>{obtained}<span className="text-[var(--faint)]"> / {Number(m.max_marks)}</span></>}
+                          </td>
+                          <td className="text-right">
+                            {pct === null
+                              ? <span className="text-[var(--faint)]">—</span>
+                              : <Badge tone={pct >= 60 ? "ok" : pct >= 40 ? "warn" : "bad"} dot={false}>
+                                  {grade(pct)} · {pct}%
+                                </Badge>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+
+          <Card pad={false}>
             <h2 className="px-5 pt-5 text-[15px] font-semibold">Parent interactions</h2>
             {interactions.length === 0
               ? <Empty title="No interactions recorded"
-                  action={<Link href={`/ptm/new?student=${student.id}`} className="btn btn-primary btn-sm">Record one</Link>} />
+                  action={
+                    <Link href={`/ptm/new?student=${student.id}`} className="btn btn-primary btn-sm">
+                      <IconPlus className="h-3.5 w-3.5" /> Record Parent Interaction
+                    </Link>
+                  } />
               : <ul className="mt-3">
                   {interactions.map((i) => (
                     <li key={i.id} className="border-t border-[#f1f1f6] px-5 py-3.5">

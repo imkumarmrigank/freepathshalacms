@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { query, one } from "@/lib/db";
 import { currentSession, resolveCenterId } from "@/lib/queries";
 import { Alert, Avatar, Badge, Card, Empty, StatCard } from "@/components/ui";
+import { IconPlus } from "@/components/icons";
 import { fmtDate, fullName, today } from "@/lib/format";
 import { eventsBetween } from "@/lib/calendar";
 import { EVENT_LABEL, EVENT_TONE } from "@/lib/calendar-meta";
@@ -42,10 +43,16 @@ export default async function Dashboard({
         AND session_id = $1${scope}`,
     p([session.id]),
   );
-  const [followUps] = await query<{ n: string }>(
-    `SELECT count(*) AS n FROM ptm_interactions
-      WHERE follow_up_required AND follow_up_status = 'pending'
-        AND follow_up_date <= CURRENT_DATE + INTERVAL '7 days' AND session_id = $1${scope}`,
+  const [followUps] = await query<{
+    overdue: string; due_today: string; this_week: string; pending: string;
+  }>(
+    `SELECT count(*) FILTER (WHERE follow_up_date < CURRENT_DATE)  AS overdue,
+            count(*) FILTER (WHERE follow_up_date = CURRENT_DATE)  AS due_today,
+            count(*) FILTER (WHERE follow_up_date > CURRENT_DATE
+                               AND follow_up_date <= CURRENT_DATE + INTERVAL '7 days') AS this_week,
+            count(*) AS pending
+       FROM ptm_interactions
+      WHERE follow_up_required AND follow_up_status = 'pending' AND session_id = $1${scope}`,
     p([session.id]),
   );
   const attToday = await one<{ present: string; total: string }>(
@@ -78,7 +85,7 @@ export default async function Dashboard({
        FROM ptm_interactions i JOIN students s ON s.id = i.student_id
       WHERE i.follow_up_required AND i.follow_up_status = 'pending'
         AND i.session_id = $1 ${centerId ? "AND i.center_id = $2" : ""}
-      ORDER BY i.follow_up_date NULLS LAST LIMIT 5`,
+      ORDER BY i.follow_up_date NULLS LAST LIMIT 6`,
     p([session.id]),
   );
 
@@ -93,6 +100,28 @@ export default async function Dashboard({
   return (
     <>
       {denied && <div className="mb-5"><Alert kind="bad">You don’t have access to that page.</Alert></div>}
+
+      {(Number(followUps.overdue) > 0 || Number(followUps.due_today) > 0) && (
+        <div className="mb-5">
+          <Alert kind={Number(followUps.overdue) > 0 ? "bad" : "warn"}>
+            {Number(followUps.overdue) > 0 && (
+              <>
+                <strong>{followUps.overdue}</strong> follow-up
+                {Number(followUps.overdue) === 1 ? " is" : "s are"} past the date promised to the parent
+                {Number(followUps.due_today) > 0 && ", and "}
+              </>
+            )}
+            {Number(followUps.due_today) > 0 && (
+              <>
+                <strong>{followUps.due_today}</strong> {Number(followUps.overdue) > 0 ? "" : "follow-up"}
+                {Number(followUps.due_today) === 1 ? " is" : "s are"} due today
+              </>
+            )}
+            .{" "}
+            <Link href="/follow-ups" className="font-medium underline">Open follow-ups</Link>
+          </Alert>
+        </div>
+      )}
 
       <div className="mb-6">
         <div className="label-cap">{greeting}</div>
@@ -110,13 +139,34 @@ export default async function Dashboard({
           tone={attPct !== null && attPct < 70 ? "warn" : "default"} />
         <StatCard label="PTMs this month" value={ptms.n}
           hint={new Date().toLocaleString("en-IN", { month: "long", year: "numeric" })} />
-        <StatCard label="Follow-ups due" value={followUps.n} hint="next 7 days"
-          tone={Number(followUps.n) > 0 ? "bad" : "default"} />
+        <StatCard
+          label="Follow-ups"
+          value={followUps.pending}
+          hint={
+            Number(followUps.overdue) > 0
+              ? `${followUps.overdue} overdue · ${followUps.due_today} due today`
+              : Number(followUps.due_today) > 0
+                ? `${followUps.due_today} due today · ${followUps.this_week} later this week`
+                : Number(followUps.this_week) > 0
+                  ? `${followUps.this_week} due this week`
+                  : "nothing pending"
+          }
+          tone={
+            Number(followUps.overdue) > 0
+              ? "bad"
+              : Number(followUps.due_today) > 0
+                ? "warn"
+                : "default"
+          }
+        />
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2.5">
-        <Link href="/attendance" className="btn btn-primary">Mark student attendance</Link>
-        <Link href="/ptm/new" className="btn btn-ghost">Record parent interaction</Link>
+        <Link href="/ptm/new" className="btn btn-primary">
+          <IconPlus className="h-4 w-4" /> Record Parent Interaction
+        </Link>
+        <Link href="/ptm" className="btn btn-ghost">View Interaction History</Link>
+        <Link href="/attendance" className="btn btn-ghost">Mark student attendance</Link>
         {user.role !== "super_admin" && (
           <Link href="/my-attendance" className="btn btn-ghost">My check-in</Link>
         )}
@@ -156,7 +206,11 @@ export default async function Dashboard({
             {recent.length === 0
               ? <Empty title="No interactions yet"
                   hint="Parent-teacher conversations you record will show up here."
-                  action={<Link href="/ptm/new" className="btn btn-primary btn-sm">Record one</Link>} />
+                  action={
+                    <Link href="/ptm/new" className="btn btn-primary btn-sm">
+                      <IconPlus className="h-3.5 w-3.5" /> Record Parent Interaction
+                    </Link>
+                  } />
               : <ul>
                   {recent.map((r) => (
                     <li key={r.id} className="flex items-center gap-3 border-b border-[#f1f1f6] px-4 py-3 last:border-0">
@@ -185,11 +239,13 @@ export default async function Dashboard({
               ? <Empty title="Nothing pending" hint="Follow-ups you flag during a PTM appear here." />
               : <ul>
                   {upcoming.map((f) => {
-                    const overdue = f.follow_up_date && f.follow_up_date.slice(0, 10) < today();
+                    const due = f.follow_up_date ? f.follow_up_date.slice(0, 10) : null;
+                    const overdue = due !== null && due < today();
+                    const dueToday = due === today();
                     return (
                       <li key={f.id} className="flex items-center gap-3 border-b border-[#f1f1f6] px-4 py-3 last:border-0">
                         <span className="h-1.5 w-1.5 flex-none rounded-full"
-                          style={{ background: overdue ? "var(--bad)" : "var(--warn)" }} />
+                          style={{ background: overdue ? "var(--bad)" : dueToday ? "var(--warn)" : "var(--brand)" }} />
                         <div className="min-w-0 flex-1">
                           <Link href={`/ptm/${f.id}`} className="block truncate text-[14px] font-medium hover:text-[var(--brand)]">
                             {fullName(f)}
@@ -198,8 +254,13 @@ export default async function Dashboard({
                             {(f.follow_up_mode ?? "follow-up").replace("_", " ")}
                           </div>
                         </div>
-                        <span className={`text-[13px] ${overdue ? "text-[var(--bad)]" : "text-[var(--muted)]"}`}>
-                          {fmtDate(f.follow_up_date)}
+                        <span className="flex flex-none items-center gap-2">
+                          {overdue && <Badge tone="bad">Overdue</Badge>}
+                          {dueToday && <Badge tone="warn">Today</Badge>}
+                          <span className={`text-[13px] ${
+                            overdue ? "text-[var(--bad)]" : dueToday ? "text-[var(--warn)]" : "text-[var(--muted)]"}`}>
+                            {fmtDate(f.follow_up_date)}
+                          </span>
                         </span>
                       </li>
                     );

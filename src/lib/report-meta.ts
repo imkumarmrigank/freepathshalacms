@@ -85,6 +85,22 @@ export const REPORTS: ReportMeta[] = [
     roles: ["super_admin", "center_manager"],
   },
   {
+    key: "exam-marks",
+    label: "Marks sheet",
+    group: "Tests",
+    description:
+      "Every student's marks for each test in the period — subject, maximum, obtained, percentage and grade.",
+    filters: ["dates", "center", "class", "session"],
+  },
+  {
+    key: "exam-summary",
+    label: "Test summary",
+    group: "Tests",
+    description:
+      "One row per test: how many were graded, the class average, highest and lowest, and how many passed.",
+    filters: ["dates", "center", "class", "session"],
+  },
+  {
     key: "ptm-summary",
     label: "PTM and follow-ups",
     group: "PTM",

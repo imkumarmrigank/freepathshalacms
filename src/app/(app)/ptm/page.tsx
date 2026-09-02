@@ -4,6 +4,7 @@ import { query } from "@/lib/db";
 import { centersForUser, currentSession, listClasses, resolveCenterId } from "@/lib/queries";
 import { Avatar, Badge, Card, Empty, PageHeader } from "@/components/ui";
 import Filters from "@/components/Filters";
+import { IconPlus } from "@/components/icons";
 import { fmtDate, fullName, titleCase } from "@/lib/format";
 
 const TONE: Record<string, string> = { attentive: "ok", neutral: "warn", resistant: "bad" };
@@ -55,7 +56,9 @@ export default async function PtmPage({
         right={
           <>
             <Link href="/ptm/meetings" className="btn btn-ghost">Scheduled PTMs</Link>
-            <Link href="/ptm/new" className="btn btn-primary">+ Record interaction</Link>
+            <Link href="/ptm/new" className="btn btn-primary">
+              <IconPlus className="h-4 w-4" /> Record Parent Interaction
+            </Link>
           </>
         } />
 
@@ -72,7 +75,11 @@ export default async function PtmPage({
         {rows.length === 0 ? (
           <Empty title="No interactions recorded"
             hint="Record what was discussed with a parent, and the follow-up it needs."
-            action={<Link href="/ptm/new" className="btn btn-primary btn-sm">Record interaction</Link>} />
+            action={
+              <Link href="/ptm/new" className="btn btn-primary btn-sm">
+                <IconPlus className="h-3.5 w-3.5" /> Record Parent Interaction
+              </Link>
+            } />
         ) : (
           <div className="overflow-x-auto">
             <table className="tbl">

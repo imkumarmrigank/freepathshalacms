@@ -8,9 +8,9 @@
   --text: #16162a;
   --muted: #6b6b85;
   --faint: #9a9ab0;
-  --brand: #2f36a3;
-  --brand-hover: #262c8a;
-  --brand-soft: #eef0fb;
+  --brand: #1b47be;
+  --brand-hover: #163a9c;
+  --brand-soft: #eaf0fd;
   --ok: #16a34a;
   --ok-soft: #e8f7ee;
   --warn: #d97706;
@@ -57,18 +57,18 @@ body {
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
-  border-radius: 9px; font-size: 0.875rem; font-weight: 500;
-  padding: 0.5625rem 1rem; border: 1px solid transparent;
+  border-radius: 12px; font-size: 0.875rem; font-weight: 500;
+  padding: 0.75rem 1.25rem; border: 1px solid transparent;
   cursor: pointer; transition: background .15s, border-color .15s, color .15s;
   white-space: nowrap;
 }
 .btn:disabled { opacity: .55; cursor: not-allowed; }
-.btn-primary { background: var(--brand); color: #fff; }
+.btn-primary { background: var(--brand); color: #fff; font-weight: 600; }
 .btn-primary:hover:not(:disabled) { background: var(--brand-hover); }
-.btn-ghost { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
-.btn-ghost:hover:not(:disabled) { background: #fafaff; }
+.btn-ghost { background: var(--surface); color: #374151; border-color: #e5e7eb; }
+.btn-ghost:hover:not(:disabled) { background: #f7f9fe; border-color: var(--border-strong); }
 .btn-danger { background: var(--bad-soft); color: var(--bad); border-color: #f6cfcd; }
-.btn-sm { padding: 0.375rem 0.6875rem; font-size: 0.8125rem; }
+.btn-sm { padding: 0.4375rem 0.8125rem; font-size: 0.8125rem; border-radius: 9px; }
 
 .input, .select, .textarea {
   width: 100%; background: var(--surface); color: var(--text);
@@ -122,7 +122,7 @@ table.tbl tbody tr:hover { background: #fafaff; }
 
 .nav-item {
   display: flex; align-items: center; gap: 0.6875rem;
-  padding: 0.5625rem 0.75rem; border-radius: 9px;
+  padding: 0.625rem 0.75rem; border-radius: 8px;
   font-size: 0.875rem; color: var(--muted); font-weight: 500;
 }
 .nav-item:hover { background: #f1f1f8; color: var(--text); }
@@ -130,4 +130,43 @@ table.tbl tbody tr:hover { background: #fafaff; }
 .nav-section {
   padding: 1rem 0.75rem 0.375rem; font-size: 0.625rem; font-weight: 700;
   letter-spacing: 0.1em; text-transform: uppercase; color: #b4b4c6;
+}
+
+/* ---------------------------------------------------------- print / report card */
+.print-only { display: none; }
+
+@media print {
+  @page { size: A4 portrait; margin: 12mm; }
+
+  /* the app chrome is not part of the document being printed */
+  aside, header, .no-print { display: none !important; }
+  .print-only { display: block !important; }
+
+  html, body { background: #fff !important; }
+  main { max-width: none !important; padding: 0 !important; margin: 0 !important; }
+
+  .card {
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+  .card-pad { padding: 0 !important; }
+
+  /* keep a report card on one sheet where it fits */
+  .sheet { break-inside: avoid; }
+  .sheet-break { break-before: page; }
+
+  table.tbl { font-size: 11px; }
+  table.tbl thead th {
+    color: #000 !important;
+    border-bottom: 1px solid #000 !important;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  table.tbl tbody td { border-bottom: 1px solid #ddd !important; }
+  table.tbl tbody tr:hover { background: transparent !important; }
+
+  .badge, .avatar, .meter > span {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  a { text-decoration: none !important; color: inherit !important; }
 }

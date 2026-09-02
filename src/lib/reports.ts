@@ -63,6 +63,8 @@ export async function runReport(
     case "admissions":                   return admissions(scoped, period);
     case "supplies-stock":               return suppliesStock(scoped);
     case "supplies-issued":              return suppliesIssued(scoped, period);
+    case "exam-marks":                   return examMarks(scoped, period);
+    case "exam-summary":                 return examSummary(scoped, period);
     case "ptm-summary":                  return ptmSummary(scoped, period);
     case "teaching-plan-progress":       return teachingPlanProgress(scoped);
     case "timetable":                    return timetableReport(scoped);
@@ -518,6 +520,145 @@ async function suppliesIssued(p: ReportParams, period: string): Promise<ReportRe
       { key: "remarks", label: "Remarks", width: 28 },
     ],
     rows,
+  };
+}
+
+/* ------------------------------------------------------------------ tests */
+
+async function examMarks(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.sessionId, p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND x.center_id = $${params.length}`; }
+  if (p.classId) { params.push(p.classId); where += ` AND x.class_level_id = $${params.length}`; }
+
+  const rows = await query<{
+    exam_date: string; title: string; subject: string; exam_type: string;
+    center_name: string; class_name: string; enrollment_no: string; student: string;
+    max_marks: string; marks_obtained: string | null; is_absent: boolean;
+  }>(
+    `SELECT x.exam_date::text AS exam_date, x.title, x.subject, x.exam_type,
+            ce.name AS center_name, cl.name AS class_name,
+            s.enrollment_no, trim(s.first_name || ' ' || COALESCE(s.last_name,'')) AS student,
+            x.max_marks, m.marks_obtained, m.is_absent
+       FROM exam_marks m
+       JOIN exams x ON x.id = m.exam_id
+       JOIN students s ON s.id = m.student_id
+       JOIN centers ce ON ce.id = x.center_id
+       JOIN class_levels cl ON cl.id = x.class_level_id
+      WHERE x.session_id = $1 AND x.exam_date BETWEEN $2 AND $3 ${where}
+      ORDER BY x.exam_date DESC, ce.code, cl.sequence, student`,
+    params,
+  );
+
+  const GRADE = (pct: number | null) => {
+    if (pct === null) return "—";
+    if (pct >= 90) return "A+"; if (pct >= 80) return "A"; if (pct >= 70) return "B+";
+    if (pct >= 60) return "B";  if (pct >= 50) return "C"; if (pct >= 40) return "D";
+    return "E";
+  };
+
+  return {
+    title: "Marks sheet",
+    subtitle: period,
+    columns: [
+      { key: "exam_date", label: "Date", width: 13 },
+      { key: "title", label: "Test", width: 24 },
+      { key: "subject", label: "Subject", width: 16 },
+      { key: "exam_type", label: "Type", width: 14 },
+      { key: "center_name", label: "Centre", width: 18 },
+      { key: "class_name", label: "Class", width: 12 },
+      { key: "enrollment_no", label: "Enrolment No", width: 16 },
+      { key: "student", label: "Student", width: 24 },
+      { key: "max_marks", label: "Max", numeric: true },
+      { key: "obtained", label: "Obtained", numeric: true, width: 11 },
+      { key: "pct", label: "%", numeric: true },
+      { key: "grade", label: "Grade", width: 9 },
+    ],
+    rows: rows.map((r) => {
+      const max = Number(r.max_marks);
+      const obtained = r.is_absent || r.marks_obtained === null ? null : Number(r.marks_obtained);
+      const p2 = obtained === null ? null : Math.round((obtained / max) * 1000) / 10;
+      return {
+        exam_date: r.exam_date, title: r.title, subject: r.subject,
+        exam_type: r.exam_type.replace(/_/g, " "),
+        center_name: r.center_name, class_name: r.class_name,
+        enrollment_no: r.enrollment_no, student: r.student,
+        max_marks: max,
+        obtained: r.is_absent ? "Absent" : obtained,
+        pct: p2, grade: GRADE(p2),
+      };
+    }),
+  };
+}
+
+async function examSummary(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.sessionId, p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND x.center_id = $${params.length}`; }
+  if (p.classId) { params.push(p.classId); where += ` AND x.class_level_id = $${params.length}`; }
+
+  const rows = await query<{
+    exam_date: string; title: string; subject: string; exam_type: string;
+    center_name: string; class_name: string; max_marks: string; pass_marks: string | null;
+    graded: string; absent: string; average: string | null;
+    highest: string | null; lowest: string | null; passed: string | null; status: string;
+  }>(
+    `SELECT x.exam_date::text AS exam_date, x.title, x.subject, x.exam_type,
+            ce.name AS center_name, cl.name AS class_name, x.max_marks, x.pass_marks, x.status,
+            count(m.*) FILTER (WHERE m.marks_obtained IS NOT NULL) AS graded,
+            count(m.*) FILTER (WHERE m.is_absent) AS absent,
+            round(avg(m.marks_obtained), 1) AS average,
+            max(m.marks_obtained) AS highest,
+            min(m.marks_obtained) AS lowest,
+            count(m.*) FILTER (
+              WHERE x.pass_marks IS NOT NULL AND m.marks_obtained >= x.pass_marks) AS passed
+       FROM exams x
+       JOIN centers ce ON ce.id = x.center_id
+       JOIN class_levels cl ON cl.id = x.class_level_id
+       LEFT JOIN exam_marks m ON m.exam_id = x.id
+      WHERE x.session_id = $1 AND x.exam_date BETWEEN $2 AND $3 ${where}
+      GROUP BY x.id, ce.name, ce.code, cl.name, cl.sequence
+      ORDER BY x.exam_date DESC, ce.code, cl.sequence`,
+    params,
+  );
+
+  return {
+    title: "Test summary",
+    subtitle: period,
+    columns: [
+      { key: "exam_date", label: "Date", width: 13 },
+      { key: "title", label: "Test", width: 26 },
+      { key: "subject", label: "Subject", width: 16 },
+      { key: "exam_type", label: "Type", width: 14 },
+      { key: "center_name", label: "Centre", width: 18 },
+      { key: "class_name", label: "Class", width: 12 },
+      { key: "max_marks", label: "Max", numeric: true },
+      { key: "graded", label: "Graded", numeric: true },
+      { key: "absent", label: "Absent", numeric: true },
+      { key: "average", label: "Average", numeric: true, width: 11 },
+      { key: "average_pct", label: "Average %", numeric: true, width: 12 },
+      { key: "highest", label: "Highest", numeric: true },
+      { key: "lowest", label: "Lowest", numeric: true },
+      { key: "passed", label: "Passed", numeric: true },
+      { key: "status", label: "Status", width: 12 },
+    ],
+    rows: rows.map((r) => {
+      const max = Number(r.max_marks);
+      const avg = r.average === null ? null : Number(r.average);
+      return {
+        exam_date: r.exam_date, title: r.title, subject: r.subject,
+        exam_type: r.exam_type.replace(/_/g, " "),
+        center_name: r.center_name, class_name: r.class_name,
+        max_marks: max,
+        graded: Number(r.graded), absent: Number(r.absent),
+        average: avg,
+        average_pct: avg === null ? null : Math.round((avg / max) * 1000) / 10,
+        highest: r.highest === null ? null : Number(r.highest),
+        lowest: r.lowest === null ? null : Number(r.lowest),
+        passed: r.pass_marks === null ? null : Number(r.passed),
+        status: r.status,
+      };
+    }),
   };
 }
 
