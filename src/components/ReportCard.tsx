@@ -58,6 +58,7 @@ export default function ReportCard({ data }: { data: ReportCardData }) {
       </p>
 
       {/* -------------------------------------------------------- student details */}
+      <div className="flex items-start gap-4">
       <table className="w-full border-collapse text-[13px]">
         <tbody>
           {([
@@ -82,6 +83,14 @@ export default function ReportCard({ data }: { data: ReportCardData }) {
           ))}
         </tbody>
       </table>
+      {student.photo_media_id && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={`/api/media/${student.photo_media_id}`} alt={fullName(student)}
+          width={96} height={116}
+          className="flex-none rounded-[6px] border border-[#e5e7eb] object-cover"
+          style={{ width: 96, height: 116 }} />
+      )}
+      </div>
 
       {/* ---------------------------------------------------------------- results */}
       <h2 className="mb-2 mt-6 text-[14px] font-semibold">Test results</h2>

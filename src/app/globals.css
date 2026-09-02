@@ -127,6 +127,11 @@ table.tbl tbody tr:hover { background: #fafaff; }
   font-size: 0.75rem; font-weight: 600; flex: none;
 }
 
+.avatar-img {
+  border-radius: 999px; object-fit: cover; flex: none;
+  background: var(--brand-soft); border: 1px solid var(--border);
+}
+
 .meter { height: 6px; border-radius: 999px; background: #ececf3; overflow: hidden; width: 88px; }
 .meter > span { display: block; height: 100%; border-radius: 999px; }
 

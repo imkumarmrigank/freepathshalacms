@@ -39,7 +39,17 @@ export function StatCard({ label, value, hint, tone = "default" }:
   );
 }
 
-export function Avatar({ name, size = 34 }: { name: string; size?: number }) {
+export function Avatar({ name, size = 34, src }:
+  { name: string; size?: number; src?: string | null }) {
+  if (src) {
+    return (
+      // a plain <img>: the bytes come from our own /api/media route, already
+      // shrunk on the way in, so there is nothing for the image optimiser to do
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={src} alt={name} width={size} height={size}
+        className="avatar-img" style={{ width: size, height: size }} />
+    );
+  }
   return (
     <span className="avatar" style={{ width: size, height: size, fontSize: size * 0.36 }}>
       {initials(name)}

@@ -25,7 +25,7 @@ export type ReportCardData = {
   student: {
     id: number; enrollment_no: string; first_name: string; last_name: string | null;
     dob: string | null; father_name: string | null; mother_name: string | null;
-    admission_date: string; center_id: number;
+    admission_date: string; center_id: number; photo_media_id: number | null;
     center_name: string; center_code: string; center_address: string | null;
     center_area: string | null; center_city: string | null; center_state: string | null;
     center_pincode: string | null; center_phone: string | null;
@@ -52,6 +52,7 @@ export async function loadReportCard(
   const student = await one<ReportCardData["student"]>(
     `SELECT s.id, s.enrollment_no, s.first_name, s.last_name, s.dob,
             s.father_name, s.mother_name, s.admission_date, s.center_id,
+            s.photo_media_id,
             c.name AS center_name, c.code AS center_code, c.address AS center_address,
             c.area AS center_area, c.city AS center_city, c.state AS center_state,
             c.pincode AS center_pincode, c.phone AS center_phone

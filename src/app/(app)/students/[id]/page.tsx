@@ -10,6 +10,7 @@ import { EXAM_TYPE_LABEL, grade, percentage } from "@/lib/exam-meta";
 import { canEditStudents } from "@/lib/roles";
 import type { Student } from "@/lib/types";
 import EditStudent from "./EditStudent";
+import AdmissionRecord from "./AdmissionRecord";
 import EnrollmentControls from "./EnrollmentControls";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
 
@@ -119,6 +120,11 @@ export default async function StudentPage({
             <EditStudent s={student} readOnly={!canEditStudents(user.role)} />
           </Card>
 
+          <Card>
+            <h2 className="mb-4 text-[15px] font-semibold">Admission record</h2>
+            <AdmissionRecord s={student} />
+          </Card>
+
           <Card pad={false}>
             <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5">
               <h2 className="text-[15px] font-semibold">Test results</h2>
@@ -212,7 +218,8 @@ export default async function StudentPage({
         <div className="space-y-5">
           <Card>
             <div className="flex items-center gap-3">
-              <Avatar name={fullName(student)} size={44} />
+              <Avatar name={fullName(student)} size={44}
+                src={student.photo_media_id ? `/api/media/${student.photo_media_id}` : null} />
               <div className="min-w-0">
                 <div className="truncate text-[15px] font-semibold">{fullName(student)}</div>
                 <div className="font-mono text-[12px] text-[var(--muted)]">{student.enrollment_no}</div>

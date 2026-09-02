@@ -17,7 +17,7 @@ export type StepKey = (typeof STEPS)[number]["key"];
 export const GENDERS = ["Male", "Female", "Other"] as const;
 
 export const QUALIFICATIONS = [
-  "Uneducated", "3rd Pass", "5th Pass", "10th Pass",
+  "Uneducated", "3rd Pass", "5th Pass", "8th Pass", "10th Pass",
   "Intermediate", "Graduate", "Post Graduate",
 ] as const;
 
