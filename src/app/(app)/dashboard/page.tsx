@@ -7,7 +7,7 @@ import { IconPlus } from "@/components/icons";
 import { fmtDate, fullName, today } from "@/lib/format";
 import { eventsBetween } from "@/lib/calendar";
 import { EVENT_LABEL, EVENT_TONE } from "@/lib/calendar-meta";
-import { isGlobalRole, isTeaching } from "@/lib/roles";
+import { isGlobalRole, canAdmitStudents, can } from "@/lib/roles";
 
 const ENGAGEMENT_TONE: Record<string, string> = {
   attentive: "ok", neutral: "warn", resistant: "bad",
@@ -167,11 +167,13 @@ export default async function Dashboard({
           <IconPlus className="h-4 w-4" /> Record Parent Interaction
         </Link>
         <Link href="/ptm" className="btn btn-ghost">View Interaction History</Link>
-        <Link href="/attendance" className="btn btn-ghost">Mark student attendance</Link>
+        {can(user.role, "attendance") && (
+          <Link href="/attendance" className="btn btn-ghost">Mark student attendance</Link>
+        )}
         {!isGlobalRole(user.role) && (
           <Link href="/my-attendance" className="btn btn-ghost">My check-in</Link>
         )}
-        {!isTeaching(user.role) && (
+        {canAdmitStudents(user.role) && (
           <Link href="/students/new" className="btn btn-ghost">Add student</Link>
         )}
       </div>
