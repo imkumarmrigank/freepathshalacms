@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { centersForUser, resolveCenterId } from "@/lib/queries";
@@ -111,10 +112,30 @@ export default async function SuppliesPage({
 
   return (
     <>
-      <PageHeader title="Supplies"
+      <PageHeader
+        title="Supplies"
         subtitle={isAdmin
-          ? "Stock sent to centres, and what each centre has handed to students"
-          : `Stock at ${user.centerName} and what has been given to students`} />
+          ? "Received at headquarters, sent to centres, handed to students"
+          : `Stock at ${user.centerName} and what has been given to students`}
+        right={
+          <>
+            {runsHq && (
+              <Link href="/reports?report=hq-receipts" className="btn btn-ghost" prefetch={false}>
+                Goods-in report
+              </Link>
+            )}
+            <Link
+              href={`/reports?report=${runsHq ? "supplies-dispatched" : "supplies-issued"}`}
+              className="btn btn-ghost" prefetch={false}>
+              {runsHq ? "Dispatch report" : "Issue report"}
+            </Link>
+            <Link href="/reports?report=supplies-by-centre" className="btn btn-primary"
+              prefetch={false}>
+              Centre-wise report
+            </Link>
+          </>
+        }
+      />
 
       {isAdmin && centers.length > 0 && (
         <form className="mb-4 flex items-end gap-2">

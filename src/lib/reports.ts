@@ -1,6 +1,7 @@
 import "server-only";
 import { query } from "./db";
 import { reportByKey } from "./report-meta";
+import { titleCase } from "./format";
 import type { SessionUser } from "./auth";
 import { isGlobalRole } from "./roles";
 
@@ -64,6 +65,9 @@ export async function runReport(
     case "admissions":                   return admissions(scoped, period);
     case "supplies-stock":               return suppliesStock(scoped);
     case "hq-stock":                     return hqStock();
+    case "hq-receipts":                  return hqReceipts(scoped, period);
+    case "supplies-dispatched":          return suppliesDispatched(scoped, period);
+    case "supplies-by-centre":           return suppliesByCentre(scoped);
     case "supplies-issued":              return suppliesIssued(scoped, period);
     case "exam-marks":                   return examMarks(scoped, period);
     case "exam-summary":                 return examSummary(scoped, period);
@@ -519,6 +523,162 @@ async function hqStock(): Promise<ReportResult> {
       at_hq: Number(r.received) - Number(r.dispatched),
       to_students: Number(r.to_students),
       at_centres: Number(r.dispatched) - Number(r.to_students),
+    })),
+  };
+}
+
+/** Goods in at headquarters, consignment by consignment. */
+async function hqReceipts(p: ReportParams, period: string): Promise<ReportResult> {
+  const rows = await query<{
+    received_on: string; item: string; category: string; unit: string;
+    quantity: number; supplier: string | null; invoice_no: string | null;
+    unit_cost: string | null; recorded_by: string | null; remarks: string | null;
+  }>(
+    `SELECT h.received_on::text AS received_on, i.name AS item, i.category, i.unit,
+            h.quantity, h.supplier, h.invoice_no, h.unit_cost,
+            u.name AS recorded_by, h.remarks
+       FROM hq_supply_receipts h
+       JOIN supply_items i ON i.id = h.item_id
+       LEFT JOIN users u ON u.id = h.recorded_by
+      WHERE h.received_on BETWEEN $1 AND $2
+      ORDER BY h.received_on DESC, h.id DESC`,
+    [p.from, p.to],
+  );
+
+  return {
+    title: "Goods received at headquarters",
+    subtitle: period,
+    columns: [
+      { key: "received_on", label: "Received on", width: 14 },
+      { key: "item", label: "Item", width: 24 },
+      { key: "category", label: "Category", width: 14 },
+      { key: "quantity", label: "Quantity", numeric: true },
+      { key: "unit", label: "Unit", width: 10 },
+      { key: "supplier", label: "Supplier", width: 24 },
+      { key: "invoice_no", label: "Invoice no.", width: 16 },
+      { key: "unit_cost", label: "Unit cost", numeric: true, width: 12 },
+      { key: "value", label: "Value", numeric: true, width: 12 },
+      { key: "recorded_by", label: "Recorded by", width: 20 },
+      { key: "remarks", label: "Remarks", width: 28 },
+    ],
+    rows: rows.map((r) => {
+      const cost = r.unit_cost === null ? null : Number(r.unit_cost);
+      return {
+        received_on: r.received_on, item: r.item, category: titleCase(r.category),
+        quantity: Number(r.quantity), unit: r.unit,
+        supplier: r.supplier, invoice_no: r.invoice_no,
+        unit_cost: cost,
+        value: cost === null ? null : Math.round(cost * Number(r.quantity) * 100) / 100,
+        recorded_by: r.recorded_by, remarks: r.remarks,
+      };
+    }),
+  };
+}
+
+/** What headquarters sent out, centre by centre. */
+async function suppliesDispatched(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where = ` AND r.center_id = $${params.length}`; }
+
+  const rows = await query<{
+    received_on: string; center_code: string; center_name: string; item: string;
+    category: string; unit: string; quantity: number; challan_no: string | null;
+    unit_cost: string | null; sent_by: string | null; remarks: string | null;
+  }>(
+    `SELECT r.received_on::text AS received_on, c.code AS center_code, c.name AS center_name,
+            i.name AS item, i.category, i.unit, r.quantity, r.challan_no, r.unit_cost,
+            COALESCE(d.name, u.name) AS sent_by, r.remarks
+       FROM center_supply_receipts r
+       JOIN supply_items i ON i.id = r.item_id
+       JOIN centers c ON c.id = r.center_id
+       LEFT JOIN users u ON u.id = r.recorded_by
+       LEFT JOIN users d ON d.id = r.dispatched_by
+      WHERE r.received_on BETWEEN $1 AND $2 ${where}
+      ORDER BY r.received_on DESC, c.code, i.name`,
+    params,
+  );
+
+  return {
+    title: "Supplies sent to centres",
+    subtitle: period,
+    columns: [
+      { key: "received_on", label: "Dispatched on", width: 15 },
+      { key: "center_code", label: "Code", width: 9 },
+      { key: "center_name", label: "Centre", width: 20 },
+      { key: "item", label: "Item", width: 24 },
+      { key: "category", label: "Category", width: 14 },
+      { key: "quantity", label: "Quantity", numeric: true },
+      { key: "unit", label: "Unit", width: 10 },
+      { key: "challan_no", label: "Challan no.", width: 16 },
+      { key: "unit_cost", label: "Unit cost", numeric: true, width: 12 },
+      { key: "value", label: "Value", numeric: true, width: 12 },
+      { key: "sent_by", label: "Sent by", width: 20 },
+      { key: "remarks", label: "Remarks", width: 28 },
+    ],
+    rows: rows.map((r) => {
+      const cost = r.unit_cost === null ? null : Number(r.unit_cost);
+      return {
+        received_on: r.received_on, center_code: r.center_code, center_name: r.center_name,
+        item: r.item, category: titleCase(r.category),
+        quantity: Number(r.quantity), unit: r.unit, challan_no: r.challan_no,
+        unit_cost: cost,
+        value: cost === null ? null : Math.round(cost * Number(r.quantity) * 100) / 100,
+        sent_by: r.sent_by, remarks: r.remarks,
+      };
+    }),
+  };
+}
+
+/** Where every item stands at every centre: sent, given out, still in hand. */
+async function suppliesByCentre(p: ReportParams): Promise<ReportResult> {
+  const params: unknown[] = [];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where = ` AND c.id = $${params.length}`; }
+
+  const rows = await query<{
+    center_code: string; center_name: string; item: string; category: string; unit: string;
+    sent: string; to_students: string; students_served: string; last_sent: string | null;
+  }>(
+    `SELECT c.code AS center_code, c.name AS center_name, i.name AS item,
+            i.category, i.unit,
+            COALESCE((SELECT sum(r.quantity) FROM center_supply_receipts r
+                       WHERE r.item_id = i.id AND r.center_id = c.id), 0) AS sent,
+            COALESCE((SELECT sum(s.quantity) FROM student_supply_issues s
+                       WHERE s.item_id = i.id AND s.center_id = c.id), 0) AS to_students,
+            COALESCE((SELECT count(DISTINCT s.student_id) FROM student_supply_issues s
+                       WHERE s.item_id = i.id AND s.center_id = c.id), 0) AS students_served,
+            (SELECT max(r.received_on)::text FROM center_supply_receipts r
+              WHERE r.item_id = i.id AND r.center_id = c.id) AS last_sent
+       FROM centers c
+       CROSS JOIN supply_items i
+      WHERE c.is_active AND i.is_active ${where}
+      ORDER BY c.code, i.category, i.name`,
+    params,
+  );
+
+  return {
+    title: "Centre-wise supply position",
+    subtitle: "Sent from headquarters, given to students, and what remains",
+    columns: [
+      { key: "center_code", label: "Code", width: 9 },
+      { key: "center_name", label: "Centre", width: 20 },
+      { key: "item", label: "Item", width: 24 },
+      { key: "category", label: "Category", width: 14 },
+      { key: "unit", label: "Unit", width: 10 },
+      { key: "sent", label: "Sent to centre", numeric: true, width: 15 },
+      { key: "to_students", label: "Given to students", numeric: true, width: 17 },
+      { key: "in_hand", label: "In hand", numeric: true, width: 11 },
+      { key: "students_served", label: "Students served", numeric: true, width: 16 },
+      { key: "last_sent", label: "Last dispatch", width: 14 },
+    ],
+    rows: rows.map((r) => ({
+      center_code: r.center_code, center_name: r.center_name, item: r.item,
+      category: titleCase(r.category), unit: r.unit,
+      sent: Number(r.sent), to_students: Number(r.to_students),
+      in_hand: Number(r.sent) - Number(r.to_students),
+      students_served: Number(r.students_served),
+      last_sent: r.last_sent,
     })),
   };
 }

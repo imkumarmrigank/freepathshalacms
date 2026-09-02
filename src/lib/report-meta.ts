@@ -86,6 +86,33 @@ export const REPORTS: ReportMeta[] = [
     roles: ["super_admin", "mentor"],
   },
   {
+    key: "hq-receipts",
+    label: "Goods received at HQ",
+    group: "Supplies",
+    description:
+      "Every consignment received at headquarters — item, quantity, supplier, invoice, unit cost and value.",
+    filters: ["dates"],
+    roles: ["super_admin", "mentor"],
+  },
+  {
+    key: "supplies-dispatched",
+    label: "Supplies sent to centres",
+    group: "Supplies",
+    description:
+      "Every dispatch from headquarters to a centre — date, centre, item, quantity, challan and value.",
+    filters: ["dates", "center"],
+    roles: ["super_admin", "mentor"],
+  },
+  {
+    key: "supplies-by-centre",
+    label: "Centre-wise supply position",
+    group: "Supplies",
+    description:
+      "For each centre and item: how much was sent, how much reached students, and what is still in hand.",
+    filters: ["center"],
+    roles: ["super_admin", "mentor", "center_manager"],
+  },
+  {
     key: "supplies-issued",
     label: "Supplies given to students",
     group: "Supplies",
