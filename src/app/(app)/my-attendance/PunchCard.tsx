@@ -122,8 +122,9 @@ export default function PunchCard({
 
         <span className="text-[13px] text-[var(--muted)]">
           {coords
-            ? `Location ready (±${coords.acc} m). Must be within ${radius} m of ${centerName}.`
-            : `You must be within ${radius} m of ${centerName}.`}
+            ? `Location ready (±${coords.acc} m). Checking ${kind === "in" ? "in" : "out"} is only ` +
+              `possible within ${radius} m of ${centerName}.`
+            : `Both check-in and check-out must be done within ${radius} m of ${centerName}.`}
         </span>
       </form>
     </div>

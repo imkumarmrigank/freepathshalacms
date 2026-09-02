@@ -26,7 +26,16 @@ export type GeoCheck = {
   distance: number;
   radius: number;
   reason?: string;
+  /** True when the gap is so large the centre's saved pin is the likely fault. */
+  pinLooksWrong?: boolean;
 };
+
+/** Past this, "you are too far" is almost certainly a bad pin, not a distant member of staff. */
+const PIN_SUSPECT_M = 2000;
+
+function readable(m: number) {
+  return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${m} m`;
+}
 
 /** Is the punch inside the centre's geofence? */
 export function checkGeofence(
@@ -40,8 +49,20 @@ export function checkGeofence(
   }
   const distance = haversineMeters(center.latitude, center.longitude, lat, lng);
   const radius = center.geofence_radius_m ?? GEOFENCE_DEFAULT_M;
-  return distance <= radius
-    ? { ok: true, distance, radius }
-    : { ok: false, distance, radius,
-        reason: `You are ${distance} m from the centre (allowed ${radius} m).` };
+  if (distance <= radius) return { ok: true, distance, radius };
+
+  // A few hundred metres is someone standing down the road. A thousand times that
+  // is the centre's own coordinates being wrong, and the message should say so.
+  if (distance > PIN_SUSPECT_M) {
+    return {
+      ok: false, distance, radius, pinLooksWrong: true,
+      reason: `This centre’s saved location looks wrong — it places you ${readable(distance)} away. ` +
+              "Ask your administrator to stand at the centre and re-pin it.",
+    };
+  }
+  return {
+    ok: false, distance, radius,
+    reason: `You are ${readable(distance)} from the centre. Check-in is only possible ` +
+            `within ${radius} m, so move closer and try again.`,
+  };
 }

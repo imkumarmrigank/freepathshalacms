@@ -2,7 +2,7 @@ import { requireRole } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { centersForUser, getCenter, listCenters } from "@/lib/queries";
 import { canCreateCentre } from "@/lib/roles";
-import { Badge, Card, Empty, PageHeader } from "@/components/ui";
+import { Alert, Badge, Card, Empty, PageHeader } from "@/components/ui";
 import Link from "next/link";
 import CenterForm from "./CenterForm";
 import ManagerPicker from "./ManagerPicker";
@@ -31,6 +31,15 @@ export default async function CentersPage({
 
   return (
     <>
+      {centers.some((c) => c.latitude == null) && (
+        <div className="mb-5">
+          <Alert kind="warn">
+            Some centres have no location pinned, so nobody can check in there. Open the centre,
+            stand at the building and tap “Use my current location”.
+          </Alert>
+        </div>
+      )}
+
       <PageHeader title="Centres"
         subtitle="Each centre has one manager, its own teachers, and a geofence for staff check-in"
         right={edit ? <Link href="/manage/centers" className="btn btn-ghost">Cancel edit</Link> : undefined} />
@@ -64,9 +73,16 @@ export default async function CentersPage({
                         <td className="tabular-nums">{byId.get(c.id)?.students ?? 0}</td>
                         <td className="tabular-nums">{byId.get(c.id)?.staff ?? 0}</td>
                         <td className="text-[13px] text-[var(--muted)]">
-                          {c.latitude == null
-                            ? <Badge tone="warn">Not pinned</Badge>
-                            : `${c.geofence_radius_m} m`}
+                          {c.latitude == null ? (
+                            <Badge tone="warn">Not pinned</Badge>
+                          ) : (
+                            <>
+                              <div>{c.geofence_radius_m} m radius</div>
+                              <div className="font-mono text-[11px] text-[var(--faint)]">
+                                {Number(c.latitude).toFixed(4)}, {Number(c.longitude).toFixed(4)}
+                              </div>
+                            </>
+                          )}
                         </td>
                         <td>
                           <Link href={`/manage/centers?edit=${c.id}`} className="btn btn-ghost btn-sm">Edit</Link>
