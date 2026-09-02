@@ -98,34 +98,38 @@ export function canAssignCoverage(role: Role) {
 export type Feature =
   | "students" | "attendance" | "timetable" | "teachingPlans" | "exams"
   | "progressReports" | "calendar" | "ptm" | "followUps" | "supplies"
-  | "statistics" | "reports" | "staff" | "centres" | "coverage" | "ownCheckIn";
+  | "statistics" | "reports" | "staff" | "centres" | "coverage" | "ownCheckIn"
+  | "counselling" | "teacherRemarks";
 
 /** One explicit list per role — no inference, so a gate is read, not deduced. */
 const FEATURES: Record<Role, Feature[]> = {
   super_admin: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
     "calendar", "ptm", "followUps", "supplies", "statistics", "reports",
-    "staff", "centres", "coverage",
+    "staff", "centres", "coverage", "counselling", "teacherRemarks",
   ],
   admin: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
     "calendar", "ptm", "followUps", "supplies", "statistics", "reports",
-    "staff", "centres", "coverage",
+    "staff", "centres", "coverage", "counselling", "teacherRemarks",
   ],
   // the whole point of the mentor role is that this list is short
-  mentor: ["ptm", "followUps", "progressReports", "students", "calendar", "statistics"],
+  mentor: [
+    "ptm", "followUps", "progressReports", "students", "calendar", "statistics",
+    "counselling", "teacherRemarks",
+  ],
   center_manager: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
     "calendar", "ptm", "followUps", "supplies", "statistics", "reports",
-    "staff", "ownCheckIn",
+    "staff", "ownCheckIn", "counselling",
   ],
   teacher: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
-    "calendar", "ptm", "followUps", "reports", "ownCheckIn",
+    "calendar", "ptm", "followUps", "reports", "ownCheckIn", "counselling",
   ],
   backup_teacher: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
-    "calendar", "ptm", "followUps", "reports", "ownCheckIn",
+    "calendar", "ptm", "followUps", "reports", "ownCheckIn", "counselling",
   ],
 };
 
@@ -136,4 +140,17 @@ export function can(role: Role, feature: Feature): boolean {
 /** A mentor may read a student but never change one. */
 export function canEditStudents(role: Role) {
   return role !== "mentor" && !isTeaching(role);
+}
+
+/**
+ * Admitting a student. Teachers pass the details to their manager, and a mentor
+ * only ever reads the roll — so this is narrower than canEditStudents.
+ */
+export function canAdmitStudents(role: Role) {
+  return role === "super_admin" || role === "admin" || role === "center_manager";
+}
+
+/** Taking a child off the roll is an administrator's decision, never a centre's. */
+export function canMarkDropout(role: Role) {
+  return role === "super_admin" || role === "admin";
 }

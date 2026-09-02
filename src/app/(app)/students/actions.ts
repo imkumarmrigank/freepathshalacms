@@ -5,7 +5,7 @@ import { requireUser, canTouchCenter } from "@/lib/auth";
 import { tx, query, one } from "@/lib/db";
 import { nextEnrollmentNo } from "@/lib/enrollment";
 import { currentSession } from "@/lib/queries";
-import { isGlobalRole, isTeaching } from "@/lib/roles";
+import { isGlobalRole, isTeaching, canMarkDropout } from "@/lib/roles";
 
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
@@ -69,12 +69,20 @@ export async function createStudent(_prev: unknown, form: FormData) {
 export async function updateStudent(_prev: unknown, form: FormData) {
   const user = await requireUser();
   const id = Number(form.get("id"));
-  const existing = await one<{ center_id: number }>(
-    "SELECT center_id FROM students WHERE id = $1", [id],
+  const existing = await one<{ center_id: number; status: string }>(
+    "SELECT center_id, status FROM students WHERE id = $1", [id],
   );
   if (!existing) return { error: "Student not found." };
   if (!canTouchCenter(user, existing.center_id))
     return { error: "This student belongs to another centre." };
+
+  // dropping a child off the roll is an administrator's call, made on its own
+  // control with a reason attached — never a quiet change of this dropdown
+  const status = String(form.get("status") ?? "active");
+  if (status === "dropped" && existing.status !== "dropped" && !canMarkDropout(user.role))
+    return { error: "Only an administrator can mark a student as dropped out." };
+  if (existing.status === "dropped" && status !== "dropped" && !canMarkDropout(user.role))
+    return { error: "Only an administrator can bring a dropped-out student back." };
 
   await query(
     `UPDATE students SET first_name=$2, last_name=$3, gender=$4, dob=$5, father_name=$6,
@@ -84,7 +92,7 @@ export async function updateStudent(_prev: unknown, form: FormData) {
     [id, str(form, "first_name"), str(form, "last_name"), str(form, "gender"), str(form, "dob"),
      str(form, "father_name"), str(form, "mother_name"), str(form, "guardian_name"),
      str(form, "primary_phone"), str(form, "alt_phone"), str(form, "email"),
-     str(form, "address"), String(form.get("status") ?? "active"), str(form, "notes")],
+     str(form, "address"), status, str(form, "notes")],
   );
   revalidatePath(`/students/${id}`);
   return { ok: "Saved." };
@@ -126,4 +134,69 @@ export async function setPromotionDecision(_prev: unknown, form: FormData) {
     [enrollmentId, decision]);
   revalidatePath(`/students/${row.student_id}`);
   return { ok: "Promotion decision saved." };
+}
+
+
+/**
+ * Takes a child off the roll, with the reason and the date it happened. Restricted
+ * to administrators: a centre cannot quietly drop a student it is measured on.
+ * The current enrolment is closed too, so the register stops expecting them.
+ */
+export async function markDropout(_prev: unknown, form: FormData) {
+  const user = await requireUser();
+  if (!canMarkDropout(user.role))
+    return { error: "Only an administrator can mark a student as dropped out." };
+
+  const id = Number(form.get("id"));
+  const reason = str(form, "dropout_reason");
+  const on = str(form, "dropout_date") ?? new Date().toISOString().slice(0, 10);
+  if (!reason) return { error: "Give a reason — it is what the follow-up works from." };
+
+  const existing = await one<{ center_id: number; status: string }>(
+    "SELECT center_id, status FROM students WHERE id = $1", [id]);
+  if (!existing) return { error: "Student not found." };
+  if (existing.status === "dropped") return { error: "This student is already marked dropped out." };
+
+  await tx(async (c) => {
+    await c.query(
+      `UPDATE students SET status = 'dropped', dropout_reason = $2, dropout_date = $3,
+          updated_at = now() WHERE id = $1`,
+      [id, reason, on]);
+    await c.query(
+      "UPDATE enrollments SET status = 'left' WHERE student_id = $1 AND status = 'active'",
+      [id]);
+  });
+
+  revalidatePath(`/students/${id}`);
+  revalidatePath("/students");
+  return { ok: "Marked as dropped out." };
+}
+
+/** Undoes a drop-out — the child came back. */
+export async function reinstateStudent(_prev: unknown, form: FormData) {
+  const user = await requireUser();
+  if (!canMarkDropout(user.role))
+    return { error: "Only an administrator can bring a dropped-out student back." };
+
+  const id = Number(form.get("id"));
+  const session = await currentSession();
+  const existing = await one<{ status: string }>(
+    "SELECT status FROM students WHERE id = $1", [id]);
+  if (!existing) return { error: "Student not found." };
+  if (existing.status !== "dropped") return { error: "This student is not marked dropped out." };
+
+  await tx(async (c) => {
+    await c.query(
+      `UPDATE students SET status = 'active', dropout_reason = NULL, dropout_date = NULL,
+          updated_at = now() WHERE id = $1`, [id]);
+    if (session)
+      await c.query(
+        `UPDATE enrollments SET status = 'active'
+          WHERE student_id = $1 AND session_id = $2 AND status = 'left'`,
+        [id, session.id]);
+  });
+
+  revalidatePath(`/students/${id}`);
+  revalidatePath("/students");
+  return { ok: "Back on the roll." };
 }

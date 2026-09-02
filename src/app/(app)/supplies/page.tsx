@@ -7,6 +7,8 @@ import { fmtDate, titleCase } from "@/lib/format";
 import { HqReceiptForm, IssueForm, ItemForm, ReceiptForm } from "./Forms";
 import { canManageHqStock, isTeaching } from "@/lib/roles";
 import { isGlobalRole } from "@/lib/roles";
+import Pager from "@/components/Pager";
+import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
 
 export default async function SuppliesPage({
   searchParams,
@@ -63,12 +65,19 @@ export default async function SuppliesPage({
         [centerId])
     : [];
 
+  // three independent lists on one page, so each turns its own pages
+  const issuePg = pageFrom(sp, 25, "ipage");
+  const receiptPg = pageFrom(sp, 25, "rpage");
+  const hqPg = pageFrom(sp, 25, "hpage");
+
   const [recentIssues, recentReceipts] = await Promise.all([
     query<{
       id: number; item: string; unit: string; quantity: number; issued_on: string;
       student: string; enrollment_no: string; center_name: string; issued_by: string | null;
+      total_rows: string;
     }>(
-      `SELECT s.id, i.name AS item, i.unit, s.quantity, s.issued_on,
+      `SELECT count(*) OVER () AS total_rows,
+              s.id, i.name AS item, i.unit, s.quantity, s.issued_on,
               st.first_name || ' ' || COALESCE(st.last_name,'') AS student,
               st.enrollment_no, c.name AS center_name, u.name AS issued_by
          FROM student_supply_issues s
@@ -77,34 +86,47 @@ export default async function SuppliesPage({
          JOIN centers c ON c.id = s.center_id
          LEFT JOIN users u ON u.id = s.issued_by
         WHERE 1=1 ${centerId ? "AND s.center_id = $1" : ""}
-        ORDER BY s.issued_on DESC, s.id DESC LIMIT 40`,
-      centerId ? [centerId] : []),
+        ORDER BY s.issued_on DESC, s.id DESC
+        LIMIT ${centerId ? "$2" : "$1"} OFFSET ${centerId ? "$3" : "$2"}`,
+      centerId ? [centerId, issuePg.size, issuePg.offset] : [issuePg.size, issuePg.offset]),
     query<{
       id: number; item: string; unit: string; quantity: number; received_on: string;
       center_name: string; challan_no: string | null; recorded_by: string | null;
+      total_rows: string;
     }>(
-      `SELECT r.id, i.name AS item, i.unit, r.quantity, r.received_on, c.name AS center_name,
+      `SELECT count(*) OVER () AS total_rows,
+              r.id, i.name AS item, i.unit, r.quantity, r.received_on, c.name AS center_name,
               r.challan_no, u.name AS recorded_by
          FROM center_supply_receipts r
          JOIN supply_items i ON i.id = r.item_id
          JOIN centers c ON c.id = r.center_id
          LEFT JOIN users u ON u.id = r.recorded_by
         WHERE 1=1 ${centerId ? "AND r.center_id = $1" : ""}
-        ORDER BY r.received_on DESC, r.id DESC LIMIT 40`,
-      centerId ? [centerId] : []),
+        ORDER BY r.received_on DESC, r.id DESC
+        LIMIT ${centerId ? "$2" : "$1"} OFFSET ${centerId ? "$3" : "$2"}`,
+      centerId ? [centerId, receiptPg.size, receiptPg.offset] : [receiptPg.size, receiptPg.offset]),
   ]);
 
   const hqReceipts = runsHq
     ? await query<{ id: number; item: string; unit: string; quantity: number;
         received_on: string; supplier: string | null; invoice_no: string | null;
-        recorded_by: string | null }>(
-        `SELECT h.id, i.name AS item, i.unit, h.quantity, h.received_on, h.supplier,
+        recorded_by: string | null; total_rows: string }>(
+        `SELECT count(*) OVER () AS total_rows,
+                h.id, i.name AS item, i.unit, h.quantity, h.received_on, h.supplier,
                 h.invoice_no, u.name AS recorded_by
            FROM hq_supply_receipts h
            JOIN supply_items i ON i.id = h.item_id
            LEFT JOIN users u ON u.id = h.recorded_by
-          ORDER BY h.received_on DESC, h.id DESC LIMIT 40`)
+          ORDER BY h.received_on DESC, h.id DESC LIMIT $1 OFFSET $2`,
+        [hqPg.size, hqPg.offset])
     : [];
+
+  const issueTotal = totalOf(recentIssues);
+  const issueWin = pageWindow(issuePg, recentIssues.length, issueTotal);
+  const receiptTotal = totalOf(recentReceipts);
+  const receiptWin = pageWindow(receiptPg, recentReceipts.length, receiptTotal);
+  const hqTotal = totalOf(hqReceipts);
+  const hqWin = pageWindow(hqPg, hqReceipts.length, hqTotal);
 
   const hqInHand = hq.reduce((n, h) => n + (Number(h.received) - Number(h.dispatched)), 0);
   const totalIn = items.reduce((n, i) => n + i.available, 0);
@@ -267,7 +289,9 @@ export default async function SuppliesPage({
                 </table>
               </div>
             )}
-          </Card>
+          <Pager page={issuePg.page} pages={issueWin.pages} first={issueWin.first}
+              last={issueWin.last} total={issueTotal} unit="issue" param="ipage" />
+        </Card>
 
           {runsHq && (
             <Card pad={false}>
@@ -297,7 +321,9 @@ export default async function SuppliesPage({
                   </table>
                 </div>
               )}
-            </Card>
+            <Pager page={hqPg.page} pages={hqWin.pages} first={hqWin.first}
+                last={hqWin.last} total={hqTotal} unit="receipt" param="hpage" />
+        </Card>
           )}
 
           <Card pad={false}>
@@ -328,7 +354,9 @@ export default async function SuppliesPage({
                 </table>
               </div>
             )}
-          </Card>
+          <Pager page={receiptPg.page} pages={receiptWin.pages} first={receiptWin.first}
+              last={receiptWin.last} total={receiptTotal} unit="receipt" param="rpage" />
+        </Card>
         </div>
 
         <div className="space-y-5">

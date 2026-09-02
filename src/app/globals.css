@@ -127,6 +127,19 @@ table.tbl tbody tr:hover { background: #fafaff; }
   font-size: 0.75rem; font-weight: 600; flex: none;
 }
 
+.pager-btn {
+  min-width: 2rem; padding: 0.3125rem 0.5rem; border-radius: 8px;
+  border: 1px solid var(--border); background: #fff;
+  font-size: 0.8125rem; line-height: 1.25rem; color: var(--muted);
+  cursor: pointer; transition: border-color .15s, color .15s, background .15s;
+}
+.pager-btn:hover:not(:disabled) { border-color: var(--brand); color: var(--brand); }
+.pager-btn:disabled { opacity: .45; cursor: default; }
+.pager-btn-on {
+  border-color: var(--brand); background: var(--brand); color: #fff; font-weight: 600;
+}
+.pager-btn-on:hover { color: #fff; }
+
 .avatar-img {
   border-radius: 999px; object-fit: cover; flex: none;
   background: var(--brand-soft); border: 1px solid var(--border);

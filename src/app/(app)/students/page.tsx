@@ -5,7 +5,9 @@ import { centersForUser, currentSession, listClasses, listSessions, resolveCente
 import { Avatar, Badge, Card, Empty, Meter, PageHeader } from "@/components/ui";
 import Filters from "@/components/Filters";
 import { fmtDate, fullName } from "@/lib/format";
-import { isGlobalRole, isTeaching } from "@/lib/roles";
+import { isGlobalRole, canAdmitStudents } from "@/lib/roles";
+import Pager from "@/components/Pager";
+import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
 
 const STATUS_TONE: Record<string, string> = {
   active: "ok", inactive: "mute", graduated: "info", transferred: "mute", dropped: "bad",
@@ -15,6 +17,7 @@ type Row = {
   id: number; enrollment_no: string; first_name: string; last_name: string | null;
   status: string; class_name: string | null; center_name: string; section: string | null;
   admission_date: string; attendance_pct: string | null; enrolled_here: boolean;
+  total_rows: string;
 };
 
 export default async function StudentsPage({
@@ -42,8 +45,12 @@ export default async function StudentsPage({
   }
   if (sp.status) { params.push(sp.status); where += ` AND s.status = $${params.length}`; }
 
+  const pg = pageFrom(sp);
+  params.push(pg.size, pg.offset);
+
   const rows = await query<Row>(
-    `SELECT s.id, s.enrollment_no, s.first_name, s.last_name, s.status, s.admission_date,
+    `SELECT count(*) OVER () AS total_rows,
+            s.id, s.enrollment_no, s.first_name, s.last_name, s.status, s.admission_date,
             cl.name AS class_name, ce.name AS center_name, e.section,
             (e.id IS NOT NULL) AS enrolled_here,
             (SELECT round(100.0 * count(*) FILTER (WHERE a.status IN ('present','late','half_day'))
@@ -55,18 +62,21 @@ export default async function StudentsPage({
        LEFT JOIN enrollments e ON e.student_id = s.id AND e.session_id = $1
        LEFT JOIN class_levels cl ON cl.id = e.class_level_id
       WHERE 1=1 ${where}
-      ORDER BY cl.sequence NULLS LAST, s.first_name
-      LIMIT 400`,
+      ORDER BY cl.sequence NULLS LAST, s.first_name, s.id
+      LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params,
   );
+
+  const total = totalOf(rows);
+  const win = pageWindow(pg, rows.length, total);
 
   return (
     <>
       <PageHeader
         title="Students"
-        subtitle={`${rows.length} student${rows.length === 1 ? "" : "s"}${
+        subtitle={`${total} student${total === 1 ? "" : "s"}${
           cur && sessionId === cur.id ? ` in ${cur.name}` : ""}`}
-        right={!isTeaching(user.role)
+        right={canAdmitStudents(user.role)
           ? <Link href="/students/new" className="btn btn-primary">+ Add student</Link>
           : undefined}
       />
@@ -85,10 +95,10 @@ export default async function StudentsPage({
       <Card className="mt-4 overflow-hidden" pad={false}>
         {rows.length === 0 ? (
           <Empty title="No students found"
-            hint={isTeaching(user.role)
-              ? "Try a different filter. Your centre manager admits new students."
-              : "Try a different filter, or add the first student for this centre."}
-            action={!isTeaching(user.role)
+            hint={canAdmitStudents(user.role)
+              ? "Try a different filter, or add the first student for this centre."
+              : "Try a different filter. The centre manager admits new students."}
+            action={canAdmitStudents(user.role)
               ? <Link href="/students/new" className="btn btn-primary btn-sm">Add student</Link>
               : undefined} />
         ) : (
@@ -128,6 +138,8 @@ export default async function StudentsPage({
             </table>
           </div>
         )}
+        <Pager page={pg.page} pages={win.pages} first={win.first} last={win.last}
+          total={total} unit="student" />
       </Card>
     </>
   );

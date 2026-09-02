@@ -3,6 +3,8 @@ import { requireUser } from "@/lib/auth";
 import { centersForUser, resolveCenterId } from "@/lib/queries";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { eventsBetween } from "@/lib/calendar";
+import { weekOffDays } from "@/lib/attendance";
+import { describeWeekOff } from "@/lib/week";
 import { EVENT_LABEL, EVENT_TONE } from "@/lib/calendar-meta";
 import { fmtDate, today } from "@/lib/format";
 import MonthGrid from "./MonthGrid";
@@ -34,9 +36,10 @@ export default async function CalendarPage({
   const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? sp.month! : today().slice(0, 7);
   const { from, to, label, prev, next } = monthBounds(month);
 
-  const [monthEvents, upcoming] = await Promise.all([
+  const [monthEvents, upcoming, weekOff] = await Promise.all([
     eventsBetween(from, to, centerId),
     eventsBetween(today(), `${Number(today().slice(0, 4)) + 1}-12-31`, centerId),
+    weekOffDays(),
   ]);
 
   const canEdit = !isTeaching(user.role);
@@ -76,7 +79,15 @@ export default async function CalendarPage({
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">
           <Card pad={false} className="p-1.5">
-            <MonthGrid month={month} events={monthEvents} today={today()} />
+            <MonthGrid month={month} events={monthEvents} today={today()} weekOff={weekOff} />
+            <p className="px-2 py-2 text-[12px] text-[var(--muted)]">
+              {describeWeekOff(weekOff)} every week, at every centre
+              {user.role === "super_admin" && (
+                <> — <Link href="/manage/working-days" className="text-[var(--brand)] hover:underline">
+                  change the working week
+                </Link></>
+              )}.
+            </p>
           </Card>
 
           <Card pad={false}>

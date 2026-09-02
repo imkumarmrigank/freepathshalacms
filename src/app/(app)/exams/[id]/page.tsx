@@ -6,6 +6,7 @@ import { fmtDate } from "@/lib/format";
 import { EXAM_TYPE_LABEL, grade, percentage } from "@/lib/exam-meta";
 import MarksSheet, { type MarkRow } from "./MarksSheet";
 import PublishToggle from "./PublishToggle";
+import EditExam from "./EditExam";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
 
 export default async function ExamPage({ params }: { params: Promise<{ id: string }> }) {
@@ -43,6 +44,15 @@ export default async function ExamPage({ params }: { params: Promise<{ id: strin
     );
     canEdit = Boolean(allotted);
   }
+
+  // the other subjects of the same test, which an edit can carry along
+  const siblings = await one<{ n: string }>(
+    `SELECT count(*) AS n FROM exams
+      WHERE id <> $1 AND session_id = $2 AND center_id = $3 AND class_level_id = $4
+        AND COALESCE(term_label, title) = $5`,
+    [examId, exam.session_id, exam.center_id, exam.class_level_id,
+     exam.term_label ?? exam.title],
+  );
 
   const rows = await query<MarkRow>(
     `SELECT s.id AS student_id, s.enrollment_no, s.first_name, s.last_name, e.roll_no,
@@ -109,6 +119,12 @@ export default async function ExamPage({ params }: { params: Promise<{ id: strin
           <Alert kind="warn">
             These results are published. Reopen the test if you need to correct a mark.
           </Alert>
+        </div>
+      )}
+
+      {canEdit && (
+        <div className="mb-5">
+          <EditExam exam={exam} siblings={Number(siblings?.n ?? 0)} />
         </div>
       )}
 

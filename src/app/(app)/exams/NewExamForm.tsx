@@ -13,6 +13,51 @@ const COMMON_SUBJECTS = [
 type Row = { subject: string; max: string; pass: string };
 const blank = (): Row => ({ subject: "", max: "", pass: "" });
 
+/** A row of toggle chips that posts one hidden input per selection. */
+function PickMany({ name, label, hint, options, value, onChange }: {
+  name: string;
+  label: string;
+  hint?: string;
+  options: { id: number; label: string }[];
+  value: number[];
+  onChange: (next: number[]) => void;
+}) {
+  const all = value.length === options.length && options.length > 0;
+  const toggle = (id: number) =>
+    onChange(value.includes(id) ? value.filter((v) => v !== id) : [...value, id]);
+
+  return (
+    <div className="mb-3.5">
+      <div className="mb-1.5 flex items-baseline justify-between gap-3">
+        <span className="text-[13px] font-medium">
+          {label} <span className="text-[var(--faint)]">({value.length})</span>
+        </span>
+        <button type="button" className="text-[12px] text-[var(--brand)] hover:underline"
+          onClick={() => onChange(all ? [] : options.map((o) => o.id))}>
+          {all ? "clear" : "select all"}
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((o) => {
+          const on = value.includes(o.id);
+          return (
+            <button key={o.id} type="button" onClick={() => toggle(o.id)} aria-pressed={on}
+              className={`rounded-full border px-2.5 py-1 text-[12px] transition ${
+                on
+                  ? "border-[var(--brand)] bg-[var(--brand)] text-white"
+                  : "border-[var(--border-strong)] text-[var(--muted)] hover:border-[var(--brand)] hover:text-[var(--brand)]"
+              }`}>
+              {on ? "\u2713 " : ""}{o.label}
+            </button>
+          );
+        })}
+      </div>
+      {hint && <p className="mt-1.5 text-[12px] text-[var(--faint)]">{hint}</p>}
+      {value.map((id) => <input key={id} type="hidden" name={name} value={id} />)}
+    </div>
+  );
+}
+
 export default function NewExamForm({
   classes, centers, isAdmin, isTeacher,
 }: {
@@ -23,6 +68,8 @@ export default function NewExamForm({
 }) {
   const [state, action] = useActionState(createExam, null);
   const [rows, setRows] = useState<Row[]>([blank(), blank(), blank()]);
+  const [pickedClasses, setPickedClasses] = useState<number[]>([]);
+  const [pickedCentres, setPickedCentres] = useState<number[]>([]);
 
   const update = (i: number, patch: Partial<Row>) =>
     setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
@@ -44,6 +91,9 @@ export default function NewExamForm({
   };
 
   const filled = rows.filter((r) => r.subject.trim() !== "").length;
+  const classCount = pickedClasses.length;
+  const centreCount = isAdmin ? pickedCentres.length : 1;
+  const sheets = filled * classCount * centreCount;
 
   if (isTeacher && classes.length === 0) {
     return (
@@ -61,8 +111,9 @@ export default function NewExamForm({
     <Card>
       <h2 className="mb-1 text-[15px] font-semibold">Set up a test</h2>
       <p className="mb-4 text-[13px] text-[var(--muted)]">
-        One test, every subject. Each subject gets its own marks sheet, and they appear
-        together on the progress report.
+        One window for the whole schedule: pick the subjects, the classes and{" "}
+        {isAdmin ? "the centres" : "your centre"}. Each subject gets its own marks sheet,
+        and they appear together on the progress report.
       </p>
       <form action={action}>
         <FormMessage state={state} />
@@ -75,19 +126,15 @@ export default function NewExamForm({
           </select>
         </Field>
         {isAdmin && (
-          <Field label="Centre *">
-            <select className="select" name="center_id" required defaultValue="">
-              <option value="">Select centre</option>
-              {centers.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
-            </select>
-          </Field>
+          <PickMany name="center_id" label="Centres *"
+            hint="Every centre you tick gets its own marks sheet for each class."
+            options={centers.map((c) => ({ id: c.id, label: `${c.code} · ${c.name}` }))}
+            value={pickedCentres} onChange={setPickedCentres} />
         )}
-        <Field label="Class *" hint={isTeacher ? "Only classes you are allotted" : undefined}>
-          <select className="select" name="class_level_id" required defaultValue="">
-            <option value="">Select class</option>
-            {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </Field>
+        <PickMany name="class_level_id" label="Classes *"
+          hint={isTeacher ? "Only classes you are allotted" : undefined}
+          options={classes.map((c) => ({ id: c.id, label: c.name }))}
+          value={pickedClasses} onChange={setPickedClasses} />
         <Field label="Date of test *">
           <input className="input" type="date" name="exam_date" required
             defaultValue={new Date().toISOString().slice(0, 10)} />
@@ -168,6 +215,14 @@ export default function NewExamForm({
         <Field label="Term label" hint="Groups the subjects on the report — defaults to the test name">
           <input className="input" name="term_label" placeholder="Term 1" />
         </Field>
+        {sheets > 0 && (
+          <p className="mb-3 rounded-[9px] bg-[var(--brand-soft)] px-3 py-2 text-[12px] text-[var(--brand)]">
+            This will create {sheets} marks sheet{sheets === 1 ? "" : "s"}
+            {" "}— {filled} subject{filled === 1 ? "" : "s"} × {classCount} class
+            {classCount === 1 ? "" : "es"}{isAdmin ? ` × ${centreCount} centre${
+              centreCount === 1 ? "" : "s"}` : ""}.
+          </p>
+        )}
         <Submit>Create test</Submit>
       </form>
     </Card>

@@ -7,6 +7,8 @@ import Filters from "@/components/Filters";
 import { IconPlus } from "@/components/icons";
 import { fmtDate, fullName, titleCase } from "@/lib/format";
 import { isGlobalRole } from "@/lib/roles";
+import Pager from "@/components/Pager";
+import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
 
 const TONE: Record<string, string> = { attentive: "ok", neutral: "warn", resistant: "bad" };
 
@@ -31,13 +33,17 @@ export default async function PtmPage({
                     OR s.enrollment_no ILIKE $${params.length} OR u.name ILIKE $${params.length})`;
   }
 
+  const pg = pageFrom(sp);
+  params.push(pg.size, pg.offset);
+
   const rows = await query<{
     id: number; interaction_date: string; first_name: string; last_name: string | null;
     enrollment_no: string; mentor: string | null; parent_present: string; engagement: string;
     center_name: string; class_name: string | null;
-    follow_up_required: boolean; follow_up_status: string;
+    follow_up_required: boolean; follow_up_status: string; total_rows: string;
   }>(
-    `SELECT i.id, i.interaction_date, s.first_name, s.last_name, s.enrollment_no,
+    `SELECT count(*) OVER () AS total_rows,
+            i.id, i.interaction_date, s.first_name, s.last_name, s.enrollment_no,
             u.name AS mentor, i.parent_present, i.engagement, ce.name AS center_name,
             cl.name AS class_name, i.follow_up_required, i.follow_up_status
        FROM ptm_interactions i
@@ -46,14 +52,18 @@ export default async function PtmPage({
        LEFT JOIN users u ON u.id = i.mentor_id
        LEFT JOIN class_levels cl ON cl.id = i.class_level_id
       WHERE i.session_id = $1 ${where}
-      ORDER BY i.interaction_date DESC, i.id DESC LIMIT 300`,
+      ORDER BY i.interaction_date DESC, i.id DESC
+      LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params,
   );
+
+  const total = totalOf(rows);
+  const win = pageWindow(pg, rows.length, total);
 
   return (
     <>
       <PageHeader title="PTM interactions"
-        subtitle={`${rows.length} interaction${rows.length === 1 ? "" : "s"} in ${session?.name ?? "this session"}`}
+        subtitle={`${total} interaction${total === 1 ? "" : "s"} in ${session?.name ?? "this session"}`}
         right={
           <>
             <Link href="/ptm/meetings" className="btn btn-ghost">Scheduled PTMs</Link>
@@ -124,6 +134,8 @@ export default async function PtmPage({
             </table>
           </div>
         )}
+        <Pager page={pg.page} pages={win.pages} first={win.first} last={win.last}
+          total={total} unit="interaction" />
       </Card>
     </>
   );

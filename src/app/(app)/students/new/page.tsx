@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
+import { canAdmitStudents } from "@/lib/roles";
 import { one, query } from "@/lib/db";
 import { centersForUser, currentSession, listClasses } from "@/lib/queries";
 import { Alert, Card, PageHeader } from "@/components/ui";
@@ -19,10 +20,12 @@ export default async function NewStudentPage({
     centersForUser(user), listClasses(), currentSession(),
   ]);
 
-  if (user.role === "teacher" || user.role === "backup_teacher")
+  if (!canAdmitStudents(user.role))
     return (
       <Alert kind="bad">
-        Only the centre manager can admit a student. Pass the details to your manager.
+        {user.role === "mentor"
+          ? "Mentors do not admit students. Ask the centre manager to add the child."
+          : "Only the centre manager can admit a student. Pass the details to your manager."}
       </Alert>
     );
   if (!session)

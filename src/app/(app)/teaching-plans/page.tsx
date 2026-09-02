@@ -4,6 +4,8 @@ import { query } from "@/lib/db";
 import { centersForUser, currentSession, listClasses, resolveCenterId } from "@/lib/queries";
 import { Alert, Badge, Card, Empty, Meter, PageHeader } from "@/components/ui";
 import Filters from "@/components/Filters";
+import Pager from "@/components/Pager";
+import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
 import { fmtDate } from "@/lib/format";
 import NewPlanForm from "./NewPlanForm";
 import { PLAN_LEAD_DAYS } from "@/lib/plan-meta";
@@ -27,12 +29,17 @@ export default async function TeachingPlansPage({
   if (isTeaching(user.role)) { params.push(user.uid); where += ` AND p.teacher_id = $${params.length}`; }
   if (sp.status) { params.push(sp.status); where += ` AND p.status = $${params.length}`; }
 
+  const pg = pageFrom(sp);
+  params.push(pg.size, pg.offset);
+
   const plans = await query<{
     id: number; title: string; subject: string | null; class_name: string;
     teacher: string; center_name: string; status: string; submitted_at: string | null;
     total: string; done: string; starts_on: string | null; ends_on: string | null;
+    total_rows: string;
   }>(
-    `SELECT p.id, p.title, p.subject, cl.name AS class_name, u.name AS teacher,
+    `SELECT count(*) OVER () AS total_rows,
+            p.id, p.title, p.subject, cl.name AS class_name, u.name AS teacher,
             ce.name AS center_name, p.status, p.starts_on, p.ends_on, p.submitted_at,
             (SELECT count(*) FROM teaching_plan_topics t WHERE t.plan_id = p.id) AS total,
             (SELECT count(*) FROM teaching_plan_topics t
@@ -42,9 +49,13 @@ export default async function TeachingPlansPage({
        JOIN users u ON u.id = p.teacher_id
        JOIN centers ce ON ce.id = p.center_id
       WHERE p.session_id = $1 ${where}
-      ORDER BY cl.sequence, p.created_at DESC`,
+      ORDER BY cl.sequence, p.created_at DESC, p.id
+      LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params,
   );
+
+  const totalPlans = totalOf(plans);
+  const planWin = pageWindow(pg, plans.length, totalPlans);
 
   // A teacher can only plan for classes they hold this session.
   const myClasses = isTeaching(user.role)
@@ -132,6 +143,8 @@ export default async function TeachingPlansPage({
                 </table>
               </div>
             )}
+            <Pager page={pg.page} pages={planWin.pages} first={planWin.first}
+              last={planWin.last} total={totalPlans} unit="plan" />
           </Card>
         </div>
 

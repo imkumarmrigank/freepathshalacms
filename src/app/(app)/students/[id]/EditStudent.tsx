@@ -6,7 +6,8 @@ import { FormMessage, Submit } from "@/components/form";
 
 import type { Student } from "@/lib/types";
 
-export default function EditStudent({ s, readOnly }: { s: Student; readOnly: boolean }) {
+export default function EditStudent({ s, readOnly, canDrop }:
+  { s: Student; readOnly: boolean; canDrop: boolean }) {
   const [state, action] = useActionState(updateStudent, null);
   const d = (v: string | null) => v ?? "";
 
@@ -35,7 +36,10 @@ export default function EditStudent({ s, readOnly }: { s: Student; readOnly: boo
           <Field label="Email"><input className="input" type="email" name="email" defaultValue={d(s.email)} /></Field>
           <Field label="Status">
             <select className="select" name="status" defaultValue={s.status}>
-              {["active","inactive","graduated","transferred","dropped"].map((v) => (
+              {["active","inactive","graduated","transferred","dropped"]
+                // dropping out has its own control, with a reason attached
+                .filter((v) => v !== "dropped" || canDrop || s.status === "dropped")
+                .map((v) => (
                 <option key={v} value={v}>{v[0].toUpperCase() + v.slice(1)}</option>
               ))}
             </select>

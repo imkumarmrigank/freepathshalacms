@@ -23,6 +23,8 @@ export default function Filters({
   const set = (key: string, value: string) => {
     const next = new URLSearchParams(params.toString());
     if (value) next.set(key, value); else next.delete(key);
+    // a new filter always starts at the first page, on every list of the page
+    for (const k of [...next.keys()]) if (k === "page" || k.endsWith("page")) next.delete(k);
     start(() => router.replace(`${path}?${next.toString()}`));
   };
 

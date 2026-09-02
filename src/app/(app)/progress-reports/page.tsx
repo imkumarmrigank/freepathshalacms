@@ -4,6 +4,8 @@ import { centersForUser, currentSession, listClasses, listSessions, resolveCente
 import { classProgress } from "@/lib/report-card";
 import { Alert, Avatar, Badge, Card, Empty, Meter, PageHeader } from "@/components/ui";
 import Filters from "@/components/Filters";
+import Pager from "@/components/Pager";
+import { pageFrom, pageWindow } from "@/lib/paginate";
 import { fullName } from "@/lib/format";
 import { grade, percentage } from "@/lib/exam-meta";
 import { isGlobalRole } from "@/lib/roles";
@@ -34,6 +36,11 @@ export default async function ProgressReportsPage({
   }).toString();
 
   const withMarks = rows.filter((r) => Number(r.papers) > 0).length;
+
+  // the list turns a page at a time; "print all" still covers the whole filter
+  const pg = pageFrom(sp);
+  const shown = rows.slice(pg.offset, pg.offset + pg.size);
+  const win = pageWindow(pg, shown.length, rows.length);
 
   return (
     <>
@@ -86,7 +93,7 @@ export default async function ProgressReportsPage({
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r, i) => {
+                {shown.map((r, i) => {
                   const obtained = r.obtained === null ? null : Number(r.obtained);
                   const outOf = r.out_of === null ? null : Number(r.out_of);
                   const pct = obtained === null || !outOf ? null : percentage(obtained, outOf);
@@ -138,6 +145,8 @@ export default async function ProgressReportsPage({
             </table>
           </div>
         )}
+        <Pager page={pg.page} pages={win.pages} first={win.first} last={win.last}
+          total={rows.length} unit="student" />
       </Card>
     </>
   );

@@ -19,6 +19,8 @@ const MAIN: Item[] = [
   { href: "/dashboard", label: "Dashboard", icon: IconGrid },
   { href: "/ptm", label: "PTM Interactions", icon: IconChat, feature: "ptm" },
   { href: "/follow-ups", label: "Follow-ups", icon: IconClock, feature: "followUps" },
+  { href: "/counselling", label: "Counselling", icon: IconAward, feature: "counselling" },
+  { href: "/teacher-remarks", label: "Teacher Remarks", icon: IconBook, feature: "teacherRemarks" },
   { href: "/progress-reports", label: "Progress Reports", icon: IconBook, feature: "progressReports" },
   { href: "/students", label: "Students", icon: IconUsers, feature: "students" },
   { href: "/attendance", label: "Student Attendance", icon: IconCheck, feature: "attendance" },
@@ -42,6 +44,7 @@ const ADMIN: Item[] = [
     roles: ["super_admin", "admin", "center_manager"] },
   { href: "/manage/sessions", label: "Sessions", icon: IconLayers, roles: ["super_admin"] },
   { href: "/manage/classes", label: "Classes", icon: IconLayers, roles: ["super_admin"] },
+  { href: "/manage/working-days", label: "Working Days", icon: IconCal, roles: ["super_admin"] },
   { href: "/manage/promotions", label: "Promotions", icon: IconArrowUp, roles: ["super_admin"] },
 ];
 

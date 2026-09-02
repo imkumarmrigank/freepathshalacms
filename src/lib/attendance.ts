@@ -1,6 +1,7 @@
 import "server-only";
 import { one, query } from "./db";
 import { today } from "./format";
+import { WEEK_OFF_KEY, parseWeekOff, isWeekOff } from "./week";
 
 /** Statuses a teacher may only award on the day itself. */
 export const SAME_DAY_ONLY = new Set(["present", "late", "half_day"]);
@@ -12,11 +13,17 @@ export const AUTO_ABSENT_REMARK = "Auto-marked absent — register not filled th
 /** How far back a close-out will ever reach, so a long gap can't stall a page load. */
 const MAX_BACKFILL_DAYS = 60;
 const LAST_CLOSED_KEY = "attendance.last_closed_date";
-const WEEK_OFF_KEY = "attendance.week_off_dow";   // 0 = Sunday, "" = no weekly off
 
 async function setting(key: string, fallback: string) {
   const row = await one<{ value: string }>("SELECT value FROM app_settings WHERE key = $1", [key]);
   return row?.value ?? fallback;
+}
+
+/** The weekly days off, as the super admin has them set. */
+export async function weekOffDays(): Promise<number[]> {
+  const row = await one<{ value: string }>(
+    "SELECT value FROM app_settings WHERE key = $1", [WEEK_OFF_KEY]);
+  return parseWeekOff(row?.value);
 }
 
 async function putSetting(key: string, value: string) {
@@ -40,7 +47,7 @@ function addDays(iso: string, n: number) {
  */
 export async function closeRegisterUpToYesterday(): Promise<number> {
   const yesterday = addDays(today(), -1);
-  const weekOff = await setting(WEEK_OFF_KEY, "0");
+  const weekOff = await weekOffDays();
 
   const earliest = addDays(today(), -MAX_BACKFILL_DAYS);
   let cursor = await setting(LAST_CLOSED_KEY, "");
@@ -50,7 +57,7 @@ export async function closeRegisterUpToYesterday(): Promise<number> {
   let filled = 0;
   let day = addDays(cursor, 1);
   while (day <= yesterday) {
-    if (weekOff === "" || new Date(`${day}T00:00:00Z`).getUTCDay() !== Number(weekOff)) {
+    if (!isWeekOff(day, weekOff)) {
       const rows = await query<{ id: number }>(
         `INSERT INTO student_attendance
            (student_id, enrollment_id, session_id, class_level_id, center_id,

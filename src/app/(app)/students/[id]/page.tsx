@@ -7,10 +7,12 @@ import { Alert, Avatar, Badge, Card, Empty, Meter, PageHeader } from "@/componen
 import { IconPlus } from "@/components/icons";
 import { fmtDate, fullName, titleCase } from "@/lib/format";
 import { EXAM_TYPE_LABEL, grade, percentage } from "@/lib/exam-meta";
-import { canEditStudents } from "@/lib/roles";
+import { canEditStudents, canMarkDropout, can } from "@/lib/roles";
 import type { Student } from "@/lib/types";
 import EditStudent from "./EditStudent";
 import AdmissionRecord from "./AdmissionRecord";
+import DropoutControl from "./DropoutControl";
+import FlagForCounselling, { type OpenFlag } from "./FlagForCounselling";
 import EnrollmentControls from "./EnrollmentControls";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
 
@@ -68,6 +70,17 @@ export default async function StudentPage({
     listClasses(),
   ]);
 
+  // the live counselling referral, if the child has one
+  const flag = await one<OpenFlag>(
+    `SELECT f.id, f.status, f.urgency, f.reasons, f.note, f.raised_on,
+            u.name AS raised_by_name
+       FROM counselling_flags f
+       LEFT JOIN users u ON u.id = f.raised_by
+      WHERE f.student_id = $1 AND f.status <> 'closed'
+      ORDER BY f.id DESC LIMIT 1`,
+    [sid],
+  );
+
   const marks = await query<{
     exam_id: number; title: string; subject: string; exam_type: string; exam_date: string;
     max_marks: string; marks_obtained: string | null; is_absent: boolean;
@@ -117,7 +130,8 @@ export default async function StudentPage({
         <div className="space-y-5 lg:col-span-2">
           <Card>
             <h2 className="mb-4 text-[15px] font-semibold">Profile</h2>
-            <EditStudent s={student} readOnly={!canEditStudents(user.role)} />
+            <EditStudent s={student} readOnly={!canEditStudents(user.role)}
+              canDrop={canMarkDropout(user.role)} />
           </Card>
 
           <Card>
@@ -242,6 +256,16 @@ export default async function StudentPage({
               </div>
             </dl>
           </Card>
+
+          {can(user.role, "counselling") && (
+            <FlagForCounselling studentId={student.id} flag={flag}
+              canRaise={user.role !== "mentor"} />
+          )}
+
+          {canMarkDropout(user.role) && (
+            <DropoutControl studentId={student.id} status={student.status}
+              reason={student.dropout_reason} on={student.dropout_date} />
+          )}
 
           <Card>
             <h2 className="mb-3 text-[15px] font-semibold">Enrolment history</h2>

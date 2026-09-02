@@ -8,6 +8,8 @@ import { fmtDate } from "@/lib/format";
 import { EXAM_TYPE_LABEL, EXAM_TYPES } from "@/lib/exam-meta";
 import NewExamForm from "./NewExamForm";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
+import Pager from "@/components/Pager";
+import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
 
 export default async function ExamsPage({
   searchParams,
@@ -26,7 +28,39 @@ export default async function ExamsPage({
   if (sp.class) { params.push(Number(sp.class)); where += ` AND e.class_level_id = $${params.length}`; }
   if (sp.type) { params.push(sp.type); where += ` AND e.exam_type = $${params.length}`; }
 
-  const exams = await query<{
+  // Tests are listed by test, not by paper — a single test can now be scheduled
+  // across every class and centre at once, so the page turns on whole tests and
+  // a test's subjects are never split across two pages.
+  const pg = pageFrom(sp, 20);
+  const groupParams = [...params, pg.size, pg.offset];
+
+  const groupKeys = await query<{
+    exam_type: string; grp: string; class_level_id: number; center_id: number;
+    total_rows: string;
+  }>(
+    `SELECT count(*) OVER () AS total_rows,
+            e.exam_type, COALESCE(e.term_label, e.title) AS grp,
+            e.class_level_id, e.center_id
+       FROM exams e
+      WHERE e.session_id = $1 ${where}
+      GROUP BY e.exam_type, COALESCE(e.term_label, e.title), e.class_level_id, e.center_id
+      ORDER BY max(e.exam_date) DESC, e.class_level_id, e.center_id
+      LIMIT $${groupParams.length - 1} OFFSET $${groupParams.length}`,
+    groupParams,
+  );
+
+  const totalGroups = totalOf(groupKeys);
+  const win = pageWindow(pg, groupKeys.length, totalGroups);
+
+  const rowParams = [
+    session.id,
+    groupKeys.map((g) => g.exam_type),
+    groupKeys.map((g) => g.grp),
+    groupKeys.map((g) => g.class_level_id),
+    groupKeys.map((g) => g.center_id),
+  ];
+
+  const exams = groupKeys.length === 0 ? [] : await query<{
     id: number; title: string; subject: string; exam_type: string; exam_date: string;
     term_label: string | null; max_marks: string; class_name: string; center_name: string;
     status: string; teacher: string | null; entered: string; roster: string; average: string | null;
@@ -44,9 +78,11 @@ export default async function ExamsPage({
        JOIN class_levels cl ON cl.id = e.class_level_id
        JOIN centers ce ON ce.id = e.center_id
        LEFT JOIN users u ON u.id = e.created_by
-      WHERE e.session_id = $1 ${where}
+      WHERE e.session_id = $1
+        AND (e.exam_type, COALESCE(e.term_label, e.title), e.class_level_id, e.center_id)
+            IN (SELECT * FROM unnest($2::text[], $3::text[], $4::bigint[], $5::bigint[]))
       ORDER BY e.exam_date DESC, e.class_level_id, COALESCE(e.term_label, e.title), e.subject`,
-    params,
+    rowParams,
   );
 
   // A teacher only sets tests for the classes they hold.
@@ -76,7 +112,8 @@ export default async function ExamsPage({
   return (
     <>
       <PageHeader title="Tests and marks"
-        subtitle={`Monthly, quarterly, half yearly and yearly results · session ${session.name}`} />
+        subtitle={`${totalGroups} test${totalGroups === 1 ? "" : "s"} · monthly, quarterly, ` +
+          `half yearly and yearly results · session ${session.name}`} />
 
       <Filters
         centers={isGlobalRole(user.role) ? centers : []}
@@ -153,6 +190,8 @@ export default async function ExamsPage({
                 </table>
               </div>
             )}
+            <Pager page={pg.page} pages={win.pages} first={win.first} last={win.last}
+              total={totalGroups} unit="test" />
           </Card>
         </div>
 

@@ -7,6 +7,7 @@ import { one, query, tx } from "@/lib/db";
 import { nextEnrollmentNo } from "@/lib/enrollment";
 import { currentSession } from "@/lib/queries";
 import { isAadhaar, isEmail, isMobile } from "@/lib/admission-meta";
+import { canAdmitStudents } from "@/lib/roles";
 
 /** The wizard's own shape. Kept loose so a half-filled draft is always storable. */
 export type AdmissionPayload = Record<string, unknown>;
@@ -44,7 +45,7 @@ async function nextNumber(client: PoolClient, scope: string, prefix: string) {
 
 export async function saveDraft(payload: AdmissionPayload, draftId: number | null) {
   const user = await requireUser();
-  if (user.role === "teacher" || user.role === "backup_teacher")
+  if (!canAdmitStudents(user.role))
     return { error: "Only the centre manager can admit a student." };
 
   const name = [s(payload, "first_name"), s(payload, "last_name")]
@@ -85,7 +86,7 @@ export async function discardDraft(draftId: number) {
 
 export async function submitAdmission(payload: AdmissionPayload, draftId: number | null) {
   const user = await requireUser();
-  if (user.role === "teacher" || user.role === "backup_teacher")
+  if (!canAdmitStudents(user.role))
     return { error: "Only the centre manager can admit a student." };
 
   const session = await currentSession();

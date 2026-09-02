@@ -41,13 +41,13 @@ export async function createExam(_prev: unknown, form: FormData) {
   if (!session) return { error: "No academic session is open." };
 
   const title = str(form, "title");
-  const classLevelId = Number(form.get("class_level_id"));
+  const classLevelIds = form.getAll("class_level_id").map(Number).filter(Boolean);
   const examDate = str(form, "exam_date");
   const defaultMax = Number(form.get("max_marks"));
   const defaultPassRaw = str(form, "pass_marks");
   const defaultPass = defaultPassRaw === null ? null : Number(defaultPassRaw);
 
-  if (!title || !classLevelId || !examDate)
+  if (!title || classLevelIds.length === 0 || !examDate)
     return { error: "Title, class and date are all required." };
   if (!Number.isFinite(defaultMax) || defaultMax <= 0)
     return { error: "Maximum marks must be greater than zero." };
@@ -78,43 +78,135 @@ export async function createExam(_prev: unknown, form: FormData) {
 
   if (papers.length === 0) return { error: "Add at least one subject." };
 
-  const centerId = isGlobalRole(user.role)
-    ? Number(form.get("center_id")) || null
-    : user.centerId;
-  if (!centerId) return { error: "Pick a centre." };
-  if (!canTouchCenter(user, centerId)) return { error: "That centre is not one of yours." };
+  // One window schedules the whole thing: pick any number of centres and any
+  // number of classes, and every combination gets the same set of papers.
+  const centerIds = isGlobalRole(user.role)
+    ? form.getAll("center_id").map(Number).filter(Boolean)
+    : (user.centerId ? [user.centerId] : []);
+  if (centerIds.length === 0) return { error: "Pick at least one centre." };
+  for (const id of centerIds)
+    if (!canTouchCenter(user, id)) return { error: "One of those centres is not yours." };
 
-  const denied = await assertCanTouchClass(user, session.id, classLevelId, centerId);
-  if (denied) return { error: denied };
+  if (classLevelIds.length === 0) return { error: "Pick at least one class." };
+  for (const centerId of centerIds) {
+    for (const classLevelId of classLevelIds) {
+      const denied = await assertCanTouchClass(user, session.id, classLevelId, centerId);
+      if (denied) return { error: denied };
+    }
+  }
 
   const examType = String(form.get("exam_type") ?? "monthly");
   // the label is what ties the subjects together, so never leave it empty
   const termLabel = str(form, "term_label") ?? title;
 
   let firstId = 0;
+  let written = 0;
   try {
-    firstId = await tx(async (c) => {
-      let first = 0;
-      for (const paper of papers) {
-        const { rows } = await c.query<{ id: number }>(
-          `INSERT INTO exams (title, exam_type, subject, center_id, session_id, class_level_id,
-              exam_date, max_marks, pass_marks, term_label, created_by)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
-          [title, examType, paper.subject, centerId, session.id, classLevelId,
-           examDate, paper.max, paper.pass, termLabel, user.uid],
-        );
-        if (!first) first = rows[0].id;
+    const out = await tx(async (c) => {
+      let first = 0, count = 0;
+      for (const centerId of centerIds) {
+        for (const classLevelId of classLevelIds) {
+          for (const paper of papers) {
+            const { rows } = await c.query<{ id: number }>(
+              `INSERT INTO exams (title, exam_type, subject, center_id, session_id, class_level_id,
+                  exam_date, max_marks, pass_marks, term_label, created_by)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+              [title, examType, paper.subject, centerId, session.id, classLevelId,
+               examDate, paper.max, paper.pass, termLabel, user.uid],
+            );
+            if (!first) first = rows[0].id;
+            count++;
+          }
+        }
       }
-      return first;
+      return { first, count };
     });
+    firstId = out.first;
+    written = out.count;
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not create the test." };
   }
 
   revalidatePath("/exams");
-  redirect(papers.length === 1
+  redirect(written === 1
     ? `/exams/${firstId}`
     : `/exams?term=${encodeURIComponent(termLabel)}`);
+}
+
+/**
+ * Changes a test that is already on the calendar. Class and centre stay put —
+ * moving a paper to another roster would orphan the marks already entered —
+ * but everything about the scheduling can be corrected, either for this one
+ * subject or for every subject of the same test.
+ */
+export async function updateExam(_prev: unknown, form: FormData) {
+  const user = await requireUser();
+  const examId = Number(form.get("exam_id"));
+
+  const exam = await one<{
+    id: number; center_id: number; class_level_id: number; session_id: number;
+    term_label: string | null; title: string; max_marks: string;
+  }>(
+    `SELECT id, center_id, class_level_id, session_id, term_label, title, max_marks
+       FROM exams WHERE id = $1`, [examId]);
+  if (!exam) return { error: "Test not found." };
+
+  const denied = await assertCanTouchClass(user, exam.session_id, exam.class_level_id, exam.center_id);
+  if (denied) return { error: denied };
+
+  const title = str(form, "title");
+  const subject = str(form, "subject");
+  const examDate = str(form, "exam_date");
+  const examType = String(form.get("exam_type") ?? "monthly");
+  const termLabel = str(form, "term_label") ?? title;
+  const max = Number(form.get("max_marks"));
+  const passRaw = str(form, "pass_marks");
+  const pass = passRaw === null ? null : Number(passRaw);
+  const applyToAll = form.get("apply_to_all") === "on";
+
+  if (!title || !subject || !examDate)
+    return { error: "Title, subject and date are all required." };
+  if (!Number.isFinite(max) || max <= 0)
+    return { error: "Maximum marks must be greater than zero." };
+  if (pass !== null && (!Number.isFinite(pass) || pass < 0 || pass > max))
+    return { error: `Pass marks must be between zero and ${max}.` };
+
+  const highest = await one<{ top: string | null }>(
+    "SELECT max(marks_obtained) AS top FROM exam_marks WHERE exam_id = $1", [examId]);
+  if (highest?.top !== null && highest?.top !== undefined && Number(highest.top) > max)
+    return { error: `Someone has already scored ${Number(highest.top)}. Raise the maximum, or correct the marks first.` };
+
+  let changed = 0;
+  try {
+    changed = await tx(async (c) => {
+      // this paper always changes, including its own subject name
+      const own = await c.query(
+        `UPDATE exams SET title=$2, subject=$3, exam_type=$4, exam_date=$5,
+             max_marks=$6, pass_marks=$7, term_label=$8
+           WHERE id=$1`,
+        [examId, title, subject, examType, examDate, max, pass, termLabel]);
+      let n = own.rowCount ?? 0;
+
+      if (applyToAll) {
+        // the rest of the test keeps its own subject and marking scheme, and
+        // just picks up the new name, type and date
+        const rest = await c.query(
+          `UPDATE exams SET title=$2, exam_type=$3, exam_date=$4, term_label=$5
+             WHERE id <> $1 AND session_id = $6 AND center_id = $7 AND class_level_id = $8
+               AND COALESCE(term_label, title) = $9`,
+          [examId, title, examType, examDate, termLabel, exam.session_id, exam.center_id,
+           exam.class_level_id, exam.term_label ?? exam.title]);
+        n += rest.rowCount ?? 0;
+      }
+      return n;
+    });
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not save the test." };
+  }
+
+  revalidatePath(`/exams/${examId}`);
+  revalidatePath("/exams");
+  return { ok: changed > 1 ? `Saved — ${changed} papers updated.` : "Test updated." };
 }
 
 /** Saves the whole class's marks in one go. */
