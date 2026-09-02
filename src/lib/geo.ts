@@ -1,3 +1,12 @@
+/**
+ * Staff check-in has to prove presence at the centre, so the circle is small.
+ * The 20 m floor is deliberate: a phone reports its position to about ±10–20 m,
+ * and a tighter fence would start refusing people who are genuinely standing there.
+ */
+export const GEOFENCE_MIN_M = 20;
+export const GEOFENCE_MAX_M = 50;
+export const GEOFENCE_DEFAULT_M = 50;
+
 /** Great-circle distance in metres between two WGS-84 points. */
 export function haversineMeters(
   lat1: number, lng1: number, lat2: number, lng2: number,
@@ -30,7 +39,7 @@ export function checkGeofence(
       reason: "This centre has no location set. Ask your admin to pin the centre on the map." };
   }
   const distance = haversineMeters(center.latitude, center.longitude, lat, lng);
-  const radius = center.geofence_radius_m ?? 150;
+  const radius = center.geofence_radius_m ?? GEOFENCE_DEFAULT_M;
   return distance <= radius
     ? { ok: true, distance, radius }
     : { ok: false, distance, radius,

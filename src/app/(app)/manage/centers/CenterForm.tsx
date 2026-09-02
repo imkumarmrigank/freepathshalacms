@@ -4,6 +4,7 @@ import { saveCenter } from "../actions";
 import { Card, Field } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
 import type { Center } from "@/lib/queries";
+import { GEOFENCE_DEFAULT_M, GEOFENCE_MAX_M, GEOFENCE_MIN_M } from "@/lib/geo";
 
 export default function CenterForm({ center }: { center?: Center | null }) {
   const [state, action] = useActionState(saveCenter, null);
@@ -60,7 +61,8 @@ export default function CenterForm({ center }: { center?: Center | null }) {
         <h3 className="mb-1 mt-4 text-[14px] font-semibold">Attendance geofence</h3>
         <p className="mb-3 text-[13px] text-[var(--muted)]">
           Staff can only check in from inside this circle. Stand at the centre and tap
-          “Use my current location” for the most accurate pin.
+          “Use my current location” for the most accurate pin — the pin matters more than
+          the radius, because the circle is only {GEOFENCE_MAX_M} m wide.
         </p>
         <div className="grid gap-x-4 sm:grid-cols-3">
           <Field label="Latitude">
@@ -71,9 +73,10 @@ export default function CenterForm({ center }: { center?: Center | null }) {
             <input className="input" name="longitude" value={coords.lng} inputMode="decimal"
               onChange={(e) => setCoords((c) => ({ ...c, lng: e.target.value }))} placeholder="72.846400" />
           </Field>
-          <Field label="Radius (metres)">
-            <input className="input" type="number" name="geofence_radius_m" min={25} max={5000}
-              defaultValue={center?.geofence_radius_m ?? 150} />
+          <Field label="Radius (metres)" hint={`${GEOFENCE_MIN_M}–${GEOFENCE_MAX_M} m`}>
+            <input className="input" type="number" name="geofence_radius_m"
+              min={GEOFENCE_MIN_M} max={GEOFENCE_MAX_M} step={5}
+              defaultValue={center?.geofence_radius_m ?? GEOFENCE_DEFAULT_M} />
           </Field>
         </div>
         <button type="button" className="btn btn-ghost btn-sm mb-4" onClick={useMyLocation} disabled={locating}>

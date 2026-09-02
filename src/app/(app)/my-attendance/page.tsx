@@ -3,6 +3,7 @@ import { one, query } from "@/lib/db";
 import { Alert, Badge, Card, Empty, PageHeader, StatCard } from "@/components/ui";
 import { fmtDate, minutesToHours, today, titleCase } from "@/lib/format";
 import PunchCard from "./PunchCard";
+import { GEOFENCE_DEFAULT_M } from "@/lib/geo";
 
 const TONE: Record<string, string> = {
   present: "ok", late: "warn", absent: "bad", leave: "mute", holiday: "mute",
@@ -57,7 +58,7 @@ export default async function MyAttendancePage() {
       <PunchCard
         today={todayRow}
         centerName={center?.name ?? "your centre"}
-        radius={center?.geofence_radius_m ?? 150}
+        radius={center?.geofence_radius_m ?? GEOFENCE_DEFAULT_M}
         hasCoords={center?.latitude != null && center?.longitude != null}
       />
 

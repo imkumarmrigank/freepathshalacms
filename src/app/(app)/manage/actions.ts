@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { requireRole, requireUser, hashPassword, canTouchCenter } from "@/lib/auth";
 import { canCreateCentre, canCreateRole, canManageStaff, isGlobalRole, type Role } from "@/lib/roles";
 import { one, query } from "@/lib/db";
+import { GEOFENCE_DEFAULT_M, GEOFENCE_MAX_M, GEOFENCE_MIN_M } from "@/lib/geo";
 
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
@@ -31,8 +32,12 @@ export async function saveCenter(_prev: unknown, form: FormData) {
   if (lat !== null && (Math.abs(lat) > 90 || Math.abs(lng!) > 180))
     return { error: "Those coordinates are out of range." };
 
-  const radius = numOrNull(form, "geofence_radius_m") ?? 150;
-  if (radius < 25 || radius > 5000) return { error: "Geofence radius must be between 25 m and 5000 m." };
+  const radius = numOrNull(form, "geofence_radius_m") ?? GEOFENCE_DEFAULT_M;
+  if (radius < GEOFENCE_MIN_M || radius > GEOFENCE_MAX_M)
+    return {
+      error: `The check-in radius must be between ${GEOFENCE_MIN_M} m and ${GEOFENCE_MAX_M} m — ` +
+             "small enough to prove someone is at the centre, wide enough for a phone's own GPS error.",
+    };
 
   try {
     if (id) {
