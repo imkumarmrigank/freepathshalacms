@@ -3,8 +3,9 @@ import path from "node:path";
 import Image from "next/image";
 import { requireUser } from "@/lib/auth";
 import { PageHeader } from "@/components/ui";
-import { manualFor, type Manual } from "@/lib/manual";
+import { loadManual, manualKeyFor, type Manual } from "@/lib/manual";
 import { ROLE_LABEL, type Role } from "@/lib/roles";
+import Link from "next/link";
 import PrintButton from "@/app/(app)/students/[id]/report-card/PrintButton";
 
 export const metadata = { title: "Training manual · FreePathshala CMS" };
@@ -31,15 +32,25 @@ const slug = (s: string) =>
 
 export default async function ManualPage() {
   const user = await requireUser();
-  const m: Manual = manualFor(user.role);
+  const key = manualKeyFor(user.role);
+  const m: Manual = await loadManual(key);
   const shots = capturedShots();
 
   return (
-    <div className="doc" data-role={user.role as Role}>
+    <div className="doc" data-role={key as Role}>
       <PageHeader
         title="Training manual"
         subtitle={`${ROLE_LABEL[user.role]} · how to use the system, step by step`}
-        right={<PrintButton />}
+        right={
+          <>
+            {user.role === "super_admin" && (
+              <Link href={`/manage/manual?book=${key}`} className="btn btn-ghost no-print">
+                Edit manuals
+              </Link>
+            )}
+            <PrintButton />
+          </>
+        }
       />
 
       {/* --------------------------------------------------------- the opening */}
@@ -129,11 +140,11 @@ export default async function ManualPage() {
               The messages you are most likely to meet, and what each one actually means.
             </p>
             <dl className="doc-measure">
-              {m.pitfalls.map(([problem, meaning]) => (
-                <div key={problem}
+              {m.pitfalls.map((p) => (
+                <div key={p.id}
                   className="grid gap-x-5 gap-y-0.5 border-t border-[#f1f1f6] py-3 first:border-t-0 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
-                  <dt className="text-[14px] font-semibold">{problem}</dt>
-                  <dd className="text-[13.5px] leading-relaxed text-[var(--muted)]">{meaning}</dd>
+                  <dt className="text-[14px] font-semibold">{p.problem}</dt>
+                  <dd className="text-[13.5px] leading-relaxed text-[var(--muted)]">{p.meaning}</dd>
                 </div>
               ))}
             </dl>

@@ -71,8 +71,6 @@ const MENU: Node[] = [
   },
 
   { href: "/calendar", label: "Calendar", icon: IconCal, feature: "calendar" },
-  // everyone gets one, and everyone gets a different one
-  { href: "/manual", label: "Training Manual", icon: IconBook },
   { href: "/supplies", label: "Supplies", icon: IconBox, feature: "supplies" },
 
   {
@@ -98,10 +96,14 @@ const MENU: Node[] = [
           { href: "/manage/classes", label: "Classes", roles: ["super_admin"] },
           { href: "/manage/sessions", label: "Sessions", roles: ["super_admin"] },
           { href: "/manage/working-days", label: "Working days", roles: ["super_admin"] },
+          { href: "/manage/manual", label: "Training manuals", roles: ["super_admin"] },
         ],
       },
     ],
   },
+
+  // last in the list on purpose: reached when something is unclear, not daily
+  { href: "/manual", label: "Training Manual", icon: IconBook },
 ];
 
 /* ------------------------------------------------------------------ helpers */
