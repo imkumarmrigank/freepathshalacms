@@ -27,10 +27,13 @@ const SOURCE_LABEL: Record<string, string> = {
 
 export default async function StudentPage({
   params, searchParams,
-}: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string }> }) {
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ created?: string; flag?: string }>;
+}) {
   const user = await requireUser();
   const { id } = await params;
-  const { created } = await searchParams;
+  const { created, flag: openFlag } = await searchParams;
   const sid = Number(id);
 
   const student = await one<Student & { center_name: string }>(
@@ -281,7 +284,7 @@ export default async function StudentPage({
 
           {can(user.role, "counselling") && (
             <FlagForCounselling studentId={student.id} flag={flag}
-              canRaise={user.role !== "mentor"} />
+              canRaise={user.role !== "mentor"} startOpen={openFlag === "1"} />
           )}
 
           {canMarkDropout(user.role) && (

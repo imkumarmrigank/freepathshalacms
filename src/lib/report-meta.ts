@@ -84,6 +84,24 @@ export const REPORTS: ReportMeta[] = [
     roles: ["super_admin", "admin", "center_manager"],
   },
   {
+    key: "counselling-referrals",
+    label: "Counselling referrals",
+    group: "Parents & support",
+    description:
+      "Every child a teacher has referred to the mentor: the reasons ticked, what the teacher "
+      + "wrote, how urgent, who has it, how long it has been open and how it ended.",
+    filters: ["dates", "center", "class"],
+  },
+  {
+    key: "counselling-summary",
+    label: "Counselling — reasons and load",
+    group: "Parents & support",
+    description:
+      "How many referrals each centre has raised, broken down by reason, with how many are "
+      + "still waiting on the mentor and how long they have been waiting.",
+    filters: ["dates", "center"],
+  },
+  {
     key: "students-by-class",
     label: "Students by class and centre",
     group: "Students",

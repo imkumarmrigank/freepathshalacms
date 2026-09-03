@@ -8,6 +8,7 @@ import { fmtDate, fullName, today } from "@/lib/format";
 import { eventsBetween } from "@/lib/calendar";
 import { EVENT_LABEL, EVENT_TONE } from "@/lib/calendar-meta";
 import { isGlobalRole, canAdmitStudents, can } from "@/lib/roles";
+import { counsellingLoad, strugglingStudents } from "@/lib/statistics";
 import DailyByCentre, { type CentreDay } from "./DailyByCentre";
 
 const ENGAGEMENT_TONE: Record<string, string> = {
@@ -34,6 +35,17 @@ export default async function Dashboard({
       </Alert>
     );
   }
+
+  // The mentor's two standing questions: who is behind, and who is waiting.
+  // Administrators watch the same numbers, so they load for them too.
+  const watchesSupport = user.role === "mentor" || isGlobalRole(user.role)
+    || user.role === "center_manager";
+  const [behind, counselling] = watchesSupport
+    ? await Promise.all([
+        strugglingStudents(session.id, centerId, 8),
+        counsellingLoad(centerId),
+      ])
+    : [[], null];
 
   const [students] = await query<{ n: string }>(
     `SELECT count(*) AS n FROM enrollments WHERE session_id = $1 AND status = 'active'${scope}`,
@@ -203,6 +215,16 @@ export default async function Dashboard({
                 : "default"
           }
         />
+        {watchesSupport && counselling && Number(counselling.open) > 0 && (
+          <StatCard
+            label="Counselling"
+            value={counselling.open}
+            hint={Number(counselling.urgent) > 0
+              ? `${counselling.urgent} urgent · ${counselling.waiting} not picked up`
+              : `${counselling.waiting} not picked up yet`}
+            tone={Number(counselling.urgent) > 0 ? "bad"
+              : Number(counselling.waiting) > 0 ? "warn" : "default"} />
+        )}
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2.5">
@@ -247,6 +269,60 @@ export default async function Dashboard({
                 </li>
               ))}
             </ul>
+          </Card>
+        </>
+      )}
+
+      {watchesSupport && behind.length > 0 && (
+        <>
+          <div className="label-cap mb-2.5 mt-6">
+            Falling behind in tests — worth a parent meeting
+          </div>
+          <Card pad={false}>
+            <div className="overflow-x-auto">
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Student</th><th>Class</th>
+                    {!centerId && <th>Centre</th>}
+                    <th>Scored</th><th>Needed to pass</th><th>Last PTM</th><th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {behind.map((b) => (
+                    <tr key={b.id}>
+                      <td>
+                        <Link href={`/students/${b.id}`}
+                          className="font-medium hover:text-[var(--brand)]">
+                          {b.student}
+                        </Link>
+                        {b.flagged && (
+                          <Badge tone="warn">Counselling open</Badge>
+                        )}
+                      </td>
+                      <td className="text-[var(--muted)]">{b.class_name ?? "—"}</td>
+                      {!centerId && <td className="text-[var(--muted)]">{b.center_name}</td>}
+                      <td className="whitespace-nowrap tabular-nums">
+                        {Math.round(Number(b.obtained))}
+                        <span className="text-[var(--faint)]"> / {Math.round(Number(b.max_marks))}</span>
+                        <span className="ml-1.5 text-[var(--bad)]">{b.pct}%</span>
+                      </td>
+                      <td className="tabular-nums text-[var(--muted)]">
+                        {Math.round(Number(b.pass_mark))}
+                      </td>
+                      <td className="whitespace-nowrap text-[var(--muted)]">
+                        {b.last_ptm ? fmtDate(b.last_ptm) : "never"}
+                      </td>
+                      <td className="text-right">
+                        <Link href={`/ptm/new?student=${b.id}`} className="btn btn-ghost btn-sm">
+                          Arrange PTM
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </Card>
         </>
       )}

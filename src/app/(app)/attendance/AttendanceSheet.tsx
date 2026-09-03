@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { saveAttendance } from "./actions";
 import { Avatar } from "@/components/ui";
@@ -88,11 +89,19 @@ export default function AttendanceSheet({
                     <div className="flex items-center gap-2.5">
                       <Avatar name={`${r.first_name} ${r.last_name ?? ""}`} size={30} />
                       <div className="min-w-0">
-                        <div className="truncate font-medium">
+                        <Link href={`/students/${r.student_id}`}
+                          className="block truncate font-medium hover:text-[var(--brand)]">
                           {r.first_name} {r.last_name ?? ""}
-                        </div>
+                        </Link>
                         <div className="font-mono text-[11px] text-[var(--faint)]">{r.enrollment_no}</div>
                       </div>
+                      {/* the moment a teacher notices something is while they are
+                          looking at the class, so the referral starts here */}
+                      <Link href={`/students/${r.student_id}?flag=1`}
+                        title="Flag for counselling"
+                        className="ml-auto flex-none rounded-lg border border-[var(--border)] px-2 py-1 text-[13px] leading-none text-[var(--faint)] hover:border-[var(--warn)] hover:text-[var(--warn)]">
+                        &#9873;
+                      </Link>
                     </div>
                   </td>
                   <td>

@@ -69,6 +69,8 @@ export async function runReport(
     case "student-attendance-register":  return studentAttendanceRegister(scoped, period);
     case "staff-attendance-summary":     return staffAttendanceSummary(scoped, period);
     case "staff-attendance-detail":      return staffAttendanceDetail(scoped, period);
+    case "counselling-referrals":        return counsellingReferrals(scoped, period);
+    case "counselling-summary":          return counsellingSummary(scoped, period);
     case "students-by-class":            return studentsByClass(scoped);
     case "student-roster":               return studentRoster(scoped);
     case "admissions":                   return admissions(scoped, period);
@@ -85,6 +87,127 @@ export async function runReport(
     case "timetable":                    return timetableReport(scoped);
     default: throw new Error("Unknown report.");
   }
+}
+
+/* ------------------------------------------------------------ counselling */
+
+/**
+ * Referrals a teacher has raised. Kept as one row per child rather than one per
+ * reason, because the question an administrator asks is "who is waiting", and
+ * the reasons are the detail underneath that.
+ */
+async function counsellingReferrals(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND f.center_id = $${params.length}`; }
+  if (p.classId) { params.push(p.classId); where += ` AND f.class_level_id = $${params.length}`; }
+
+  const rows = await query<{
+    raised_on: string; enrollment_no: string; student: string; class_name: string | null;
+    center_name: string; reasons: string[]; note: string | null; urgency: string;
+    status: string; raised_by: string | null; mentor: string | null;
+    outcome: string | null; closed_on: string | null; days_open: string;
+  }>(
+    `SELECT f.raised_on, s.enrollment_no,
+            trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
+            cl.name AS class_name, ce.name AS center_name,
+            f.reasons, f.note, f.urgency, f.status, f.outcome, f.closed_on,
+            r.name AS raised_by, m.name AS mentor,
+            COALESCE(f.closed_on, CURRENT_DATE) - f.raised_on AS days_open
+       FROM counselling_flags f
+       JOIN students s ON s.id = f.student_id
+       JOIN centers ce ON ce.id = f.center_id
+       LEFT JOIN class_levels cl ON cl.id = f.class_level_id
+       LEFT JOIN users r ON r.id = f.raised_by
+       LEFT JOIN users m ON m.id = f.mentor_id
+      WHERE f.raised_on BETWEEN $1 AND $2 ${where}
+      ORDER BY (f.status <> 'closed') DESC, (f.urgency = 'high') DESC, f.raised_on DESC`,
+    params,
+  );
+
+  return {
+    title: "Counselling referrals",
+    subtitle: `${period} · ${rows.length} referral${rows.length === 1 ? "" : "s"}`,
+    columns: [
+      { key: "raised_on", label: "Raised", width: 12 },
+      { key: "student", label: "Student", width: 22 },
+      { key: "enrollment_no", label: "Enrolment no.", width: 14 },
+      { key: "class_name", label: "Class" },
+      { key: "center_name", label: "Centre" },
+      { key: "reasons", label: "Reasons", width: 40 },
+      { key: "note", label: "What the teacher wrote", width: 44 },
+      { key: "urgency", label: "Urgency" },
+      { key: "raised_by", label: "Raised by", width: 18 },
+      { key: "status", label: "Status", width: 20 },
+      { key: "mentor", label: "With", width: 18 },
+      { key: "days_open", label: "Days open", numeric: true },
+      { key: "outcome", label: "Outcome", width: 40 },
+      { key: "closed_on", label: "Closed", width: 12 },
+    ],
+    rows: rows.map((r) => ({
+      raised_on: r.raised_on,
+      student: r.student,
+      enrollment_no: r.enrollment_no,
+      class_name: r.class_name ?? "—",
+      center_name: r.center_name,
+      reasons: (r.reasons ?? []).join("; "),
+      note: r.note ?? "",
+      urgency: r.urgency === "high" ? "Urgent" : "Normal",
+      raised_by: r.raised_by ?? "—",
+      status: r.status === "open" ? "Awaiting mentor"
+        : r.status === "in_progress" ? "Counselling under way" : "Closed",
+      mentor: r.mentor ?? "—",
+      days_open: Number(r.days_open),
+      outcome: r.outcome ?? "",
+      closed_on: r.closed_on ?? "",
+    })),
+  };
+}
+
+/** The same referrals counted by reason, so a pattern at one centre shows up. */
+async function counsellingSummary(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND f.center_id = $${params.length}`; }
+
+  const rows = await query<{
+    center_name: string; reason: string; total: string; open: string;
+    urgent: string; avg_days: string | null;
+  }>(
+    `SELECT ce.name AS center_name, reason,
+            count(*)                                        AS total,
+            count(*) FILTER (WHERE f.status <> 'closed')    AS open,
+            count(*) FILTER (WHERE f.urgency = 'high')      AS urgent,
+            round(avg(COALESCE(f.closed_on, CURRENT_DATE) - f.raised_on), 1) AS avg_days
+       FROM counselling_flags f
+       JOIN centers ce ON ce.id = f.center_id
+       CROSS JOIN LATERAL unnest(f.reasons) AS reason
+      WHERE f.raised_on BETWEEN $1 AND $2 ${where}
+      GROUP BY ce.name, ce.code, reason
+      ORDER BY ce.code, count(*) DESC`,
+    params,
+  );
+
+  return {
+    title: "Counselling — reasons and load",
+    subtitle: `${period} · ${rows.length} row${rows.length === 1 ? "" : "s"}`,
+    columns: [
+      { key: "center_name", label: "Centre", width: 16 },
+      { key: "reason", label: "Reason", width: 34 },
+      { key: "total", label: "Referrals", numeric: true },
+      { key: "open", label: "Still open", numeric: true },
+      { key: "urgent", label: "Urgent", numeric: true },
+      { key: "avg_days", label: "Avg days open", numeric: true },
+    ],
+    rows: rows.map((r) => ({
+      center_name: r.center_name,
+      reason: r.reason,
+      total: Number(r.total),
+      open: Number(r.open),
+      urgent: Number(r.urgent),
+      avg_days: r.avg_days === null ? 0 : Number(r.avg_days),
+    })),
+  };
 }
 
 /* ------------------------------------------------------------- attendance */

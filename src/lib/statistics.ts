@@ -1,5 +1,5 @@
 import "server-only";
-import { query } from "./db";
+import { one, query } from "./db";
 
 const scoped = (centerId: number | null, params: unknown[], col: string) => {
   if (centerId == null) return "";
@@ -125,5 +125,78 @@ export async function byCentre(sessionId: number) {
       WHERE c.is_active
       GROUP BY c.name, c.code ORDER BY c.code`,
     [sessionId],
+  );
+}
+
+/**
+ * Children whose results are behind, for the mentor to pick up.
+ *
+ * "Behind" is the same rule promotion uses at the year end — the total against
+ * the total of the pass marks on the papers actually sat — so a child flagged
+ * here is a child who would repeat the class if the session ended today. It is
+ * shown with the last parent meeting and any open counselling referral, because
+ * the mentor's first question is always "has anyone spoken to them yet?".
+ */
+export async function strugglingStudents(
+  sessionId: number,
+  centerId: number | null,
+  limit = 12,
+) {
+  const params: unknown[] = [sessionId, limit];
+  const centreFilter = centerId ? " AND s.center_id = $3" : "";
+  if (centerId) params.push(centerId);
+
+  return query<{
+    id: number; student: string; class_name: string | null; center_name: string;
+    papers: string; obtained: string; max_marks: string; pass_mark: string;
+    pct: string; last_ptm: string | null; flagged: boolean;
+  }>(
+    `WITH res AS (
+       SELECT m.student_id,
+              count(*) AS papers,
+              sum(CASE WHEN m.is_absent THEN 0
+                       ELSE COALESCE(m.marks_obtained, 0) END) AS obtained,
+              sum(x.max_marks) AS max_marks,
+              sum(COALESCE(x.pass_marks, x.max_marks / 3.0)) AS pass_mark
+         FROM exam_marks m
+         JOIN exams x ON x.id = m.exam_id
+        WHERE x.session_id = $1 AND (m.marks_obtained IS NOT NULL OR m.is_absent)
+        GROUP BY m.student_id
+     )
+     SELECT s.id,
+            trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
+            cl.name AS class_name, ce.name AS center_name,
+            r.papers, r.obtained, r.max_marks, r.pass_mark,
+            round(100.0 * r.obtained / NULLIF(r.max_marks, 0), 1) AS pct,
+            (SELECT max(i.interaction_date) FROM ptm_interactions i
+              WHERE i.student_id = s.id) AS last_ptm,
+            EXISTS (SELECT 1 FROM counselling_flags f
+                     WHERE f.student_id = s.id AND f.status <> 'closed') AS flagged
+       FROM res r
+       JOIN students s ON s.id = r.student_id
+       JOIN centers ce ON ce.id = s.center_id
+       LEFT JOIN enrollments e ON e.student_id = s.id AND e.session_id = $1
+       LEFT JOIN class_levels cl ON cl.id = e.class_level_id
+      WHERE r.obtained < r.pass_mark AND s.status = 'active'${centreFilter}
+      ORDER BY (r.obtained / NULLIF(r.pass_mark, 0)) ASC, s.first_name
+      LIMIT $2`,
+    params,
+  );
+}
+
+/** Open counselling referrals, for the administrator's overview. */
+export async function counsellingLoad(centerId: number | null) {
+  const params: unknown[] = [];
+  const centreFilter = centerId ? " AND f.center_id = $1" : "";
+  if (centerId) params.push(centerId);
+
+  return one<{ open: string; urgent: string; waiting: string; oldest: string | null }>(
+    `SELECT count(*) FILTER (WHERE f.status <> 'closed')                       AS open,
+            count(*) FILTER (WHERE f.status <> 'closed' AND f.urgency = 'high') AS urgent,
+            count(*) FILTER (WHERE f.status = 'open')                           AS waiting,
+            min(f.raised_on) FILTER (WHERE f.status <> 'closed')                AS oldest
+       FROM counselling_flags f
+      WHERE TRUE${centreFilter}`,
+    params,
   );
 }

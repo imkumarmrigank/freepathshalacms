@@ -17,10 +17,10 @@ export type OpenFlag = {
  * A teacher's referral to the mentor. Reasons come from a list — that is what
  * turns a hundred worried notes into something a mentor can prioritise.
  */
-export default function FlagForCounselling({ studentId, flag, canRaise }:
-  { studentId: number; flag: OpenFlag | null; canRaise: boolean }) {
+export default function FlagForCounselling({ studentId, flag, canRaise, startOpen = false }:
+  { studentId: number; flag: OpenFlag | null; canRaise: boolean; startOpen?: boolean }) {
   const [state, action] = useActionState(raiseFlag, null);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
 
   if (flag) {
     return (
