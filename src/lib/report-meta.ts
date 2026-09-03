@@ -1,7 +1,23 @@
 import type { Role } from "./roles";
 
 /** Report catalogue — shared by the page, the client filters and the export route. */
-export type ReportFilter = "dates" | "center" | "class" | "session" | "role";
+export type ReportFilter =
+  | "dates" | "center" | "class" | "session" | "role"
+  /** Day, week or month — how the rows of a running report are bucketed. */
+  | "groupBy";
+
+/** The buckets a cumulative attendance report can be added up over. */
+export const GROUP_BY = [
+  { value: "day", label: "Daily" },
+  { value: "week", label: "Weekly" },
+  { value: "month", label: "Monthly" },
+] as const;
+
+export type GroupBy = (typeof GROUP_BY)[number]["value"];
+
+export function groupByOf(v: string | null | undefined): GroupBy {
+  return v === "week" || v === "month" ? v : "day";
+}
 
 export type ReportMeta = {
   key: string;
@@ -29,6 +45,25 @@ export const REPORTS: ReportMeta[] = [
     description:
       "The day-by-day register — students down the side, dates across the top. Best for a week or a month.",
     filters: ["dates", "center", "class", "session"],
+  },
+  {
+    key: "student-attendance-trend",
+    label: "Student attendance over time",
+    group: "Attendance",
+    description:
+      "Attendance added up day by day, week by week or month by month, one line per centre, "
+      + "with the running total across the whole period.",
+    filters: ["dates", "center", "class", "session", "groupBy"],
+  },
+  {
+    key: "staff-attendance-trend",
+    label: "Staff attendance over time",
+    group: "Attendance",
+    description:
+      "The same for teachers and centre managers: how many were on duty each day, week or month, "
+      + "centre by centre, with the running total.",
+    filters: ["dates", "center", "role", "groupBy"],
+    roles: ["super_admin", "admin", "center_manager"],
   },
   {
     key: "staff-attendance-summary",

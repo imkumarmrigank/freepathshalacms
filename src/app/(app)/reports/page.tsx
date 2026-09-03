@@ -34,6 +34,7 @@ export default async function ReportsPage({
     classId: Number(sp.class) || null,
     sessionId: Number(sp.session) || cur?.id || sessions[0]?.id || 0,
     role: sp.role || null,
+    groupBy: sp.groupBy || null,
   };
 
   let result: ReportResult | null = null;
@@ -49,6 +50,7 @@ export default async function ReportsPage({
     from: params.from,
     to: params.to,
     session: String(params.sessionId),
+    ...(params.groupBy ? { groupBy: params.groupBy } : {}),
     ...(params.centerId ? { center: String(params.centerId) } : {}),
     ...(params.classId ? { class: String(params.classId) } : {}),
     ...(params.role ? { role: params.role } : {}),

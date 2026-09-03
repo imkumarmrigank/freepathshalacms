@@ -1,6 +1,6 @@
 import "server-only";
 import { query } from "./db";
-import { reportByKey } from "./report-meta";
+import { groupByOf, reportByKey, type GroupBy } from "./report-meta";
 import { titleCase } from "./format";
 import type { SessionUser } from "./auth";
 import { isGlobalRole } from "./roles";
@@ -21,6 +21,8 @@ export type ReportParams = {
   classId: number | null;
   sessionId: number;
   role: string | null;
+  /** day, week or month — only the running reports read it */
+  groupBy?: string | null;
 };
 
 const COUNTED = "('present','late','half_day')";   // counts towards attendance
@@ -62,6 +64,8 @@ export async function runReport(
 
   switch (key) {
     case "student-attendance-summary":   return studentAttendanceSummary(scoped, period);
+    case "student-attendance-trend":     return studentAttendanceTrend(scoped, period);
+    case "staff-attendance-trend":       return staffAttendanceTrend(scoped, period);
     case "student-attendance-register":  return studentAttendanceRegister(scoped, period);
     case "staff-attendance-summary":     return staffAttendanceSummary(scoped, period);
     case "staff-attendance-detail":      return staffAttendanceDetail(scoped, period);
@@ -84,6 +88,167 @@ export async function runReport(
 }
 
 /* ------------------------------------------------------------- attendance */
+
+/** Postgres date_trunc unit, and how the bucket should read on the page. */
+const BUCKET: Record<GroupBy, { unit: string; label: string }> = {
+  day:   { unit: "day",   label: "Day" },
+  week:  { unit: "week",  label: "Week beginning" },
+  month: { unit: "month", label: "Month" },
+};
+
+/**
+ * Attendance added up over time rather than per student — the shape you want
+ * when the question is "how are the centres doing", not "how is this child
+ * doing". Each row is one bucket at one centre, and the running columns carry
+ * the total from the start of the period so the trend can be read straight off.
+ */
+async function studentAttendanceTrend(p: ReportParams, period: string): Promise<ReportResult> {
+  const g = groupByOf(p.groupBy);
+  const params: unknown[] = [p.sessionId, p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND a.center_id = $${params.length}`; }
+  if (p.classId) { params.push(p.classId); where += ` AND a.class_level_id = $${params.length}`; }
+
+  const rows = await query<{
+    bucket: string; center_name: string; students: string; marked: string;
+    present: string; absent: string; late: string; half_day: string; leave: string;
+  }>(
+    `SELECT to_char(date_trunc('${BUCKET[g].unit}', a.att_date), 'YYYY-MM-DD') AS bucket,
+            ce.name AS center_name,
+            count(DISTINCT a.student_id)                    AS students,
+            count(*) FILTER (WHERE ${MARKED})               AS marked,
+            count(*) FILTER (WHERE a.status = 'present')    AS present,
+            count(*) FILTER (WHERE a.status = 'absent')     AS absent,
+            count(*) FILTER (WHERE a.status = 'late')       AS late,
+            count(*) FILTER (WHERE a.status = 'half_day')   AS half_day,
+            count(*) FILTER (WHERE a.status = 'leave')      AS leave
+       FROM student_attendance a
+       JOIN centers ce ON ce.id = a.center_id
+      WHERE a.session_id = $1 AND a.att_date BETWEEN $2 AND $3 ${where}
+      GROUP BY 1, ce.name, ce.code
+      ORDER BY 1, ce.code`,
+    params,
+  );
+
+  // running totals, kept per centre so a multi-centre report reads sensibly
+  const seen = new Map<string, { counted: number; marked: number }>();
+  const out: ReportRow[] = rows.map((r) => {
+    const counted = Number(r.present) + Number(r.late) + Number(r.half_day);
+    const marked = Number(r.marked);
+    const acc = seen.get(r.center_name) ?? { counted: 0, marked: 0 };
+    acc.counted += counted; acc.marked += marked;
+    seen.set(r.center_name, acc);
+    return {
+      bucket: g === "month" ? r.bucket.slice(0, 7) : r.bucket,
+      center_name: r.center_name,
+      students: Number(r.students),
+      marked,
+      present: Number(r.present),
+      late: Number(r.late),
+      half_day: Number(r.half_day),
+      absent: Number(r.absent),
+      leave: Number(r.leave),
+      pct: pct(counted, marked),
+      running_pct: pct(acc.counted, acc.marked),
+    };
+  });
+
+  return {
+    title: "Student attendance over time",
+    subtitle: `${period} · ${BUCKET[g].label.toLowerCase()} · ${out.length} row${out.length === 1 ? "" : "s"}`,
+    columns: [
+      { key: "bucket", label: BUCKET[g].label, width: 16 },
+      { key: "center_name", label: "Centre", width: 14 },
+      { key: "students", label: "Students", numeric: true },
+      { key: "marked", label: "Days marked", numeric: true },
+      { key: "present", label: "Present", numeric: true },
+      { key: "late", label: "Late", numeric: true },
+      { key: "half_day", label: "Half day", numeric: true },
+      { key: "absent", label: "Absent", numeric: true },
+      { key: "leave", label: "Leave", numeric: true },
+      { key: "pct", label: "Attendance %", numeric: true },
+      { key: "running_pct", label: "Running %", numeric: true },
+    ],
+    rows: out,
+  };
+}
+
+/** The same shape for staff, counted off their own check-ins. */
+async function staffAttendanceTrend(p: ReportParams, period: string): Promise<ReportResult> {
+  const g = groupByOf(p.groupBy);
+  const params: unknown[] = [p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND a.center_id = $${params.length}`; }
+  if (p.role) { params.push(p.role); where += ` AND u.role = $${params.length}`; }
+
+  const rows = await query<{
+    bucket: string; center_name: string; staff: string; days: string;
+    present: string; late: string; absent: string; half_day: string;
+    minutes: string | null; off_site: string;
+  }>(
+    `SELECT to_char(date_trunc('${BUCKET[g].unit}', a.att_date), 'YYYY-MM-DD') AS bucket,
+            ce.name AS center_name,
+            count(DISTINCT a.user_id)                        AS staff,
+            count(*)                                         AS days,
+            count(*) FILTER (WHERE a.status = 'present')     AS present,
+            count(*) FILTER (WHERE a.status = 'late')        AS late,
+            count(*) FILTER (WHERE a.status = 'absent')      AS absent,
+            count(*) FILTER (WHERE a.status = 'half_day')    AS half_day,
+            sum(a.worked_minutes)                            AS minutes,
+            count(*) FILTER (WHERE NOT a.within_geofence)    AS off_site
+       FROM staff_attendance a
+       JOIN centers ce ON ce.id = a.center_id
+       JOIN users u ON u.id = a.user_id
+      WHERE a.att_date BETWEEN $1 AND $2 ${where}
+      GROUP BY 1, ce.name, ce.code
+      ORDER BY 1, ce.code`,
+    params,
+  );
+
+  const seen = new Map<string, { on: number; days: number }>();
+  const out: ReportRow[] = rows.map((r) => {
+    const on = Number(r.present) + Number(r.late) + Number(r.half_day);
+    const days = Number(r.days);
+    const acc = seen.get(r.center_name) ?? { on: 0, days: 0 };
+    acc.on += on; acc.days += days;
+    seen.set(r.center_name, acc);
+    const mins = Number(r.minutes ?? 0);
+    return {
+      bucket: g === "month" ? r.bucket.slice(0, 7) : r.bucket,
+      center_name: r.center_name,
+      staff: Number(r.staff),
+      days,
+      present: Number(r.present),
+      late: Number(r.late),
+      half_day: Number(r.half_day),
+      absent: Number(r.absent),
+      hours: Math.round(mins / 6) / 10,
+      off_site: Number(r.off_site),
+      pct: pct(on, days),
+      running_pct: pct(acc.on, acc.days),
+    };
+  });
+
+  return {
+    title: "Staff attendance over time",
+    subtitle: `${period} · ${BUCKET[g].label.toLowerCase()} · ${out.length} row${out.length === 1 ? "" : "s"}`,
+    columns: [
+      { key: "bucket", label: BUCKET[g].label, width: 16 },
+      { key: "center_name", label: "Centre", width: 14 },
+      { key: "staff", label: "Staff", numeric: true },
+      { key: "days", label: "Days recorded", numeric: true },
+      { key: "present", label: "Present", numeric: true },
+      { key: "late", label: "Late", numeric: true },
+      { key: "half_day", label: "Half day", numeric: true },
+      { key: "absent", label: "Absent", numeric: true },
+      { key: "hours", label: "Hours logged", numeric: true },
+      { key: "off_site", label: "Off site", numeric: true },
+      { key: "pct", label: "On duty %", numeric: true },
+      { key: "running_pct", label: "Running %", numeric: true },
+    ],
+    rows: out,
+  };
+}
 
 async function studentAttendanceSummary(p: ReportParams, period: string): Promise<ReportResult> {
   const params: unknown[] = [p.sessionId, p.from, p.to];

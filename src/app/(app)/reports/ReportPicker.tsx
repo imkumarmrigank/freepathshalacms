@@ -1,7 +1,7 @@
 "use client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
-import { REPORTS, REPORT_GROUPS, type ReportMeta } from "@/lib/report-meta";
+import { REPORTS, REPORT_GROUPS, GROUP_BY, type ReportMeta } from "@/lib/report-meta";
 import { Card } from "@/components/ui";
 
 const PRESETS = [
@@ -120,6 +120,24 @@ export default function ReportPicker({
                 ))}
               </div>
             </>
+          )}
+
+          {uses("groupBy") && (
+            <div>
+              <span className="mb-1.5 block text-[13px] font-medium text-[var(--muted)]">
+                Add up by
+              </span>
+              <div className="flex gap-1.5">
+                {GROUP_BY.map((g) => (
+                  <button key={g.value} type="button"
+                    onClick={() => push({ groupBy: g.value })}
+                    className={`btn btn-sm h-[38px] ${
+                      (current.groupBy ?? "day") === g.value ? "btn-primary" : "btn-ghost"}`}>
+                    {g.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
 
           {uses("session") && sessions.length > 0 && (

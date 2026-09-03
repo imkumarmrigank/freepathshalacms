@@ -33,6 +33,7 @@ export async function GET(req: Request) {
     classId: Number(url.searchParams.get("class")) || null,
     sessionId: Number(url.searchParams.get("session")) || session?.id || 0,
     role: url.searchParams.get("role") || null,
+    groupBy: url.searchParams.get("groupBy") || null,
   };
 
   let result;

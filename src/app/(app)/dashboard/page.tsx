@@ -8,6 +8,7 @@ import { fmtDate, fullName, today } from "@/lib/format";
 import { eventsBetween } from "@/lib/calendar";
 import { EVENT_LABEL, EVENT_TONE } from "@/lib/calendar-meta";
 import { isGlobalRole, canAdmitStudents, can } from "@/lib/roles";
+import DailyByCentre, { type CentreDay } from "./DailyByCentre";
 
 const ENGAGEMENT_TONE: Record<string, string> = {
   attentive: "ok", neutral: "warn", resistant: "bad",
@@ -93,6 +94,48 @@ export default async function Dashboard({
   const upcomingEvents = (await eventsBetween(
     today(), `${Number(today().slice(0, 4)) + 1}-12-31`, centerId)).slice(0, 5);
 
+  // The administrator's first question each morning is which centres have not
+  // marked their register, so answer it before anything else on the page. The
+  // day shown is the last one with any register at all, so a quiet early
+  // morning does not read as though every centre had failed to mark.
+  const wantsDaily = user.role === "super_admin" || user.role === "admin";
+  const dailyDay = wantsDaily
+    ? (await one<{ d: string }>(
+        `SELECT max(att_date) AS d FROM student_attendance WHERE session_id = $1`,
+        [session.id]))?.d ?? today()
+    : today();
+
+  const daily: CentreDay[] = wantsDaily
+    ? await query<CentreDay>(
+        `SELECT ce.id AS center_id, ce.name AS center_name, ce.code AS center_code,
+                (SELECT count(*) FROM enrollments e
+                   JOIN students s ON s.id = e.student_id
+                  WHERE e.center_id = ce.id AND e.session_id = $1
+                    AND e.status = 'active' AND s.status = 'active'
+                    AND e.enrolled_on <= $2::date)                        AS roll,
+                count(a.*) FILTER (WHERE a.att_date = $2::date)           AS marked,
+                count(a.*) FILTER (WHERE a.att_date = $2::date
+                                     AND a.status IN ('present','late','half_day')) AS present,
+                count(a.*) FILTER (WHERE a.att_date = $2::date
+                                     AND a.status = 'absent')             AS absent,
+                (SELECT count(*) FROM users u
+                  WHERE u.center_id = ce.id AND u.is_active
+                    AND u.role IN ('teacher','center_manager'))           AS staff,
+                (SELECT count(*) FROM staff_attendance sa
+                  WHERE sa.center_id = ce.id AND sa.att_date = $2::date
+                    AND sa.status IN ('present','late','half_day'))       AS staff_in,
+                (SELECT count(*) FROM staff_attendance sa
+                  WHERE sa.center_id = ce.id AND sa.att_date = $2::date
+                    AND sa.status = 'late')                               AS staff_late
+           FROM centers ce
+           LEFT JOIN student_attendance a
+                  ON a.center_id = ce.id AND a.session_id = $1 AND a.att_date = $2::date
+          WHERE ce.is_active
+          GROUP BY ce.id, ce.name, ce.code
+          ORDER BY ce.code`,
+        [session.id, dailyDay])
+    : [];
+
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const attPct = Number(attToday?.total ?? 0) > 0
@@ -177,6 +220,12 @@ export default async function Dashboard({
           <Link href="/students/new" className="btn btn-ghost">Add student</Link>
         )}
       </div>
+
+      {wantsDaily && (
+        <div className="mt-6">
+          <DailyByCentre day={dailyDay} rows={daily} />
+        </div>
+      )}
 
       {upcomingEvents.length > 0 && (
         <>
