@@ -71,6 +71,8 @@ const MENU: Node[] = [
   },
 
   { href: "/calendar", label: "Calendar", icon: IconCal, feature: "calendar" },
+  // everyone gets one, and everyone gets a different one
+  { href: "/manual", label: "Training Manual", icon: IconBook },
   { href: "/supplies", label: "Supplies", icon: IconBox, feature: "supplies" },
 
   {
