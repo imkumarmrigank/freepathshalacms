@@ -179,6 +179,23 @@ table.tbl tbody tr:hover { background: #fafaff; }
 }
 .nav-item:hover { background: #f1f1f8; color: var(--text); }
 .nav-item[data-active="true"] { background: var(--brand); color: #fff; }
+/* a group header is a button, so undo the browser's idea of one */
+button.nav-item {
+  background: none; border: 0; cursor: pointer; font: inherit; width: 100%;
+}
+.nav-item[data-open="true"] { color: var(--text); }
+.nav-item-sm { padding: 0.375rem 0.625rem; font-size: 0.8125rem; }
+/* stands in for the icon on a child row, so labels still line up */
+.nav-dot {
+  width: 10px; height: 18px; flex: none; position: relative;
+}
+.nav-dot::after {
+  content: ""; position: absolute; left: 2px; top: 8px;
+  width: 5px; height: 5px; border-radius: 999px; background: currentColor;
+  opacity: .35;
+}
+.nav-item[data-active="true"] .nav-dot::after { opacity: .9; }
+
 .nav-section {
   padding: 1rem 0.75rem 0.375rem; font-size: 0.625rem; font-weight: 700;
   letter-spacing: 0.1em; text-transform: uppercase; color: #b4b4c6;
