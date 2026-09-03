@@ -114,7 +114,10 @@ export async function saveStaff(_prev: unknown, form: FormData) {
       if (!target) return { error: "User not found." };
       if (!canCreateRole(actor.role, target.role))
         return { error: `You cannot edit a ${target.role.replace(/_/g, " ")} account.` };
-      if (!canTouchCenter(actor, target.center_id))
+      // Admins, mentors, super admins and backup teachers have no home centre.
+      // A null here means an organisation-level account, not somebody else's
+      // centre — whether this actor may touch it was settled a line above.
+      if (target.center_id !== null && !canTouchCenter(actor, target.center_id))
         return { error: "That person is not at your centre." };
 
       await query(
@@ -227,7 +230,8 @@ export async function overrideStaffAttendance(_prev: unknown, form: FormData) {
   const target = await one<{ center_id: number | null }>(
     "SELECT center_id FROM users WHERE id = $1", [userId]);
   if (!target) return { error: "User not found." };
-  if (actor.role !== "super_admin" && target.center_id !== actor.centerId)
+  // an admin manages every centre, the same as the super admin
+  if (!isGlobalRole(actor.role) && target.center_id !== actor.centerId)
     return { error: "That person is not at your centre." };
   if (!reason) return { error: "Give a reason for the manual entry." };
 

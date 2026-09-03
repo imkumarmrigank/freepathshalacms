@@ -204,9 +204,11 @@ export async function setAllocation(_prev: unknown, form: FormData) {
   const teacher = await one<{ center_id: number | null }>(
     "SELECT center_id FROM users WHERE id = $1", [teacherId]);
   if (!teacher) return { error: "Teacher not found." };
+  // say the accurate thing first: somebody with no centre at all — a backup
+  // teacher, say — is not "at another centre", they simply have none yet
+  if (!teacher.center_id) return { error: "Assign the teacher to a centre first." };
   if (!canTouchCenter(user, teacher.center_id))
     return { error: "That teacher is not at your centre." };
-  if (!teacher.center_id) return { error: "Assign the teacher to a centre first." };
 
   const classIds = form.getAll("class_level_id").map(Number).filter(Boolean);
 
