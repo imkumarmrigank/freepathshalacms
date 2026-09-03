@@ -56,6 +56,8 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
   const done = topics.filter((t) => t.status === "completed").length;
   const pct = topics.length ? (done / topics.length) * 100 : 0;
   const withIssues = topics.filter((t) => t.issues_faced).length;
+  // a Hindi plan is written in Hindi, so its fields open in Hindi
+  const isHindi = /hindi|हिंदी|हिन्दी/i.test(plan.subject ?? "");
 
   return (
     <>
@@ -106,7 +108,9 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
                   : "The teacher has not added topics yet."} />
             ) : (
               <ul>
-                {topics.map((t) => <TopicRow key={t.id} t={t} canEdit={canEdit} />)}
+                {topics.map((t) => (
+                  <TopicRow key={t.id} t={t} canEdit={canEdit} hindi={isHindi} />
+                ))}
               </ul>
             )}
           </Card>
@@ -125,7 +129,7 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
               </p>
             </Card>
           )}
-          {canEdit && <AddTopic planId={plan.id} />}
+          {canEdit && <AddTopic planId={plan.id} hindi={isHindi} />}
         </div>
       </div>
     </>

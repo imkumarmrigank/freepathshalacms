@@ -127,6 +127,30 @@ table.tbl tbody tr:hover { background: #fafaff; }
   font-size: 0.75rem; font-weight: 600; flex: none;
 }
 
+.hindi-chip {
+  display: grid; place-items: center; min-width: 1.75rem; height: 1.75rem;
+  padding: 0 0.375rem; border-radius: 7px; border: 1px solid var(--border);
+  background: #fff; font-size: 0.8125rem; line-height: 1; color: var(--muted);
+  cursor: pointer; transition: border-color .15s, color .15s, background .15s;
+}
+.hindi-chip:hover { border-color: var(--brand); color: var(--brand); }
+.hindi-chip-on { border-color: var(--brand); background: var(--brand); color: #fff; }
+.hindi-chip-on:hover { color: #fff; }
+
+.hindi-pick {
+  padding: 0.1875rem 0.5rem; border-radius: 7px; border: 1px solid var(--border);
+  background: #fff; font-size: 0.9375rem; line-height: 1.4; cursor: pointer;
+}
+.hindi-pick:hover { border-color: var(--brand); }
+.hindi-pick-on { border-color: var(--brand); background: var(--brand-soft); }
+
+.hindi-key {
+  min-width: 2rem; padding: 0.25rem 0.375rem; border-radius: 6px;
+  border: 1px solid var(--border); background: #fff;
+  font-size: 0.9375rem; line-height: 1.4; cursor: pointer;
+}
+.hindi-key:hover { border-color: var(--brand); background: var(--brand-soft); }
+
 .pager-btn {
   min-width: 2rem; padding: 0.3125rem 0.5rem; border-radius: 8px;
   border: 1px solid var(--border); background: #fff;

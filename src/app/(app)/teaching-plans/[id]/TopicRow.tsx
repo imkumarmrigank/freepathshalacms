@@ -3,6 +3,7 @@ import { useActionState, useState } from "react";
 import { completeTopic, deleteTopic } from "../actions";
 import { Badge } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
+import HindiInput from "@/components/HindiInput";
 import { fmtDate, titleCase } from "@/lib/format";
 
 export type Topic = {
@@ -16,7 +17,8 @@ const TONE: Record<string, string> = {
   completed: "ok", in_progress: "warn", skipped: "mute", planned: "info",
 };
 
-export default function TopicRow({ t, canEdit }: { t: Topic; canEdit: boolean }) {
+export default function TopicRow({ t, canEdit, hindi = false }:
+  { t: Topic; canEdit: boolean; hindi?: boolean }) {
   const [state, action] = useActionState(completeTopic, null);
   const [, del] = useActionState(deleteTopic, null);
   const [open, setOpen] = useState(false);
@@ -99,19 +101,20 @@ export default function TopicRow({ t, canEdit }: { t: Topic; canEdit: boolean })
           </div>
           <label className="field">
             <span>How the class went</span>
-            <textarea className="textarea" name="remarks" rows={2} defaultValue={t.remarks ?? ""}
+            <HindiInput name="remarks" rows={2} className="textarea"
+              defaultValue={t.remarks ?? ""} startInHindi={hindi}
               placeholder="Did the students follow it? What needs revising?" />
           </label>
           <label className="field">
             <span>Aids &amp; references used</span>
-            <textarea className="textarea" name="resources_used" rows={2}
-              defaultValue={t.resources_used ?? ""}
+            <HindiInput name="resources_used" rows={2} className="textarea"
+              defaultValue={t.resources_used ?? ""} startInHindi={hindi}
               placeholder="Projector, tablet, NCERT chapter 4, a YouTube explainer…" />
           </label>
           <label className="field">
             <span>Issues faced</span>
-            <textarea className="textarea" name="issues_faced" rows={2}
-              defaultValue={t.issues_faced ?? ""}
+            <HindiInput name="issues_faced" rows={2} className="textarea"
+              defaultValue={t.issues_faced ?? ""} startInHindi={hindi}
               placeholder="Power cut, missing textbooks, a concept most students struggled with…" />
           </label>
           <Submit>Save</Submit>

@@ -1,8 +1,9 @@
 "use client";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { createPlan } from "./actions";
 import { Card, Field } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
+import HindiInput from "@/components/HindiInput";
 
 export default function NewPlanForm({
   classes, teachers, centers, isTeacher, isAdmin, leadDays,
@@ -15,6 +16,9 @@ export default function NewPlanForm({
   isAdmin: boolean;
 }) {
   const [state, action] = useActionState(createPlan, null);
+  // a Hindi plan is written in Hindi, so the fields start in Hindi
+  const [subject, setSubject] = useState("");
+  const hindiPlan = /hindi|हिंदी|हिन्दी/i.test(subject);
   const earliestDate = new Date();
   earliestDate.setDate(earliestDate.getDate() + leadDays);
   const earliest = earliestDate.toISOString().slice(0, 10);
@@ -36,9 +40,14 @@ export default function NewPlanForm({
       <h2 className="mb-4 text-[15px] font-semibold">New teaching plan</h2>
       <form action={action}>
         <FormMessage state={state} />
-        <Field label="Title *"><input className="input" name="title" required
-          placeholder="Term 1 — Mathematics" /></Field>
-        <Field label="Subject"><input className="input" name="subject" placeholder="Mathematics" /></Field>
+        <Field label="Title *">
+          <HindiInput name="title" required startInHindi={hindiPlan}
+            placeholder={hindiPlan ? "पाठ 1 — वर्णमाला" : "Term 1 — Mathematics"} />
+        </Field>
+        <Field label="Subject">
+          <input className="input" name="subject" placeholder="Mathematics"
+            value={subject} onChange={(e) => setSubject(e.target.value)} />
+        </Field>
         <Field label="Class *" hint={isTeacher ? "Only classes you are allotted" : undefined}>
           <select className="select" name="class_level_id" required defaultValue="">
             <option value="">Select class</option>
@@ -72,7 +81,9 @@ export default function NewPlanForm({
           Plans go to your centre manager at least {leadDays} days before they start, so the
           earliest you can begin is {earliest}.
         </p>
-        <Field label="Notes"><textarea className="textarea" name="description" rows={2} /></Field>
+        <Field label="Notes">
+          <HindiInput name="description" rows={2} className="textarea" startInHindi={hindiPlan} />
+        </Field>
         <Submit>Create plan</Submit>
       </form>
     </Card>
