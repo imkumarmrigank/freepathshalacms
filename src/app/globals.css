@@ -161,12 +161,42 @@ table.tbl tbody tr:hover { background: #fafaff; }
   font-size: 0.8125rem; font-weight: 700; font-variant-numeric: tabular-nums;
 }
 
-.doc-path {
-  display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.35rem;
-  background: #f4f4f9; border-radius: 7px; padding: 0.3rem 0.6rem;
-  font-size: 0.8125rem; color: var(--muted);
+/* "Where to find it" — the single thing a reader looks for first, so it is
+   built to be seen from across the page rather than read. */
+.doc-where {
+  border: 1px solid var(--doc);
+  border-left-width: 4px;
+  border-radius: 0 10px 10px 0;
+  background: var(--doc-soft);
+  padding: 0.7rem 0.9rem 0.8rem;
 }
-.doc-path b { color: var(--text); font-weight: 600; }
+.doc-where-label {
+  font-size: 0.625rem; font-weight: 700; letter-spacing: 0.11em;
+  text-transform: uppercase; color: var(--doc); margin-bottom: 0.5rem;
+}
+.doc-where-trail {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.5rem;
+}
+.doc-hop { display: inline-flex; align-items: center; gap: 0.45rem; }
+.doc-hop-n {
+  display: grid; place-items: center; flex: none;
+  width: 1.125rem; height: 1.125rem; border-radius: 999px;
+  background: var(--doc); color: #fff;
+  font-size: 0.625rem; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.doc-hop-name {
+  background: #fff; border: 1px solid var(--doc);
+  border-radius: 7px; padding: 0.2rem 0.55rem;
+  font-size: 0.875rem; font-weight: 600; color: var(--doc);
+  white-space: nowrap;
+}
+.doc-hop-arrow { color: var(--doc); font-size: 1rem; line-height: 1; opacity: .7; }
+
+@media print {
+  .doc-where { background: #fff; border-color: #999; }
+  .doc-hop-n { background: #444; }
+  .doc-hop-name { border-color: #999; color: #000; }
+}
 
 .doc-note {
   border-left: 3px solid var(--warn); background: var(--warn-soft);

@@ -94,14 +94,20 @@ export default async function ManualPage() {
                 {t.why && (
                   <p className="mt-1 max-w-[36rem] text-[14px] text-[var(--muted)]">{t.why}</p>
                 )}
-                {t.path && (
-                  <div className="doc-path mt-2.5">
-                    {t.path.map((seg, j) => (
-                      <span key={seg} className="flex items-center gap-1.5">
-                        {j > 0 && <span className="text-[var(--faint)]">›</span>}
-                        <b>{seg}</b>
-                      </span>
-                    ))}
+                {t.path.length > 0 && (
+                  <div className="doc-where mt-3">
+                    <div className="doc-where-label">
+                      Where to find it — click in this order
+                    </div>
+                    <div className="doc-where-trail">
+                      {t.path.map((seg, j) => (
+                        <span key={seg} className="doc-hop">
+                          {j > 0 && <span className="doc-hop-arrow" aria-hidden="true">→</span>}
+                          <span className="doc-hop-n">{j + 1}</span>
+                          <span className="doc-hop-name">{seg}</span>
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
 
