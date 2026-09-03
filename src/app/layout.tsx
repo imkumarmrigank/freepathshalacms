@@ -1,8 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Geist } from "next/font/google";
+import { Geist, Literata } from "next/font/google";
 import "./globals.css";
 
 const geist = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
+// the handbook reads as a document rather than a screen, and a serif carries
+// that; nothing else in the app uses it
+const literata = Literata({
+  variable: "--font-literata", subsets: ["latin"], weight: ["500", "600", "700"],
+});
 
 export const metadata: Metadata = {
   title: "FreePathshala CMS",
@@ -21,7 +26,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={geist.variable}>{children}</body>
+      <body className={`${geist.variable} ${literata.variable}`}>{children}</body>
     </html>
   );
 }

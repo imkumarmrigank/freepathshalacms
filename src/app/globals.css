@@ -127,6 +127,68 @@ table.tbl tbody tr:hover { background: #fafaff; }
   font-size: 0.75rem; font-weight: 600; flex: none;
 }
 
+/* ------------------------------------------------------------ the handbook */
+/* The manual is read, not operated, so it gets a document's typography rather
+   than the dense one every other page wants. */
+.doc { --doc: var(--brand); --doc-soft: var(--brand-soft); }
+.doc[data-role="center_manager"] { --doc: #0f6f62; --doc-soft: #e0f2ee; }
+.doc[data-role="mentor"]         { --doc: #7a3fae; --doc-soft: #f0e8f9; }
+.doc[data-role="admin"],
+.doc[data-role="super_admin"]    { --doc: #a84a15; --doc-soft: #fbeade; }
+
+.doc h2, .doc h3 {
+  font-family: var(--font-literata), Georgia, serif;
+  letter-spacing: -0.01em;
+}
+.doc-lede { max-width: 40rem; font-size: 0.9375rem; line-height: 1.7; color: var(--muted); }
+.doc-measure { max-width: 44rem; }
+
+.doc-step {
+  display: grid; grid-template-columns: 1.5rem 1fr; gap: 0 0.5rem;
+  font-size: 0.9375rem; line-height: 1.68; margin-bottom: 0.6rem;
+}
+.doc-step > b { font-weight: 600; color: var(--doc); font-variant-numeric: tabular-nums; }
+
+.doc-task { border-top: 1px solid var(--border); padding-top: 1.75rem; margin-top: 1.75rem; }
+/* number in its own gutter, so the heading and the steps share one left edge */
+.doc-grid { display: grid; grid-template-columns: 1.875rem minmax(0, 1fr); gap: 0 1rem; }
+.doc-task:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+
+.doc-n {
+  display: grid; place-items: center; flex: none;
+  width: 1.875rem; height: 1.875rem; border-radius: 999px;
+  background: var(--doc); color: #fff;
+  font-size: 0.8125rem; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+
+.doc-path {
+  display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.35rem;
+  background: #f4f4f9; border-radius: 7px; padding: 0.3rem 0.6rem;
+  font-size: 0.8125rem; color: var(--muted);
+}
+.doc-path b { color: var(--text); font-weight: 600; }
+
+.doc-note {
+  border-left: 3px solid var(--warn); background: var(--warn-soft);
+  border-radius: 0 8px 8px 0; padding: 0.75rem 1rem;
+  font-size: 0.875rem; line-height: 1.6; margin-top: 0.9rem;
+}
+.doc-note-stop { border-left-color: var(--bad); background: var(--bad-soft); }
+.doc-note b { display: block; margin-bottom: 0.15rem; }
+
+/* the contents rail, at widths that have room for it */
+.doc-rail a {
+  display: block; padding: 0.3rem 0 0.3rem 0.75rem;
+  border-left: 2px solid var(--border);
+  font-size: 0.8125rem; line-height: 1.45; color: var(--muted);
+}
+.doc-rail a:hover { color: var(--doc); border-left-color: var(--doc); }
+
+@media print {
+  .doc-rail, .no-print { display: none !important; }
+  .doc-task { break-inside: avoid; border-top-color: #ddd; }
+}
+
 .hindi-chip {
   display: grid; place-items: center; min-width: 1.75rem; height: 1.75rem;
   padding: 0 0.375rem; border-radius: 7px; border: 1px solid var(--border);
