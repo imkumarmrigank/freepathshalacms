@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import Sidebar, { dockFor } from "./Sidebar";
 import { IconLogout, IconMenu, IconClose } from "./icons";
 import { ROLE_LABEL, type Role } from "@/lib/roles";
@@ -14,6 +15,12 @@ import { ROLE_LABEL, type Role } from "@/lib/roles";
  * sideways, which hid most of it, and kept the account panel — sign out
  * included — in a sidebar that only appears on a wide screen. In the app there
  * was no way to sign out at all.
+ *
+ * The dock and the drawer are sent to the body through a portal. The header
+ * they are declared in carries a backdrop blur, and backdrop-filter makes an
+ * element the containing block for anything fixed inside it — so "bottom: 0"
+ * meant the bottom of the header, which is how the dock ended up along the top
+ * of the screen and the drawer ended up an invisible sliver.
  */
 export default function MobileNav({
   role, name, centerName, scopeLabel, logout,
@@ -28,6 +35,10 @@ export default function MobileNav({
 }) {
   const [open, setOpen] = useState(false);
   const path = usePathname();
+
+  // a portal needs a document, which the first server render does not have
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   // Going somewhere closes the drawer behind you. Adjusted during render
   // rather than in an effect, so the drawer is gone in the same paint as the
@@ -63,6 +74,8 @@ export default function MobileNav({
         <IconMenu className="h-[22px] w-[22px]" />
       </button>
 
+      {mounted && createPortal(
+        <>
       {/* ----------------------------------------------------------- the drawer */}
       {open && (
         <div className="drawer-scrim lg:hidden" onClick={() => setOpen(false)}>
@@ -113,6 +126,9 @@ export default function MobileNav({
           <span className="dock-label">More</span>
         </button>
       </nav>
+        </>,
+        document.body,
+      )}
     </>
   );
 }
