@@ -10,10 +10,10 @@ const literata = Literata({
 });
 
 export const metadata: Metadata = {
-  title: "FreePathshala CMS",
-  description: "Student, attendance and parent-teacher management for FreePathshala centres",
+  title: "Pehchaan",
+  description: "Student, attendance and parent-teacher management for Pehchaan centres",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "FreePathshala", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "Pehchaan", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

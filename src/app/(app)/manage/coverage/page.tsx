@@ -4,7 +4,7 @@ import { Alert, Avatar, Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { fmtDate, today } from "@/lib/format";
 import { CoverageForm, EndCoverage } from "./CoverageForm";
 
-export const metadata = { title: "Backup cover · FreePathshala CMS" };
+export const metadata = { title: "Backup cover · Pehchaan" };
 
 export default async function CoveragePage() {
   await requireFeature("coverage");

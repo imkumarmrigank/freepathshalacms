@@ -2,8 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 
 export const metadata = {
-  title: "Get the app · FreePathshala CMS",
-  description: "Install the FreePathshala CMS app on your Android phone.",
+  title: "Get the app · Pehchaan",
+  description: "Install the Pehchaan app on your Android phone.",
 };
 
 const STEPS = [
@@ -20,7 +20,7 @@ const STEPS = [
   {
     n: 3,
     title: "Sign in",
-    body: "Open FreePathshala and sign in with the email and password your administrator gave you.",
+    body: "Open Pehchaan and sign in with the email and password your administrator gave you.",
   },
   {
     n: 4,
@@ -40,7 +40,7 @@ export default function GetAppPage() {
         <Image src="/icons/icon-192.png" alt="" width={64} height={64}
           className="rounded-[14px] border border-[var(--border)]" />
         <div>
-          <h1 className="text-[24px] font-semibold tracking-[-0.02em]">FreePathshala for Android</h1>
+          <h1 className="text-[24px] font-semibold tracking-[-0.02em]">Pehchaan for Android</h1>
           <p className="mt-0.5 text-[14px] text-[var(--muted)]">
             The same system as the website, in an app on your phone.
           </p>
@@ -79,7 +79,7 @@ export default function GetAppPage() {
       </div>
 
       <p className="mt-8 text-center text-[12px] text-[var(--faint)]">
-        The app is signed by FreePathshala and is not distributed through the Play Store, which is
+        The app is signed by Pehchaan and is not distributed through the Play Store, which is
         why Android asks you to confirm the install.
       </p>
     </div>

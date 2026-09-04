@@ -9,7 +9,7 @@ import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
 import { fmtDate } from "@/lib/format";
 import { isGlobalRole } from "@/lib/roles";
 
-export const metadata = { title: "Teacher remarks · FreePathshala CMS" };
+export const metadata = { title: "Teacher remarks · Pehchaan" };
 
 type Row = {
   id: number; plan_id: number; topic: string; status: string;

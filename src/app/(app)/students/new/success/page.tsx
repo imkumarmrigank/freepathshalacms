@@ -5,7 +5,7 @@ import { one } from "@/lib/db";
 import { Alert, Card, PageHeader } from "@/components/ui";
 import { fullName } from "@/lib/format";
 
-export const metadata = { title: "Admission successful · FreePathshala CMS" };
+export const metadata = { title: "Admission successful · Pehchaan" };
 
 export default async function AdmissionSuccessPage({
   searchParams,
@@ -46,7 +46,7 @@ export default async function AdmissionSuccessPage({
   return (
     <div className="mx-auto max-w-[640px]">
       <PageHeader title="Admission Successful"
-        subtitle="The student has been successfully registered with FreePathshala." />
+        subtitle="The student has been successfully registered with Pehchaan." />
 
       <Card>
         <div className="mb-4 flex items-center gap-4">

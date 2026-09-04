@@ -11,7 +11,7 @@ import Link from "next/link";
 import PrintButton from "@/app/(app)/students/[id]/report-card/PrintButton";
 import LanguagePicker from "./LanguagePicker";
 
-export const metadata = { title: "Training manual · FreePathshala CMS" };
+export const metadata = { title: "Training manual · Pehchaan" };
 
 /**
  * Screenshots are added as they are captured, so the page shows the ones that

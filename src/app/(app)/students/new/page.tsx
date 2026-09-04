@@ -8,7 +8,7 @@ import { fmtDateTime } from "@/lib/format";
 import AdmissionWizard from "./AdmissionWizard";
 import type { AdmissionPayload } from "./actions";
 
-export const metadata = { title: "New admission · FreePathshala CMS" };
+export const metadata = { title: "New admission · Pehchaan" };
 
 export default async function NewStudentPage({
   searchParams,

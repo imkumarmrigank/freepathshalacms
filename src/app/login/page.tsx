@@ -2,7 +2,7 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { createSession, getSession, verifyLogin } from "@/lib/auth";
 
-export const metadata = { title: "Sign in · FreePathshala CMS" };
+export const metadata = { title: "Sign in · Pehchaan" };
 
 async function login(formData: FormData) {
   "use server";
@@ -24,7 +24,7 @@ export default async function LoginPage({
     <div className="grid min-h-screen lg:grid-cols-2">
       <div className="hidden flex-col justify-between bg-[var(--brand)] p-12 text-white lg:flex">
         <div className="w-fit self-start rounded-[12px] bg-white px-5 py-3.5 shadow-sm">
-          <Image src="/logo.png" alt="FreePathshala" width={500} height={153}
+          <Image src="/logo.png" alt="Pehchaan" width={500} height={153}
             className="h-auto w-[184px]" priority />
         </div>
         <div>
@@ -38,13 +38,13 @@ export default async function LoginPage({
             <li>· Parent-teacher meetings and follow-ups</li>
           </ul>
         </div>
-        <p className="text-[12px] text-white/50">© {new Date().getFullYear()} FreePathshala</p>
+        <p className="text-[12px] text-white/50">© {new Date().getFullYear()} Pehchaan</p>
       </div>
 
       <div className="flex items-center justify-center px-6 py-16">
         <div className="w-full max-w-[352px]">
           <div className="mb-8 lg:hidden">
-            <Image src="/logo.png" alt="FreePathshala" width={500} height={153}
+            <Image src="/logo.png" alt="Pehchaan" width={500} height={153}
               className="h-auto w-[168px]" priority />
           </div>
           <h1 className="text-[22px] font-semibold tracking-[-0.01em]">Sign in</h1>

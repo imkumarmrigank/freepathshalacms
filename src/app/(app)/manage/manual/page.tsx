@@ -7,7 +7,7 @@ import {
 } from "@/lib/manual";
 import { IntroEditor, TaskEditor, PitfallEditor } from "./Editors";
 
-export const metadata = { title: "Edit manuals · FreePathshala CMS" };
+export const metadata = { title: "Edit manuals · Pehchaan" };
 
 export default async function ManageManualPage({
   searchParams,

@@ -3,17 +3,17 @@ import type { MetadataRoute } from "next";
 /** Served at /manifest.webmanifest — also what the Android TWA wrapper is built from. */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "FreePathshala CMS",
-    short_name: "FreePathshala",
+    name: "Pehchaan",
+    short_name: "Pehchaan",
     description:
-      "Students, attendance, timetable, teaching plans and parent meetings for FreePathshala centres.",
+      "Students, attendance, timetable, teaching plans and parent meetings for Pehchaan centres.",
     id: "/",
     start_url: "/dashboard",
     scope: "/",
     display: "standalone",
     orientation: "portrait",
-    background_color: "#f6f6fa",
-    theme_color: "#2f36a3",
+    background_color: "#0e2a47",
+    theme_color: "#0e2a47",
     categories: ["education", "productivity"],
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },

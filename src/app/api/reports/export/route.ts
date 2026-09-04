@@ -61,7 +61,7 @@ export async function GET(req: Request) {
   }
 
   const wb = new ExcelJS.Workbook();
-  wb.creator = "FreePathshala CMS";
+  wb.creator = "Pehchaan";
   wb.created = new Date();
   const ws = wb.addWorksheet(result.title.slice(0, 30), {
     views: [{ state: "frozen", ySplit: 3 }],
@@ -71,7 +71,7 @@ export async function GET(req: Request) {
   const lastCol = Math.max(result.columns.length, 1);
   ws.mergeCells(1, 1, 1, lastCol);
   const titleCell = ws.getCell(1, 1);
-  titleCell.value = `FreePathshala — ${result.title}`;
+  titleCell.value = `Pehchaan — ${result.title}`;
   titleCell.font = { size: 14, bold: true, color: { argb: "FF16162A" } };
   titleCell.alignment = { vertical: "middle" };
   ws.getRow(1).height = 24;

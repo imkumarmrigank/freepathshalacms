@@ -9,7 +9,7 @@ import { fullName } from "@/lib/format";
 import PrintButton from "./PrintButton";
 import { isGlobalRole } from "@/lib/roles";
 
-export const metadata = { title: "Progress report · FreePathshala" };
+export const metadata = { title: "Progress report · Pehchaan" };
 
 export default async function ReportCardPage({
   params, searchParams,

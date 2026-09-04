@@ -12,7 +12,7 @@ import {
 } from "@/lib/statistics";
 import { isGlobalRole } from "@/lib/roles";
 
-export const metadata = { title: "Statistics · FreePathshala CMS" };
+export const metadata = { title: "Statistics · Pehchaan" };
 
 const ATT_SERIES = [
   { key: "present", label: "Present", color: ATTENDANCE_COLORS.present },

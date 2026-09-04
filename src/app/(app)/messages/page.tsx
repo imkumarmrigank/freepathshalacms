@@ -8,7 +8,7 @@ import {
 import Thread from "./Thread";
 import StartChat from "./StartChat";
 
-export const metadata = { title: "Messages · FreePathshala CMS" };
+export const metadata = { title: "Messages · Pehchaan" };
 
 export default async function MessagesPage({
   searchParams,

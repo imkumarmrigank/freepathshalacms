@@ -70,7 +70,7 @@ export default function MobileNav({
       {/* ------------------------------------------------------- the hamburger */}
       <button type="button" onClick={() => setOpen(true)}
         aria-label="Open the menu" aria-expanded={open}
-        className="dock-hamburger lg:hidden">
+        className="dock-hamburger">
         <IconMenu className="h-[22px] w-[22px]" />
       </button>
 
@@ -78,7 +78,7 @@ export default function MobileNav({
         <>
       {/* ----------------------------------------------------------- the drawer */}
       {open && (
-        <div className="drawer-scrim lg:hidden" onClick={() => setOpen(false)}>
+        <div className="drawer-scrim" onClick={() => setOpen(false)}>
           <nav className="drawer" onClick={(e) => e.stopPropagation()}
             aria-label="Menu">
             <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
@@ -110,7 +110,7 @@ export default function MobileNav({
       )}
 
       {/* ------------------------------------------------------------- the dock */}
-      <nav className="dock lg:hidden" aria-label="Main">
+      <nav className="dock" aria-label="Main">
         {dock.map((d) => {
           const Icon = d.icon;
           return (

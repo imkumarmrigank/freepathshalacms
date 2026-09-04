@@ -35,7 +35,7 @@ export function toISODate(d: Date) {
  * On the server that is India rather than wherever the instance happens to
  * run — see the TZ setting in the deployment and the SET TIME ZONE on every
  * database connection. In the browser it is the reader's own clock, which for
- * FreePathshala's staff is the same. Never use toISOString() for a date: it is
+ * Pehchaan's staff is the same. Never use toISOString() for a date: it is
  * UTC, and until half past five each morning UTC is still yesterday.
  */
 export const today = () => toISODate(new Date());

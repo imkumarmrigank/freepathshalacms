@@ -7,7 +7,7 @@ import { Alert } from "@/components/ui";
 import PrintButton from "../../students/[id]/report-card/PrintButton";
 import { isGlobalRole } from "@/lib/roles";
 
-export const metadata = { title: "Report cards · FreePathshala" };
+export const metadata = { title: "Report cards · Pehchaan" };
 
 /** Guard against someone printing a whole centre in one go by accident. */
 const MAX_CARDS = 80;

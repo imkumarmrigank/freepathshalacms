@@ -38,7 +38,7 @@ export default function ReportCard({ data }: { data: ReportCardData }) {
     <div className="sheet card card-pad bg-white" style={{ maxWidth: 820, margin: "0 auto" }}>
       {/* ------------------------------------------------------------ letterhead */}
       <div className="flex items-start justify-between gap-6 border-b-2 border-[var(--brand)] pb-4">
-        <Image src="/logo.png" alt="FreePathshala" width={500} height={153}
+        <Image src="/logo.png" alt="Pehchaan" width={500} height={153}
           className="h-auto w-[150px]" />
         <div className="text-right text-[12px] leading-relaxed text-[var(--muted)]">
           <div className="text-[15px] font-semibold text-[var(--text)]">{student.center_name}</div>
@@ -222,7 +222,7 @@ export default function ReportCard({ data }: { data: ReportCardData }) {
       </div>
 
       <p className="mt-8 text-center text-[11px] text-[var(--faint)]">
-        Generated on {fmtDate(new Date())} · FreePathshala · {student.center_name}
+        Generated on {fmtDate(new Date())} · Pehchaan · {student.center_name}
       </p>
     </div>
   );

@@ -245,6 +245,13 @@ table.tbl tbody tr:hover { background: #fafaff; }
 }
 .dock-item[data-on="true"] { color: var(--brand); }
 .dock-label { font-size: 0.625rem; font-weight: 600; letter-spacing: .01em; }
+/* These rules sit outside @layer components, so they beat Tailwind's utilities
+   — which is how the phone dock ended up showing on desktop despite lg:hidden.
+   They own their own breakpoint instead of depending on a class. */
+@media (min-width: 1024px) {
+  .dock, .dock-hamburger, .drawer-scrim { display: none; }
+}
+
 .drawer-scrim {
   position: fixed; inset: 0; z-index: 40;
   background: rgba(22, 25, 43, .45);

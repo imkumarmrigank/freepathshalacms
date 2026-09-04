@@ -11,7 +11,7 @@ import { FLAG_STATUS_LABEL, FLAG_STATUS_TONE } from "@/lib/counselling-meta";
 import { isGlobalRole } from "@/lib/roles";
 import WorkFlag from "./WorkFlag";
 
-export const metadata = { title: "Counselling · FreePathshala CMS" };
+export const metadata = { title: "Counselling · Pehchaan" };
 
 type Row = {
   id: number; student_id: number; first_name: string; last_name: string | null;

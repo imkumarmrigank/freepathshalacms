@@ -4,7 +4,7 @@ import { Card, PageHeader } from "@/components/ui";
 import { describeWeekOff } from "@/lib/week";
 import WeekForm from "./WeekForm";
 
-export const metadata = { title: "Working days · FreePathshala CMS" };
+export const metadata = { title: "Working days · Pehchaan" };
 
 export default async function WorkingDaysPage() {
   await requireRole("super_admin");

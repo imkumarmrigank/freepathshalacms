@@ -10,7 +10,7 @@ import { fullName } from "@/lib/format";
 import { grade, percentage } from "@/lib/exam-meta";
 import { isGlobalRole } from "@/lib/roles";
 
-export const metadata = { title: "Progress reports · FreePathshala CMS" };
+export const metadata = { title: "Progress reports · Pehchaan" };
 
 export default async function ProgressReportsPage({
   searchParams,
