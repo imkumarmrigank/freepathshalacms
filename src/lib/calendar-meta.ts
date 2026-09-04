@@ -13,6 +13,8 @@ export type CalendarEvent = {
   description: string | null;
   affects_attendance: boolean;
   source: "calendar" | "ptm";
+  /** Centres that stay open through this holiday, by name. */
+  open_centres: string[];
 };
 
 export const EVENT_LABEL: Record<string, string> = {

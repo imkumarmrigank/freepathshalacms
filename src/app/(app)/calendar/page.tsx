@@ -10,6 +10,7 @@ import { fmtDate, today } from "@/lib/format";
 import MonthGrid from "./MonthGrid";
 import EventForm from "./EventForm";
 import DeleteEvent from "./DeleteEvent";
+import KeepOpen from "./KeepOpen";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
 
 function monthBounds(month: string) {
@@ -120,9 +121,17 @@ export default async function CalendarPage({
                     <Badge tone={EVENT_TONE[e.event_type]}>
                       {EVENT_LABEL[e.event_type] ?? e.event_type}
                     </Badge>
-                    {canEdit && e.source === "calendar" && <DeleteEvent id={e.id} />}
+                    {canEdit && e.source === "calendar"
+                      && (e.center_id !== null || isGlobalRole(user.role)) && (
+                      <DeleteEvent id={e.id} />
+                    )}
                     {e.source === "ptm" && (
                       <Link href="/ptm/meetings" className="btn btn-ghost btn-sm">Open</Link>
+                    )}
+                    {canEdit && e.source === "calendar" && e.center_id === null
+                      && e.affects_attendance && (
+                      <KeepOpen eventId={e.id} centres={centers}
+                        openCentres={e.open_centres ?? []} />
                     )}
                   </li>
                 ))}

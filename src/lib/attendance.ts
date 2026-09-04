@@ -73,12 +73,16 @@ export async function closeRegisterUpToYesterday(): Promise<number> {
             AND NOT EXISTS (
               SELECT 1 FROM student_attendance x
                WHERE x.student_id = e.student_id AND x.att_date = $1::date)
-            -- a holiday or closure on the calendar is not an absence
+            -- a holiday or closure on the calendar is not an absence, unless
+            -- this centre was excepted from it and worked that day
             AND NOT EXISTS (
               SELECT 1 FROM calendar_events ce
                WHERE ce.affects_attendance
                  AND $1::date BETWEEN ce.start_date AND ce.end_date
-                 AND (ce.center_id IS NULL OR ce.center_id = e.center_id))
+                 AND (ce.center_id IS NULL OR ce.center_id = e.center_id)
+                 AND NOT EXISTS (
+                   SELECT 1 FROM calendar_event_exceptions x
+                    WHERE x.event_id = ce.id AND x.center_id = e.center_id))
          ON CONFLICT (student_id, att_date) DO NOTHING
          RETURNING id`,
         [day, AUTO_ABSENT_REMARK],

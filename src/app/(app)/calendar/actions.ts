@@ -6,6 +6,19 @@ import { currentSession } from "@/lib/queries";
 import { HOLIDAY_TYPES } from "@/lib/calendar-meta";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
 
+/**
+ * An event with no centre belongs to every centre, so only somebody who can
+ * post to every centre may change or remove it. Reading a null as "somebody
+ * else's centre" is what stopped anyone, super admin included, from deleting an
+ * all-centres holiday.
+ */
+function mayTouchEvent(
+  user: Awaited<ReturnType<typeof requireUser>>,
+  centerId: number | null,
+) {
+  return centerId === null ? isGlobalRole(user.role) : canTouchCenter(user, centerId);
+}
+
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
   return v === "" ? null : v;
@@ -46,8 +59,12 @@ export async function saveEvent(_prev: unknown, form: FormData) {
     const existing = await one<{ center_id: number | null }>(
       "SELECT center_id FROM calendar_events WHERE id = $1", [id]);
     if (!existing) return { error: "Event not found." };
-    if (!canTouchCenter(user, existing.center_id))
-      return { error: "That event belongs to another centre." };
+    if (!mayTouchEvent(user, existing.center_id))
+      return {
+        error: existing.center_id === null
+          ? "This event is on every centre's calendar, so only an administrator can change it."
+          : "That event belongs to another centre.",
+      };
 
     await query(
       `UPDATE calendar_events SET title=$2, event_type=$3, center_id=$4, start_date=$5,
@@ -81,10 +98,68 @@ export async function deleteEvent(_prev: unknown, form: FormData) {
   const existing = await one<{ center_id: number | null }>(
     "SELECT center_id FROM calendar_events WHERE id = $1", [id]);
   if (!existing) return { error: "Event not found." };
-  if (!canTouchCenter(user, existing.center_id))
-    return { error: "That event belongs to another centre." };
+  if (!mayTouchEvent(user, existing.center_id))
+    return {
+      error: existing.center_id === null
+        ? "This event is on every centre's calendar, so only an administrator can remove it. "
+          + "To keep just your centre open, use “this centre is working” instead."
+        : "That event belongs to another centre.",
+    };
 
   await query("DELETE FROM calendar_events WHERE id = $1", [id]);
   revalidatePath("/calendar");
   return { ok: "Event removed." };
+}
+
+
+/**
+ * Keeps one centre working through a holiday that covers all of them. The event
+ * stays where it is for everybody else — far better than deleting a holiday
+ * eleven centres are observing because the twelfth is not.
+ */
+export async function openCentreOnHoliday(_prev: unknown, form: FormData) {
+  const user = await requireUser();
+  if (isTeaching(user.role))
+    return { error: "Only centre managers and admins can change the calendar." };
+
+  const eventId = Number(form.get("event_id"));
+  const centerId = Number(form.get("center_id"));
+  if (!eventId || !centerId) return { error: "Pick a centre." };
+  if (!canTouchCenter(user, centerId))
+    return { error: "That centre is not one of yours." };
+
+  const event = await one<{ center_id: number | null; affects_attendance: boolean }>(
+    "SELECT center_id, affects_attendance FROM calendar_events WHERE id = $1", [eventId]);
+  if (!event) return { error: "Event not found." };
+  if (event.center_id !== null)
+    return { error: "That holiday is already set for one centre — remove it instead." };
+
+  await query(
+    `INSERT INTO calendar_event_exceptions (event_id, center_id, reason, created_by)
+     VALUES ($1,$2,$3,$4) ON CONFLICT (event_id, center_id) DO NOTHING`,
+    [eventId, centerId, str(form, "reason"), user.uid]);
+
+  revalidatePath("/calendar");
+  revalidatePath("/attendance");
+  return { ok: "That centre will be working." };
+}
+
+/** Puts a centre back on the holiday. */
+export async function closeCentreOnHoliday(_prev: unknown, form: FormData) {
+  const user = await requireUser();
+  if (isTeaching(user.role))
+    return { error: "Only centre managers and admins can change the calendar." };
+
+  const eventId = Number(form.get("event_id"));
+  const centerId = Number(form.get("center_id"));
+  if (!canTouchCenter(user, centerId))
+    return { error: "That centre is not one of yours." };
+
+  await query(
+    "DELETE FROM calendar_event_exceptions WHERE event_id = $1 AND center_id = $2",
+    [eventId, centerId]);
+
+  revalidatePath("/calendar");
+  revalidatePath("/attendance");
+  return { ok: "That centre is on holiday again." };
 }
