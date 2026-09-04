@@ -93,6 +93,16 @@ export function canPostToAllCentres(role: Role) {
   return role === "super_admin" || role === "admin";
 }
 
+/**
+ * Declaring a holiday or a closure — the events that call off a day's teaching
+ * and stop the register expecting anyone. A centre manager runs their centre
+ * but does not decide it is shut, so they keep feasts, activities and events
+ * and lose these two.
+ */
+export function canSetHolidays(role: Role) {
+  return role === "super_admin" || role === "admin" || role === "mentor";
+}
+
 /** Standing a backup teacher in for someone is an admin decision. */
 export function canAssignCoverage(role: Role) {
   return role === "super_admin" || role === "admin";

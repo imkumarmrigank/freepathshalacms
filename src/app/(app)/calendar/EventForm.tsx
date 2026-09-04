@@ -3,15 +3,17 @@ import { useActionState, useState } from "react";
 import { saveEvent } from "./actions";
 import { Card, Field } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
-import { EVENT_LABEL } from "@/lib/calendar-meta";
+import { EVENT_LABEL, HOLIDAY_TYPES } from "@/lib/calendar-meta";
 
 export default function EventForm({
-  centers, isAdmin, allowAllCentres = false, centerName, defaultDate,
+  centers, isAdmin, allowAllCentres = false, canSetHolidays = false, centerName, defaultDate,
 }: {
   centers: { id: number; code: string; name: string }[];
   isAdmin: boolean;
   /** Only an administrator posts a holiday the whole organisation observes. */
   allowAllCentres?: boolean;
+  /** Declaring the day off is a mentor's or an administrator's call. */
+  canSetHolidays?: boolean;
   centerName: string | null;
   defaultDate: string;
 }) {
@@ -35,7 +37,9 @@ export default function EventForm({
         <Field label="Type *">
           <select className="select" name="event_type" value={type}
             onChange={(e) => setType(e.target.value)}>
-            {Object.entries(EVENT_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            {Object.entries(EVENT_LABEL)
+              .filter(([v]) => canSetHolidays || !HOLIDAY_TYPES.has(v))
+              .map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </Field>
         {isAdmin && (

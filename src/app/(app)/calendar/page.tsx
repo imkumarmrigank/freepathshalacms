@@ -5,13 +5,13 @@ import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { eventsBetween } from "@/lib/calendar";
 import { weekOffDays } from "@/lib/attendance";
 import { describeWeekOff } from "@/lib/week";
-import { EVENT_LABEL, EVENT_TONE } from "@/lib/calendar-meta";
+import { EVENT_LABEL, EVENT_TONE, HOLIDAY_TYPES } from "@/lib/calendar-meta";
 import { fmtDate, today } from "@/lib/format";
 import MonthGrid from "./MonthGrid";
 import EventForm from "./EventForm";
 import DeleteEvent from "./DeleteEvent";
 import KeepOpen from "./KeepOpen";
-import { canPostToAllCentres, isGlobalRole, isTeaching } from "@/lib/roles";
+import { canPostToAllCentres, canSetHolidays, isGlobalRole, isTeaching } from "@/lib/roles";
 
 function monthBounds(month: string) {
   const [y, m] = month.split("-").map(Number);
@@ -122,14 +122,15 @@ export default async function CalendarPage({
                       {EVENT_LABEL[e.event_type] ?? e.event_type}
                     </Badge>
                     {canEdit && e.source === "calendar"
-                      && (e.center_id !== null || canPostToAllCentres(user.role)) && (
+                      && (e.center_id !== null || canPostToAllCentres(user.role))
+                      && (!HOLIDAY_TYPES.has(e.event_type) || canSetHolidays(user.role)) && (
                       <DeleteEvent id={e.id} />
                     )}
                     {e.source === "ptm" && (
                       <Link href="/ptm/meetings" className="btn btn-ghost btn-sm">Open</Link>
                     )}
-                    {canEdit && e.source === "calendar" && e.center_id === null
-                      && e.affects_attendance && (
+                    {canSetHolidays(user.role) && e.source === "calendar"
+                      && e.center_id === null && e.affects_attendance && (
                       <KeepOpen eventId={e.id} centres={centers}
                         openCentres={e.open_centres ?? []} />
                     )}
@@ -143,6 +144,7 @@ export default async function CalendarPage({
         {canEdit && (
           <EventForm centers={centers} isAdmin={isGlobalRole(user.role)}
             allowAllCentres={canPostToAllCentres(user.role)}
+            canSetHolidays={canSetHolidays(user.role)}
             centerName={user.centerName} defaultDate={today()} />
         )}
       </div>

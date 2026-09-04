@@ -4,7 +4,7 @@ import { requireUser, canTouchCenter } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
 import { HOLIDAY_TYPES } from "@/lib/calendar-meta";
-import { canPostToAllCentres, isTeaching } from "@/lib/roles";
+import { canPostToAllCentres, canSetHolidays, isTeaching } from "@/lib/roles";
 
 /**
  * An event with no centre belongs to every centre, so only somebody who can
@@ -54,13 +54,21 @@ export async function saveEvent(_prev: unknown, form: FormData) {
     centerId = user.centerId;
   }
 
+  if (HOLIDAY_TYPES.has(type) && !canSetHolidays(user.role))
+    return {
+      error: "Only a mentor or an administrator can declare a holiday or a closure. "
+        + "You can still add a feast, an activity or an event.",
+    };
+
   const allDay = form.get("is_all_day") === "on";
   const session = await currentSession();
 
   if (id) {
-    const existing = await one<{ center_id: number | null }>(
-      "SELECT center_id FROM calendar_events WHERE id = $1", [id]);
+    const existing = await one<{ center_id: number | null; event_type: string }>(
+      "SELECT center_id, event_type FROM calendar_events WHERE id = $1", [id]);
     if (!existing) return { error: "Event not found." };
+    if (HOLIDAY_TYPES.has(existing.event_type) && !canSetHolidays(user.role))
+      return { error: "Only a mentor or an administrator can change a holiday." };
     if (!mayTouchEvent(user, existing.center_id))
       return {
         error: existing.center_id === null
@@ -97,9 +105,11 @@ export async function deleteEvent(_prev: unknown, form: FormData) {
   const user = await requireUser();
   if (isTeaching(user.role)) return { error: "Only managers and admins can do that." };
   const id = Number(form.get("id"));
-  const existing = await one<{ center_id: number | null }>(
-    "SELECT center_id FROM calendar_events WHERE id = $1", [id]);
+  const existing = await one<{ center_id: number | null; event_type: string }>(
+    "SELECT center_id, event_type FROM calendar_events WHERE id = $1", [id]);
   if (!existing) return { error: "Event not found." };
+  if (HOLIDAY_TYPES.has(existing.event_type) && !canSetHolidays(user.role))
+    return { error: "Only a mentor or an administrator can remove a holiday." };
   if (!mayTouchEvent(user, existing.center_id))
     return {
       error: existing.center_id === null
@@ -121,8 +131,8 @@ export async function deleteEvent(_prev: unknown, form: FormData) {
  */
 export async function openCentreOnHoliday(_prev: unknown, form: FormData) {
   const user = await requireUser();
-  if (isTeaching(user.role))
-    return { error: "Only centre managers and admins can change the calendar." };
+  if (!canSetHolidays(user.role))
+    return { error: "Only a mentor or an administrator can change a holiday." };
 
   const eventId = Number(form.get("event_id"));
   const centerId = Number(form.get("center_id"));
@@ -149,8 +159,8 @@ export async function openCentreOnHoliday(_prev: unknown, form: FormData) {
 /** Puts a centre back on the holiday. */
 export async function closeCentreOnHoliday(_prev: unknown, form: FormData) {
   const user = await requireUser();
-  if (isTeaching(user.role))
-    return { error: "Only centre managers and admins can change the calendar." };
+  if (!canSetHolidays(user.role))
+    return { error: "Only a mentor or an administrator can change a holiday." };
 
   const eventId = Number(form.get("event_id"));
   const centerId = Number(form.get("center_id"));
