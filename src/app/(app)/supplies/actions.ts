@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { today } from "@/lib/format";
 import { requireRole, requireUser, canTouchCenter } from "@/lib/auth";
 import { canManageHqStock, isTeaching } from "@/lib/roles";
 import { one, query, tx } from "@/lib/db";
@@ -40,8 +41,8 @@ export async function recordHqReceipt(_prev: unknown, form: FormData) {
   if (!Number.isInteger(quantity) || quantity <= 0)
     return { error: "Quantity must be a whole number above zero." };
 
-  const receivedOn = str(form, "received_on") ?? new Date().toISOString().slice(0, 10);
-  if (receivedOn > new Date().toISOString().slice(0, 10))
+  const receivedOn = str(form, "received_on") ?? today();
+  if (receivedOn > today())
     return { error: "The received date cannot be in the future." };
 
   await query(
@@ -70,8 +71,8 @@ export async function recordReceipt(_prev: unknown, form: FormData) {
   if (!Number.isInteger(quantity) || quantity <= 0)
     return { error: "Quantity must be a whole number above zero." };
 
-  const receivedOn = str(form, "received_on") ?? new Date().toISOString().slice(0, 10);
-  if (receivedOn > new Date().toISOString().slice(0, 10))
+  const receivedOn = str(form, "received_on") ?? today();
+  if (receivedOn > today())
     return { error: "The dispatch date cannot be in the future." };
 
   try {
@@ -128,8 +129,8 @@ export async function issueToStudent(_prev: unknown, form: FormData) {
   if (user.role !== "super_admin" && student.center_id !== user.centerId)
     return { error: "That student belongs to another centre." };
 
-  const issuedOn = str(form, "issued_on") ?? new Date().toISOString().slice(0, 10);
-  if (issuedOn > new Date().toISOString().slice(0, 10))
+  const issuedOn = str(form, "issued_on") ?? today();
+  if (issuedOn > today())
     return { error: "The issue date cannot be in the future." };
 
   const session = await currentSession();

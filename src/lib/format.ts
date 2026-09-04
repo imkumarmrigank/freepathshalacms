@@ -29,7 +29,23 @@ export function toISODate(d: Date) {
   ).padStart(2, "0")}`;
 }
 
+/**
+ * The date as the people using this system would say it.
+ *
+ * On the server that is India rather than wherever the instance happens to
+ * run — see the TZ setting in the deployment and the SET TIME ZONE on every
+ * database connection. In the browser it is the reader's own clock, which for
+ * FreePathshala's staff is the same. Never use toISOString() for a date: it is
+ * UTC, and until half past five each morning UTC is still yesterday.
+ */
 export const today = () => toISODate(new Date());
+
+/** Today, shifted by a number of days. Useful for "no later than" limits. */
+export function daysFromToday(n: number) {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return toISODate(d);
+}
 
 export function fullName(s: { first_name: string; last_name?: string | null }) {
   return [s.first_name, s.last_name].filter(Boolean).join(" ");

@@ -1,5 +1,6 @@
 "use client";
 import { useActionState, useState } from "react";
+import { today } from "@/lib/format";
 import { createExam } from "./actions";
 import { Card, Field } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
@@ -137,7 +138,7 @@ export default function NewExamForm({
           value={pickedClasses} onChange={setPickedClasses} />
         <Field label="Date of test *">
           <input className="input" type="date" name="exam_date" required
-            defaultValue={new Date().toISOString().slice(0, 10)} />
+            defaultValue={today()} />
         </Field>
         <div className="grid grid-cols-2 gap-x-4">
           <Field label="Maximum marks *" hint="Applied to every subject">

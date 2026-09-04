@@ -1,5 +1,6 @@
 "use client";
 import { useActionState } from "react";
+import { today } from "@/lib/format";
 import { assignCoverage, endCoverage } from "./actions";
 import { Card, Field } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
@@ -8,7 +9,6 @@ type Person = { id: number; name: string; center_name: string | null };
 
 export function CoverageForm({ backups, teachers }: { backups: Person[]; teachers: Person[] }) {
   const [state, action] = useActionState(assignCoverage, null);
-  const today = new Date().toISOString().slice(0, 10);
 
   if (backups.length === 0) {
     return (
@@ -49,7 +49,7 @@ export function CoverageForm({ backups, teachers }: { backups: Person[]; teacher
         </Field>
         <div className="grid grid-cols-2 gap-x-4">
           <Field label="From *">
-            <input className="input" type="date" name="starts_on" defaultValue={today} required />
+            <input className="input" type="date" name="starts_on" defaultValue={today()} required />
           </Field>
           <Field label="Until" hint="Leave blank if open ended">
             <input className="input" type="date" name="ends_on" />
@@ -67,7 +67,7 @@ export function EndCoverage({ id }: { id: number }) {
   return (
     <form action={action}>
       <input type="hidden" name="id" value={id} />
-      <button className="btn btn-ghost btn-sm" type="submit" title={state?.error ?? "End today"}>
+      <button className="btn btn-ghost btn-sm" type="submit" title={state?.error ?? "End today()"}>
         End cover
       </button>
     </form>

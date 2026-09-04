@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { today, toISODate } from "@/lib/format";
 import { requireFeature } from "@/lib/auth";
 import { centersForUser, currentSession, listClasses, listSessions } from "@/lib/queries";
 import { Alert, Card, Empty, PageHeader } from "@/components/ui";
@@ -23,13 +24,12 @@ export default async function ReportsPage({
   const reportKey = sp.report && available.some((r) => r.key === sp.report)
     ? sp.report : available[0].key;
 
-  const today = new Date().toISOString().slice(0, 10);
   const monthAgo = new Date();
   monthAgo.setDate(monthAgo.getDate() - 30);
 
   const params: ReportParams = {
-    from: sp.from || monthAgo.toISOString().slice(0, 10),
-    to: sp.to || today,
+    from: sp.from || toISODate(monthAgo),
+    to: sp.to || today(),
     centerId: Number(sp.center) || null,
     classId: Number(sp.class) || null,
     sessionId: Number(sp.session) || cur?.id || sessions[0]?.id || 0,

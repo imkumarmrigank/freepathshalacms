@@ -34,6 +34,7 @@ const isGroup = (n: Node): n is Group => "children" in n;
  */
 const MENU: Node[] = [
   { href: "/dashboard", label: "Dashboard", icon: IconGrid },
+  { href: "/messages", label: "Messages", icon: IconChat, feature: "messages" },
 
   {
     label: "Students", icon: IconUsers, children: [
@@ -147,8 +148,8 @@ function contains(n: Node, href: string): boolean {
 
 /* -------------------------------------------------------------- the vertical */
 
-function Row({ node, role, active, depth }: {
-  node: Node; role: Role; active: string | null; depth: number;
+function Row({ node, role, active, depth, unread = 0 }: {
+  node: Node; role: Role; active: string | null; depth: number; unread?: number;
 }) {
   const holdsActive = active !== null && contains(node, active);
   const [open, setOpen] = useState(holdsActive);
@@ -169,6 +170,9 @@ function Row({ node, role, active, depth }: {
         style={depth ? { paddingLeft: `${0.75 + depth * 0.9}rem` } : undefined}>
         {Icon ? <Icon className="h-[18px] w-[18px] flex-none" /> : <span className="nav-dot" />}
         <span className="truncate">{node.label}</span>
+        {node.href === "/messages" && unread > 0 && (
+          <span className="nav-badge">{unread > 99 ? "99+" : unread}</span>
+        )}
       </Link>
     );
   }
@@ -190,7 +194,7 @@ function Row({ node, role, active, depth }: {
           style={{ marginLeft: "0.9rem" }}>
           {node.children.filter((c) => visible(c, role)).map((c) => (
             <Row key={isGroup(c) ? c.label : c.href} node={c} role={role}
-              active={active} depth={0} />
+              active={active} depth={0} unread={unread} />
           ))}
         </div>
       )}
@@ -204,7 +208,8 @@ function Row({ node, role, active, depth }: {
  * On a phone the tree becomes two rows: the sections, then the pages inside
  * whichever section you are in. Tapping a section switches the second row.
  */
-function Horizontal({ role, active }: { role: Role; active: string | null }) {
+function Horizontal({ role, active, unread = 0 }:
+  { role: Role; active: string | null; unread?: number }) {
   const top = MENU.filter((n) => visible(n, role));
   const current = top.find((n) => active !== null && contains(n, active));
   const [picked, setPicked] = useState<string | null>(null);
@@ -222,6 +227,9 @@ function Horizontal({ role, active }: { role: Role; active: string | null }) {
                 data-active={active === n.href} onClick={() => setPicked(null)}>
                 {LeafIcon && <LeafIcon className="h-[18px] w-[18px] flex-none" />}
                 <span>{n.label}</span>
+                {n.href === "/messages" && unread > 0 && (
+                  <span className="nav-badge">{unread > 99 ? "99+" : unread}</span>
+                )}
               </Link>
             );
           }
@@ -259,18 +267,18 @@ function Horizontal({ role, active }: { role: Role; active: string | null }) {
 
 /* ------------------------------------------------------------------- export */
 
-export default function Sidebar({ role, horizontal = false }:
-  { role: Role; horizontal?: boolean }) {
+export default function Sidebar({ role, horizontal = false, unread = 0 }:
+  { role: Role; horizontal?: boolean; unread?: number }) {
   const path = usePathname();
   const active = activeHref(path, role);
 
-  if (horizontal) return <Horizontal role={role} active={active} />;
+  if (horizontal) return <Horizontal role={role} active={active} unread={unread} />;
 
   return (
     <nav className="flex flex-col gap-0.5 px-3 pb-6">
       {MENU.filter((n) => visible(n, role)).map((n) => (
         <Row key={isGroup(n) ? n.label : n.href} node={n} role={role}
-          active={active} depth={0} />
+          active={active} depth={0} unread={unread} />
       ))}
     </nav>
   );

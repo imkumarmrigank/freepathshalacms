@@ -4,7 +4,7 @@ import { completeTopic, deleteTopic } from "../actions";
 import { Badge } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
 import HindiInput from "@/components/HindiInput";
-import { fmtDate, titleCase } from "@/lib/format";
+import { fmtDate, titleCase, today } from "@/lib/format";
 
 export type Topic = {
   id: number; sequence: number; topic: string; objective: string | null;
@@ -95,8 +95,8 @@ export default function TopicRow({ t, canEdit, hindi = false }:
             <label className="field">
               <span>Taught on</span>
               <input className="input" type="date" name="taught_on"
-                max={new Date().toISOString().slice(0, 10)}
-                defaultValue={t.taught_on ? t.taught_on.slice(0, 10) : new Date().toISOString().slice(0, 10)} />
+                max={today()}
+                defaultValue={t.taught_on ? t.taught_on.slice(0, 10) : today()} />
             </label>
           </div>
           <label className="field">

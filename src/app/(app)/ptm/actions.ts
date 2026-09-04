@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { today } from "@/lib/format";
 import { redirect } from "next/navigation";
 import { requireUser, canTouchCenter } from "@/lib/auth";
 import { one, query } from "@/lib/db";
@@ -54,8 +55,8 @@ export async function recordInteraction(_prev: unknown, form: FormData) {
   if (commitmentTags.length === 0)
     return { error: "Record at least one commitment the parent made." };
 
-  const interactionDate = str(form, "interaction_date") ?? new Date().toISOString().slice(0, 10);
-  if (interactionDate > new Date().toISOString().slice(0, 10))
+  const interactionDate = str(form, "interaction_date") ?? today();
+  if (interactionDate > today())
     return { error: "The interaction cannot be dated in the future." };
 
   // whoever is named as the mentor, defaulting to the person filling this in

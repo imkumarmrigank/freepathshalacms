@@ -1,5 +1,6 @@
 "use client";
 import { useActionState, useState } from "react";
+import { toISODate } from "@/lib/format";
 import { createPlan } from "./actions";
 import { Card, Field } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
@@ -21,7 +22,7 @@ export default function NewPlanForm({
   const hindiPlan = /hindi|हिंदी|हिन्दी/i.test(subject);
   const earliestDate = new Date();
   earliestDate.setDate(earliestDate.getDate() + leadDays);
-  const earliest = earliestDate.toISOString().slice(0, 10);
+  const earliest = toISODate(earliestDate);
 
   if (isTeacher && classes.length === 0) {
     return (

@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
+import { unreadTotal } from "@/lib/chat";
 import { Avatar } from "@/components/ui";
 import { IconLogout } from "@/components/icons";
 import { destroySession, getSession } from "@/lib/auth";
@@ -18,6 +19,9 @@ async function logout() {
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getSession();
   if (!user) redirect("/login");
+
+  // the badge beside Messages, so an unread note is visible from any page
+  const unread = await unreadTotal(user.uid);
 
   // A stand-in has no home centre — say where they are actually covering.
   let scopeLabel = "All centres";
@@ -46,7 +50,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </Link>
 
         <div className="flex-1 overflow-y-auto">
-          <Sidebar role={user.role} />
+          <Sidebar role={user.role} unread={unread} />
         </div>
 
         <div className="border-t border-[var(--border)] p-3">
@@ -81,7 +85,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </header>
 
         <div className="border-b border-[var(--border)] bg-white lg:hidden">
-          <div className="overflow-x-auto"><Sidebar role={user.role} horizontal /></div>
+          <div className="overflow-x-auto"><Sidebar role={user.role} horizontal unread={unread} /></div>
         </div>
 
         <main className="mx-auto w-full max-w-[1180px] flex-1 px-5 py-6 lg:px-8 lg:py-8">

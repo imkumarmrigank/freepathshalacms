@@ -34,6 +34,9 @@ async function putSetting(key: string, value: string) {
   );
 }
 
+// Pure arithmetic on a date string: anchored at UTC midnight and stepped in
+// UTC, so it is the same answer in any timezone. Not a "now", so it must
+// not be moved onto the local clock.
 function addDays(iso: string, n: number) {
   const d = new Date(`${iso}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);

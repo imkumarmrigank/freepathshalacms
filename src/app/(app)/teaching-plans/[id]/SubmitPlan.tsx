@@ -1,5 +1,6 @@
 "use client";
 import { useActionState } from "react";
+import { toISODate } from "@/lib/format";
 import { submitPlan } from "../actions";
 import { FormMessage, Submit } from "@/components/form";
 
@@ -9,7 +10,7 @@ export default function SubmitPlan({
   const [state, action] = useActionState(submitPlan, null);
   const earliest = new Date();
   earliest.setDate(earliest.getDate() + leadDays);
-  const tooLate = !startsOn || startsOn < earliest.toISOString().slice(0, 10);
+  const tooLate = !startsOn || startsOn < toISODate(earliest);
 
   return (
     <div className="card card-pad">

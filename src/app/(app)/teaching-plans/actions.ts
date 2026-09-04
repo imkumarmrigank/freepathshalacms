@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { today } from "@/lib/format";
 import { redirect } from "next/navigation";
 import { requireUser, canTouchCenter, effectiveTeacherIds } from "@/lib/auth";
 import { one, query } from "@/lib/db";
@@ -161,7 +162,7 @@ export async function completeTopic(_prev: unknown, form: FormData) {
   const taughtOn = str(form, "taught_on");
   if (status === "completed" && !taughtOn)
     return { error: "Enter the date this topic was taught." };
-  if (taughtOn && taughtOn > new Date().toISOString().slice(0, 10))
+  if (taughtOn && taughtOn > today())
     return { error: "A topic cannot be marked taught on a future date." };
 
   await query(

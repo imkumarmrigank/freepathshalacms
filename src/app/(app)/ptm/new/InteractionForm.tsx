@@ -1,5 +1,6 @@
 "use client";
 import { useActionState, useEffect, useState } from "react";
+import { today } from "@/lib/format";
 import Link from "next/link";
 import { recordInteraction } from "../actions";
 import { Badge, Card, Field } from "@/components/ui";
@@ -58,7 +59,6 @@ export default function InteractionForm({
   const [studentId, setStudentId] = useState<number | "">(defaultStudentId ?? "");
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(false);
-  const today = new Date().toISOString().slice(0, 10);
 
   const inCentre = centerId === "" ? students : students.filter((s) => s.centerId === centerId);
 
@@ -256,7 +256,7 @@ export default function InteractionForm({
 
           <Field label="5. Date of Interaction *">
             <input className="input" type="date" name="interaction_date" required
-              max={today} defaultValue={today} />
+              max={today()} defaultValue={today()} />
           </Field>
 
           <Field label="6. PTM Mentor Name *">

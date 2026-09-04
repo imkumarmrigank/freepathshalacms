@@ -37,6 +37,17 @@ function makePool() {
     connectionTimeoutMillis: 15_000,
   });
 
+  // The centres are in India, the server is in Singapore and Neon runs in
+  // Ohio on GMT — three clocks, and three different answers to "what is
+  // today". Every connection is put on India's, so CURRENT_DATE and now()
+  // mean what a teacher marking the register means.
+  pool.on("connect", (client) => {
+    client.query("SET TIME ZONE 'Asia/Kolkata'").catch(() => {
+      // a failed SET must not take the connection down; the app still works,
+      // it is only the date boundary that would drift
+    });
+  });
+
   // Without this, an error on an *idle* client is an unhandled 'error' event on
   // the pool, which takes the whole server process down.
   pool.on("error", (err) => {

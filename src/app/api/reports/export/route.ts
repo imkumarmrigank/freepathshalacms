@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { today, toISODate } from "@/lib/format";
 import ExcelJS from "exceljs";
 import { getSession } from "@/lib/auth";
 import { runReport, type ReportParams } from "@/lib/reports";
@@ -22,13 +23,12 @@ export async function GET(req: Request) {
   if (!meta) return new NextResponse("Unknown report", { status: 400 });
 
   const session = await currentSession();
-  const today = new Date().toISOString().slice(0, 10);
   const monthAgo = new Date();
   monthAgo.setDate(monthAgo.getDate() - 30);
 
   const params: ReportParams = {
-    from: url.searchParams.get("from") || monthAgo.toISOString().slice(0, 10),
-    to: url.searchParams.get("to") || today,
+    from: url.searchParams.get("from") || toISODate(monthAgo),
+    to: url.searchParams.get("to") || today(),
     centerId: Number(url.searchParams.get("center")) || null,
     classId: Number(url.searchParams.get("class")) || null,
     sessionId: Number(url.searchParams.get("session")) || session?.id || 0,
@@ -43,7 +43,7 @@ export async function GET(req: Request) {
     return new NextResponse(err instanceof Error ? err.message : "Report failed", { status: 400 });
   }
 
-  const stamp = new Date().toISOString().slice(0, 10);
+  const stamp = today();
   const filename = `${key}-${stamp}`;
 
   // CSV escape hatch, mostly for scripting; the UI asks for xlsx.

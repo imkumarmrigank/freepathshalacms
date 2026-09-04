@@ -3,7 +3,7 @@ import { useActionState, useState } from "react";
 import { markDropout, reinstateStudent } from "../actions";
 import { Card, Field } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
-import { fmtDate } from "@/lib/format";
+import { fmtDate, today } from "@/lib/format";
 
 /** Reasons the centres actually give, so the report groups instead of guessing. */
 const REASONS = [
@@ -87,7 +87,7 @@ export default function DropoutControl({
         )}
         <Field label="Date">
           <input className="input" type="date" name="dropout_date"
-            defaultValue={new Date().toISOString().slice(0, 10)} />
+            defaultValue={today()} />
         </Field>
         <div className="flex items-center gap-2">
           <Submit>Mark dropped out</Submit>

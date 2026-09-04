@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { today } from "@/lib/format";
 import { redirect } from "next/navigation";
 import { requireUser, canTouchCenter } from "@/lib/auth";
 import { tx, query, one } from "@/lib/db";
@@ -32,7 +33,7 @@ export async function createStudent(_prev: unknown, form: FormData) {
   if (!first) return { error: "First name is required." };
 
   // A student joining after the session started is a mid-session admission.
-  const enrolledOn = str(form, "enrolled_on") ?? new Date().toISOString().slice(0, 10);
+  const enrolledOn = str(form, "enrolled_on") ?? today();
   const source = enrolledOn > session.start_date.slice(0, 10) ? "mid_session" : "new";
 
   let studentId: number;
@@ -213,7 +214,7 @@ export async function markDropout(_prev: unknown, form: FormData) {
 
   const id = Number(form.get("id"));
   const reason = str(form, "dropout_reason");
-  const on = str(form, "dropout_date") ?? new Date().toISOString().slice(0, 10);
+  const on = str(form, "dropout_date") ?? today();
   if (!reason) return { error: "Give a reason — it is what the follow-up works from." };
 
   const existing = await one<{ center_id: number; status: string }>(

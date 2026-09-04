@@ -1,5 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
+import { today } from "@/lib/format";
 import { useRouter } from "next/navigation";
 import { Alert, Card } from "@/components/ui";
 import PhotoUpload from "./PhotoUpload";
@@ -113,7 +114,7 @@ export default function AdmissionWizard({
   const [step, setStep] = useState(0);
   const [data, setData] = useState<AdmissionPayload>(() => ({
     country: "India", nationality: "Indian",
-    admission_date: new Date().toISOString().slice(0, 10),
+    admission_date: today(),
     center_id: centers.length === 1 ? String(centers[0].id) : "",
     ...(draft ?? {}),
   }));

@@ -1,5 +1,6 @@
 "use client";
 import { useRouter, useSearchParams } from "next/navigation";
+import { toISODate } from "@/lib/format";
 import { useTransition } from "react";
 import { REPORTS, REPORT_GROUPS, GROUP_BY, type ReportMeta } from "@/lib/report-meta";
 import { Card } from "@/components/ui";
@@ -13,7 +14,7 @@ const PRESETS = [
 
 function presetRange(key: string) {
   const now = new Date();
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const iso = (d: Date) => toISODate(d);
   const monday = (d: Date) => {
     const x = new Date(d);
     x.setDate(x.getDate() - ((x.getDay() + 6) % 7));

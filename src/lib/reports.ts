@@ -31,6 +31,9 @@ const MARKED = "status <> 'holiday'";              // days that count in the den
 const pct = (num: number, den: number) => (den > 0 ? Math.round((num / den) * 1000) / 10 : 0);
 
 /** Every date in [from, to], capped so a huge range cannot blow up the register. */
+// Pure arithmetic on a date string: anchored at UTC midnight and stepped in
+// UTC, so it is the same answer in any timezone. Not a "now", so it must
+// not be moved onto the local clock.
 function datesBetween(from: string, to: string, cap = 62) {
   const out: string[] = [];
   const d = new Date(`${from}T00:00:00Z`);

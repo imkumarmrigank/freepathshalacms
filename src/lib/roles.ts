@@ -118,37 +118,37 @@ export type Feature =
   | "students" | "attendance" | "timetable" | "teachingPlans" | "exams"
   | "progressReports" | "calendar" | "ptm" | "followUps" | "supplies"
   | "statistics" | "reports" | "staff" | "centres" | "coverage" | "ownCheckIn"
-  | "counselling" | "teacherRemarks";
+  | "counselling" | "teacherRemarks" | "messages";
 
 /** One explicit list per role — no inference, so a gate is read, not deduced. */
 const FEATURES: Record<Role, Feature[]> = {
   super_admin: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
     "calendar", "ptm", "followUps", "supplies", "statistics", "reports",
-    "staff", "centres", "coverage", "counselling", "teacherRemarks",
+    "staff", "centres", "coverage", "counselling", "teacherRemarks", "messages",
   ],
   admin: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
     "calendar", "ptm", "followUps", "supplies", "statistics", "reports",
-    "staff", "centres", "coverage", "counselling", "teacherRemarks",
+    "staff", "centres", "coverage", "counselling", "teacherRemarks", "messages",
   ],
   // the whole point of the mentor role is that this list is short
   mentor: [
     "ptm", "followUps", "progressReports", "students", "calendar", "statistics",
-    "counselling", "teacherRemarks",
+    "counselling", "teacherRemarks", "messages",
   ],
   center_manager: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
     "calendar", "ptm", "followUps", "supplies", "statistics", "reports",
-    "staff", "ownCheckIn", "counselling",
+    "staff", "ownCheckIn", "counselling", "messages",
   ],
   teacher: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
-    "calendar", "ptm", "followUps", "reports", "ownCheckIn", "counselling",
+    "calendar", "ptm", "followUps", "reports", "ownCheckIn", "counselling", "messages",
   ],
   backup_teacher: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
-    "calendar", "ptm", "followUps", "reports", "ownCheckIn", "counselling",
+    "calendar", "ptm", "followUps", "reports", "ownCheckIn", "counselling", "messages",
   ],
 };
 

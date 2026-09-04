@@ -1,5 +1,6 @@
 "use client";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { today } from "@/lib/format";
 import { useTransition } from "react";
 
 export default function AttendancePicker({
@@ -41,7 +42,7 @@ export default function AttendancePicker({
       <label>
         <span className="mb-1.5 block text-[13px] font-medium text-[var(--muted)]">Date</span>
         <input className="input" type="date" value={defaults.date}
-          max={new Date().toISOString().slice(0, 10)}
+          max={today()}
           onChange={(e) => set("date", e.target.value)} />
       </label>
     </div>

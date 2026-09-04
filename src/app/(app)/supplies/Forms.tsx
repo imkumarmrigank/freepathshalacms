@@ -1,5 +1,6 @@
 "use client";
 import { useActionState } from "react";
+import { today } from "@/lib/format";
 import { issueToStudent, recordHqReceipt, recordReceipt, saveItem } from "./actions";
 import { Card, Field } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
@@ -33,8 +34,8 @@ export function HqReceiptForm({ items }: { items: (Item & { hqAvailable: number 
           </Field>
           <Field label="Received on">
             <input className="input" type="date" name="received_on"
-              max={new Date().toISOString().slice(0, 10)}
-              defaultValue={new Date().toISOString().slice(0, 10)} />
+              max={today()}
+              defaultValue={today()} />
           </Field>
           <Field label="Supplier"><input className="input" name="supplier" /></Field>
           <Field label="Invoice no."><input className="input" name="invoice_no" /></Field>
@@ -86,8 +87,8 @@ export function ReceiptForm({
           </Field>
           <Field label="Dispatched on">
             <input className="input" type="date" name="received_on"
-              max={new Date().toISOString().slice(0, 10)}
-              defaultValue={new Date().toISOString().slice(0, 10)} />
+              max={today()}
+              defaultValue={today()} />
           </Field>
           <Field label="Challan / bill no."><input className="input" name="challan_no" /></Field>
           <Field label="Unit cost (₹)">
@@ -139,8 +140,8 @@ export function IssueForm({
           </Field>
           <Field label="Issued on">
             <input className="input" type="date" name="issued_on"
-              max={new Date().toISOString().slice(0, 10)}
-              defaultValue={new Date().toISOString().slice(0, 10)} />
+              max={today()}
+              defaultValue={today()} />
           </Field>
         </div>
         <Field label="Remarks"><textarea className="textarea" name="remarks" rows={2} /></Field>

@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { today } from "@/lib/format";
 import { requireUser } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
@@ -18,7 +19,7 @@ export async function assignCoverage(_prev: unknown, form: FormData) {
 
   const backupId = Number(form.get("backup_id"));
   const coveringId = Number(form.get("covering_id"));
-  const startsOn = str(form, "starts_on") ?? new Date().toISOString().slice(0, 10);
+  const startsOn = str(form, "starts_on") ?? today();
   const endsOn = str(form, "ends_on");
 
   if (!backupId || !coveringId) return { error: "Choose a backup teacher and who they cover." };
