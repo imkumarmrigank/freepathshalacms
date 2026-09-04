@@ -4,7 +4,7 @@ import { requireUser, canTouchCenter } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
 import { HOLIDAY_TYPES } from "@/lib/calendar-meta";
-import { isGlobalRole, isTeaching } from "@/lib/roles";
+import { canPostToAllCentres, isTeaching } from "@/lib/roles";
 
 /**
  * An event with no centre belongs to every centre, so only somebody who can
@@ -16,7 +16,9 @@ function mayTouchEvent(
   user: Awaited<ReturnType<typeof requireUser>>,
   centerId: number | null,
 ) {
-  return centerId === null ? isGlobalRole(user.role) : canTouchCenter(user, centerId);
+  return centerId === null
+    ? canPostToAllCentres(user.role)
+    : canTouchCenter(user, centerId);
 }
 
 const str = (f: FormData, k: string) => {
@@ -41,7 +43,7 @@ export async function saveEvent(_prev: unknown, form: FormData) {
 
   // A manager can only publish to their own centre; only an admin can post to all centres.
   let centerId: number | null;
-  if (user.role === "super_admin") {
+  if (canPostToAllCentres(user.role)) {
     centerId = form.get("center_id") ? Number(form.get("center_id")) : null;
   } else if (user.role === "mentor") {
     centerId = form.get("center_id") ? Number(form.get("center_id")) : (user.centerIds[0] ?? null);

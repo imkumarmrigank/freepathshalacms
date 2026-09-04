@@ -11,7 +11,7 @@ import MonthGrid from "./MonthGrid";
 import EventForm from "./EventForm";
 import DeleteEvent from "./DeleteEvent";
 import KeepOpen from "./KeepOpen";
-import { isGlobalRole, isTeaching } from "@/lib/roles";
+import { canPostToAllCentres, isGlobalRole, isTeaching } from "@/lib/roles";
 
 function monthBounds(month: string) {
   const [y, m] = month.split("-").map(Number);
@@ -122,7 +122,7 @@ export default async function CalendarPage({
                       {EVENT_LABEL[e.event_type] ?? e.event_type}
                     </Badge>
                     {canEdit && e.source === "calendar"
-                      && (e.center_id !== null || isGlobalRole(user.role)) && (
+                      && (e.center_id !== null || canPostToAllCentres(user.role)) && (
                       <DeleteEvent id={e.id} />
                     )}
                     {e.source === "ptm" && (
@@ -142,6 +142,7 @@ export default async function CalendarPage({
 
         {canEdit && (
           <EventForm centers={centers} isAdmin={isGlobalRole(user.role)}
+            allowAllCentres={canPostToAllCentres(user.role)}
             centerName={user.centerName} defaultDate={today()} />
         )}
       </div>

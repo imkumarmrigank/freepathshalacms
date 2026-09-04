@@ -6,10 +6,12 @@ import { FormMessage, Submit } from "@/components/form";
 import { EVENT_LABEL } from "@/lib/calendar-meta";
 
 export default function EventForm({
-  centers, isAdmin, centerName, defaultDate,
+  centers, isAdmin, allowAllCentres = false, centerName, defaultDate,
 }: {
   centers: { id: number; code: string; name: string }[];
   isAdmin: boolean;
+  /** Only an administrator posts a holiday the whole organisation observes. */
+  allowAllCentres?: boolean;
   centerName: string | null;
   defaultDate: string;
 }) {
@@ -38,8 +40,10 @@ export default function EventForm({
         </Field>
         {isAdmin && (
           <Field label="Applies to">
-            <select className="select" name="center_id" defaultValue="">
-              <option value="">All centres</option>
+            <select className="select" name="center_id"
+              defaultValue={allowAllCentres ? "" : String(centers[0]?.id ?? "")}
+              required={!allowAllCentres}>
+              {allowAllCentres && <option value="">All centres</option>}
               {centers.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
             </select>
           </Field>

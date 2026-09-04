@@ -84,6 +84,15 @@ export function canManageHqStock(role: Role) {
   return role === "super_admin" || role === "admin";
 }
 
+/**
+ * Publishing to every centre's calendar at once — a holiday the whole
+ * organisation observes. A mentor works across centres but does not set the
+ * organisation's calendar, and a centre manager speaks only for their own.
+ */
+export function canPostToAllCentres(role: Role) {
+  return role === "super_admin" || role === "admin";
+}
+
 /** Standing a backup teacher in for someone is an admin decision. */
 export function canAssignCoverage(role: Role) {
   return role === "super_admin" || role === "admin";
