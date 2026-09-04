@@ -3,6 +3,16 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
+      "package_name": "in.freepathshala.pehchaan",
+      "sha256_cert_fingerprints": [
+        "15:40:CF:DC:4F:EB:F5:3D:C9:33:0D:DB:A4:F5:80:C5:97:0A:CB:3B:C3:AC:22:E5:EA:E5:99:EC:B0:54:AF:5A"
+      ]
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
       "package_name": "org.freepathshala.cms",
       "sha256_cert_fingerprints": [
         "A4:82:C9:08:06:9C:83:46:73:CC:54:82:9E:81:4F:01:08:44:A6:DB:5D:1A:2E:CE:43:95:29:A8:69:DE:7C:4F"
