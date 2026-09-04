@@ -47,13 +47,27 @@ export default function GetAppPage() {
         </div>
       </div>
 
-      <a href="/downloads/freepathshala.apk" download
+      <a href="/downloads/pehchaan.apk" download
          className="btn btn-primary mt-7 w-full py-3.5 text-[15px]">
         Download the app (.apk)
       </a>
       <p className="mt-2 text-center text-[12px] text-[var(--faint)]">
         Android 8.0 or newer · open this page on the phone you want to install it on
       </p>
+
+      {/* The new app is signed with a new key under a new package name, because
+          the key the old FreePathshala app was signed with is gone. Android
+          treats it as a different app, so it installs beside the old one rather
+          than replacing it — which is confusing unless somebody says so. */}
+      <div className="card card-pad mt-7 border-[var(--warn)] bg-[var(--warn-soft)]">
+        <h2 className="text-[15px] font-semibold">Already have the old FreePathshala app?</h2>
+        <p className="mt-1 text-[14px] leading-relaxed text-[var(--muted)]">
+          Pehchaan installs as a separate app, so you will see both icons on your phone.
+          Once Pehchaan opens and you can sign in, press and hold the old
+          <strong> FreePathshala</strong> icon and uninstall it. Nothing is lost — all your
+          work lives on the server, not on the phone.
+        </p>
+      </div>
 
       <ol className="mt-9 space-y-5">
         {STEPS.map((s) => (
