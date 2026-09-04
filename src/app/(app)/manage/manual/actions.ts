@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { one, query } from "@/lib/db";
-import { isManualKey, type Note } from "@/lib/manual";
+import { isLang, isManualKey, type Note } from "@/lib/manual";
 
 /** Textareas hold one item per line — the simplest editor for a list of steps. */
 const lines = (f: FormData, k: string) =>
@@ -16,6 +16,12 @@ const str = (f: FormData, k: string) => {
 function bookOf(form: FormData) {
   const book = String(form.get("book") ?? "");
   return isManualKey(book) ? book : null;
+}
+
+/** Which language's copy is being edited; English unless told otherwise. */
+function langOf(form: FormData) {
+  const lang = String(form.get("lang") ?? "en");
+  return isLang(lang) ? lang : "en";
 }
 
 /** Up to two notes per task, which is as many as any of them has needed. */
@@ -40,14 +46,16 @@ export async function saveIntro(_prev: unknown, form: FormData) {
   if (!headline) return { error: "Give the manual a headline." };
 
   await query(
-    `INSERT INTO manual_intro (role, headline, intro, routine_title, routine_items, updated_by)
-     VALUES ($1,$2,$3,$4,$5,$6)
-     ON CONFLICT (role) DO UPDATE
+    `INSERT INTO manual_intro
+       (role, lang, headline, intro, routine_title, routine_items, updated_by)
+     VALUES ($1,$7,$2,$3,$4,$5,$6)
+     ON CONFLICT (role, lang) DO UPDATE
        SET headline = EXCLUDED.headline, intro = EXCLUDED.intro,
            routine_title = EXCLUDED.routine_title, routine_items = EXCLUDED.routine_items,
            updated_at = now(), updated_by = EXCLUDED.updated_by`,
     [book, headline, lines(form, "intro"),
-     str(form, "routine_title") ?? "Every day", lines(form, "routine_items"), user.uid],
+     str(form, "routine_title") ?? "Every day", lines(form, "routine_items"),
+     user.uid, langOf(form)],
   );
 
   revalidatePath("/manage/manual");
@@ -80,13 +88,16 @@ export async function saveTask(_prev: unknown, form: FormData) {
         WHERE id=$1`,
       [id, ...values]);
   } else {
+    const lang = langOf(form);
     const last = await one<{ n: number | null }>(
-      "SELECT max(position) AS n FROM manual_tasks WHERE role = $1", [book]);
+      "SELECT max(position) AS n FROM manual_tasks WHERE role = $1 AND lang = $2",
+      [book, lang]);
     await query(
       `INSERT INTO manual_tasks
-         (role, position, title, why, path, steps, notes, shot, super_admin_only, updated_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10)`,
-      [book, (last?.n ?? -1) + 1, ...values]);
+         (role, lang, position, title, why, path, steps, notes, shot,
+          super_admin_only, updated_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11)`,
+      [book, lang, (last?.n ?? -1) + 1, ...values]);
   }
 
   revalidatePath("/manage/manual");
@@ -108,15 +119,15 @@ export async function moveTask(_prev: unknown, form: FormData) {
   const id = Number(form.get("id"));
   const up = String(form.get("direction")) === "up";
 
-  const me = await one<{ role: string; position: number }>(
-    "SELECT role, position FROM manual_tasks WHERE id = $1", [id]);
+  const me = await one<{ role: string; position: number; lang: string }>(
+    "SELECT role, position, lang FROM manual_tasks WHERE id = $1", [id]);
   if (!me) return { error: "Step not found." };
 
   const neighbour = await one<{ id: number; position: number }>(
     `SELECT id, position FROM manual_tasks
-      WHERE role = $1 AND position ${up ? "<" : ">"} $2
+      WHERE role = $1 AND lang = $3 AND position ${up ? "<" : ">"} $2
       ORDER BY position ${up ? "DESC" : "ASC"} LIMIT 1`,
-    [me.role, me.position]);
+    [me.role, me.position, me.lang]);
   if (!neighbour) return { ok: "Already at the end." };
 
   await query("UPDATE manual_tasks SET position = $2 WHERE id = $1", [id, neighbour.position]);
@@ -142,12 +153,14 @@ export async function savePitfall(_prev: unknown, form: FormData) {
       `UPDATE manual_pitfalls SET problem=$2, meaning=$3, updated_by=$4, updated_at=now()
         WHERE id=$1`, [id, problem, meaning, user.uid]);
   } else {
+    const lang = langOf(form);
     const last = await one<{ n: number | null }>(
-      "SELECT max(position) AS n FROM manual_pitfalls WHERE role = $1", [book]);
+      "SELECT max(position) AS n FROM manual_pitfalls WHERE role = $1 AND lang = $2",
+      [book, lang]);
     await query(
-      `INSERT INTO manual_pitfalls (role, position, problem, meaning, updated_by)
-       VALUES ($1,$2,$3,$4,$5)`,
-      [book, (last?.n ?? -1) + 1, problem, meaning, user.uid]);
+      `INSERT INTO manual_pitfalls (role, lang, position, problem, meaning, updated_by)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [book, lang, (last?.n ?? -1) + 1, problem, meaning, user.uid]);
   }
 
   revalidatePath("/manage/manual");

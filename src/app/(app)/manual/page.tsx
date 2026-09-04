@@ -3,10 +3,13 @@ import path from "node:path";
 import Image from "next/image";
 import { requireUser } from "@/lib/auth";
 import { PageHeader } from "@/components/ui";
-import { loadManual, manualKeyFor, type Manual } from "@/lib/manual";
+import {
+  isLang, languagesFor, loadManual, manualKeyFor, type Manual,
+} from "@/lib/manual";
 import { ROLE_LABEL, type Role } from "@/lib/roles";
 import Link from "next/link";
 import PrintButton from "@/app/(app)/students/[id]/report-card/PrintButton";
+import LanguagePicker from "./LanguagePicker";
 
 export const metadata = { title: "Training manual · FreePathshala CMS" };
 
@@ -30,19 +33,27 @@ function capturedShots(): Set<string> {
 const slug = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
-export default async function ManualPage() {
+export default async function ManualPage({
+  searchParams,
+}: { searchParams: Promise<{ lang?: string }> }) {
   const user = await requireUser();
+  const sp = await searchParams;
   const key = manualKeyFor(user.role);
-  const m: Manual = await loadManual(key);
+  const wanted = isLang(sp.lang) ? sp.lang : "en";
+  const [m, available] = await Promise.all([
+    loadManual(key, wanted) as Promise<Manual>,
+    languagesFor(key),
+  ]);
   const shots = capturedShots();
 
   return (
-    <div className="doc" data-role={key as Role}>
+    <div className="doc" data-role={key as Role} lang={m.lang}>
       <PageHeader
         title="Training manual"
         subtitle={`${ROLE_LABEL[user.role]} · how to use the system, step by step`}
         right={
           <>
+            <LanguagePicker available={available} current={m.lang} />
             {user.role === "super_admin" && (
               <Link href={`/manage/manual?book=${key}`} className="btn btn-ghost no-print">
                 Edit manuals

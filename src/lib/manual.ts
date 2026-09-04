@@ -1,6 +1,12 @@
 import "server-only";
 import { one, query } from "./db";
-import type { Role } from "./roles";
+import {
+  LANGUAGES, MANUAL_LABEL, type Manual, type ManualKey, type Note, type Pitfall,
+  manualKeyFor,
+} from "./manual-meta";
+
+// so a server module can keep importing everything from one place
+export * from "./manual-meta";
 
 /**
  * The training manual, held in the database so the super admin can correct it
@@ -11,90 +17,54 @@ import type { Role } from "./roles";
  * a row rather than drifting apart as two copies of nearly the same text.
  */
 
-export type Note = { kind: "warn" | "stop"; title: string; body: string };
-
-export type Task = {
-  id: number;
-  position: number;
-  title: string;
-  why: string | null;
-  path: string[];
-  steps: string[];
-  notes: Note[];
-  /** File name under /public/manual, without the extension. */
-  shot: string | null;
-  superAdminOnly: boolean;
-};
-
-export type Pitfall = { id: number; position: number; problem: string; meaning: string };
-
-export type Manual = {
-  key: ManualKey;
-  headline: string;
-  intro: string[];
-  routine: { title: string; items: string[] };
-  tasks: Task[];
-  pitfalls: Pitfall[];
-};
-
-/** The four manuals that exist. */
-export const MANUAL_KEYS = ["teacher", "center_manager", "mentor", "admin"] as const;
-export type ManualKey = (typeof MANUAL_KEYS)[number];
-
-export const MANUAL_LABEL: Record<ManualKey, string> = {
-  teacher: "Teacher",
-  center_manager: "Centre Manager",
-  mentor: "Mentor",
-  admin: "Administrator",
-};
-
-/** Who reads which one. */
-export const MANUAL_AUDIENCE: Record<ManualKey, string> = {
-  teacher: "Teachers and backup teachers",
-  center_manager: "Centre managers",
-  mentor: "Mentors",
-  admin: "Admins and super admins",
-};
-
-const OF_ROLE: Record<Role, ManualKey> = {
-  teacher: "teacher",
-  backup_teacher: "teacher",
-  center_manager: "center_manager",
-  mentor: "mentor",
-  admin: "admin",
-  super_admin: "admin",
-};
-
-export function manualKeyFor(role: Role): ManualKey {
-  return OF_ROLE[role];
+/**
+ * Which languages this manual has actually been written in. Only these are
+ * offered, so nobody picks a language and gets English back without knowing why.
+ */
+export async function languagesFor(key: ManualKey): Promise<string[]> {
+  const rows = await query<{ lang: string }>(
+    `SELECT DISTINCT lang FROM manual_intro WHERE role = $1
+      UNION SELECT DISTINCT lang FROM manual_tasks WHERE role = $1`, [key]);
+  const have = new Set(rows.map((r) => r.lang));
+  have.add("en");
+  return LANGUAGES.filter((l) => have.has(l.code)).map((l) => l.code);
 }
 
-export function isManualKey(v: string): v is ManualKey {
-  return (MANUAL_KEYS as readonly string[]).includes(v);
-}
+/**
+ * Everything one manual needs, in one round trip per table.
+ *
+ * A part-finished translation would be worse than none — half the steps in one
+ * language and half in another — so a language falls back to English as a
+ * whole, and only offered languages have content in the first place.
+ */
+export async function loadManual(key: ManualKey, lang = "en"): Promise<Manual> {
+  const written = await one<{ n: string }>(
+    "SELECT count(*) AS n FROM manual_tasks WHERE role = $1 AND lang = $2", [key, lang]);
+  const use = Number(written?.n ?? 0) > 0 ? lang : "en";
 
-/** Everything one manual needs, in one round trip per table. */
-export async function loadManual(key: ManualKey): Promise<Manual> {
   const [intro, tasks, pitfalls] = await Promise.all([
     one<{
       headline: string; intro: string[]; routine_title: string; routine_items: string[];
     }>(
       `SELECT headline, intro, routine_title, routine_items
-         FROM manual_intro WHERE role = $1`, [key]),
+         FROM manual_intro WHERE role = $1 AND lang = $2`, [key, use]),
     query<{
       id: number; position: number; title: string; why: string | null;
       path: string[]; steps: string[]; notes: Note[];
       shot: string | null; super_admin_only: boolean;
     }>(
       `SELECT id, position, title, why, path, steps, notes, shot, super_admin_only
-         FROM manual_tasks WHERE role = $1 ORDER BY position, id`, [key]),
+         FROM manual_tasks WHERE role = $1 AND lang = $2 ORDER BY position, id`,
+      [key, use]),
     query<Pitfall>(
       `SELECT id, position, problem, meaning
-         FROM manual_pitfalls WHERE role = $1 ORDER BY position, id`, [key]),
+         FROM manual_pitfalls WHERE role = $1 AND lang = $2 ORDER BY position, id`,
+      [key, use]),
   ]);
 
   return {
     key,
+    lang: use,
     headline: intro?.headline ?? MANUAL_LABEL[key],
     intro: intro?.intro ?? [],
     routine: {

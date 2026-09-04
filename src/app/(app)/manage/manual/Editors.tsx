@@ -5,11 +5,12 @@ import { FormMessage, Submit } from "@/components/form";
 import {
   saveIntro, saveTask, deleteTask, moveTask, savePitfall, deletePitfall,
 } from "./actions";
-import type { Manual, Note, Pitfall, Task } from "@/lib/manual";
+import type { Manual, Note, Pitfall, Task } from "@/lib/manual-meta";
 
 /* ------------------------------------------------------------- the opening */
 
-export function IntroEditor({ book, m }: { book: string; m: Manual }) {
+export function IntroEditor({ book, lang, m }:
+  { book: string; lang: string; m: Manual }) {
   const [state, action] = useActionState(saveIntro, null);
   return (
     <Card>
@@ -17,6 +18,7 @@ export function IntroEditor({ book, m }: { book: string; m: Manual }) {
       <form action={action}>
         <FormMessage state={state} />
         <input type="hidden" name="book" value={book} />
+        <input type="hidden" name="lang" value={lang} />
         <Field label="Headline *">
           <input className="input" name="headline" defaultValue={m.headline} required />
         </Field>
@@ -45,13 +47,13 @@ function noteAt(notes: Note[], i: number) {
   return notes[i] ?? { kind: "warn" as const, title: "", body: "" };
 }
 
-export function TaskEditor({ book, task, index, count }: {
-  book: string; task?: Task; index?: number; count?: number;
+export function TaskEditor({ book, lang, task, index, count }: {
+  book: string; lang: string; task?: Task; index?: number; count?: number;
 }) {
   const [state, action] = useActionState(saveTask, null);
   const [, remove] = useActionState(deleteTask, null);
   const [, move] = useActionState(moveTask, null);
-  const [open, setOpen] = useState(!task);
+  const [open, setOpen] = useState(!task || task.id === 0);
   const notes = task?.notes ?? [];
 
   if (task && !open) {
@@ -94,7 +96,8 @@ export function TaskEditor({ book, task, index, count }: {
       <form action={action}>
         <FormMessage state={state} />
         <input type="hidden" name="book" value={book} />
-        {task && <input type="hidden" name="id" value={task.id} />}
+        <input type="hidden" name="lang" value={lang} />
+        {task && task.id > 0 && <input type="hidden" name="id" value={task.id} />}
 
         <Field label="Title *">
           <input className="input" name="title" defaultValue={task?.title ?? ""} required
@@ -177,7 +180,8 @@ export function TaskEditor({ book, task, index, count }: {
 
 /* ------------------------------------------------------------- the pitfalls */
 
-export function PitfallEditor({ book, rows }: { book: string; rows: Pitfall[] }) {
+export function PitfallEditor({ book, lang, rows }:
+  { book: string; lang: string; rows: Pitfall[] }) {
   const [state, action] = useActionState(savePitfall, null);
   const [, remove] = useActionState(deletePitfall, null);
 
@@ -194,7 +198,9 @@ export function PitfallEditor({ book, rows }: { book: string; rows: Pitfall[] })
           <li key={p.id} className="border-t border-[#f1f1f6] py-2.5 first:border-t-0">
             <form action={action} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto]">
               <input type="hidden" name="book" value={book} />
-              <input type="hidden" name="id" value={p.id} />
+              <input type="hidden" name="lang" value={lang} />
+        <input type="hidden" name="lang" value={lang} />
+              {p.id > 0 && <input type="hidden" name="id" value={p.id} />}
               <input className="input" name="problem" defaultValue={p.problem} />
               <input className="input" name="meaning" defaultValue={p.meaning} />
               <div className="flex gap-1">
@@ -212,6 +218,7 @@ export function PitfallEditor({ book, rows }: { book: string; rows: Pitfall[] })
 
       <form action={action} className="grid gap-2 border-t border-[var(--border)] pt-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto]">
         <input type="hidden" name="book" value={book} />
+        <input type="hidden" name="lang" value={lang} />
         <input className="input" name="problem" placeholder="The message they see" />
         <input className="input" name="meaning" placeholder="What it actually means" />
         <Submit>Add</Submit>

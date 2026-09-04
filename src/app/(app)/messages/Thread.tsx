@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { sendMessage, readConversation } from "./actions";
+import { candidates, toDevanagari } from "@/lib/hindi";
 import type { ChatMessage } from "@/lib/chat";
 
 /**
@@ -22,8 +23,24 @@ export default function Thread({
   const [messages, setMessages] = useState<ChatMessage[]>(initial);
   const [pending, setPending] = useState<{ key: string; body: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Hindi typing, the same as the teaching plans: type the sound and press
+  // space. Kept per browser, because whoever writes in Hindi does so every time.
+  // read once, at mount, so the first paint already has the right keyboard
+  const [hindi, setHindi] = useState(() => {
+    try { return localStorage.getItem("fp-chat-hindi") === "1"; } catch { return false; }
+  });
+  const [text, setText] = useState("");     // what has already been converted
+  const [buf, setBuf] = useState("");       // the Latin word still being typed
   const boxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const setLanguage = (on: boolean) => {
+    setHindi(on);
+    setBuf("");
+    try { localStorage.setItem("fp-chat-hindi", on ? "1" : "0"); } catch { /* fine */ }
+  };
+
+  const picks = hindi && buf ? candidates(buf) : [];
 
   // the stream hands new messages to the window; take the ones for this thread
   useEffect(() => {
@@ -56,15 +73,27 @@ export default function Thread({
     void readConversation(conversationId);
   }, [conversationId, messages.length]);
 
+  const compose = (next: string) => {
+    if (!hindi) { setText(next); return; }
+    // everything past `text` is the word in progress; a space or a mark ends it
+    if (!next.startsWith(text)) { setText(next); setBuf(""); return; }
+    const tail = next.slice(text.length);
+    if (/[^A-Za-z]/.test(tail)) { setText(text + toDevanagari(tail)); setBuf(""); return; }
+    setBuf(tail);
+  };
+
+  const take = (word: string) => { setText(text + word); setBuf(""); inputRef.current?.focus(); };
+
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const el = inputRef.current;
-    const body = el?.value.trim() ?? "";
+    const body = (text + (buf ? toDevanagari(buf) : "")).trim();
     if (!body) return;
 
     const key = `${Date.now()}-${Math.random()}`;
     setPending((p) => [...p, { key, body }]);
-    if (el) { el.value = ""; el.style.height = "auto"; }
+    setText("");
+    setBuf("");
+    if (inputRef.current) inputRef.current.style.height = "auto";
     setError(null);
 
     const fd = new FormData();
@@ -125,28 +154,52 @@ export default function Thread({
         <div className="flex-none px-4 pb-2 text-[13px] text-[var(--bad)]">{error}</div>
       )}
 
-      <form onSubmit={submit}
-        className="flex flex-none items-end gap-2 border-t border-[var(--border)] p-3">
-        <textarea
-          ref={inputRef}
-          rows={1}
-          placeholder="Write a message"
-          className="textarea max-h-32 flex-1 resize-none"
-          onInput={(e) => {
-            const el = e.currentTarget;
-            el.style.height = "auto";
-            el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
-          }}
-          onKeyDown={(e) => {
-            // Enter sends, Shift+Enter starts a line
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              e.currentTarget.form?.requestSubmit();
-            }
-          }}
-        />
-        <button className="btn btn-primary" type="submit">Send</button>
-      </form>
+      <div className="flex-none border-t border-[var(--border)]">
+        {picks.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 px-3 pt-2">
+            <span className="text-[11px] uppercase tracking-[0.06em] text-[var(--faint)]">
+              {buf}
+            </span>
+            {picks.map((p, i) => (
+              <button key={p} type="button" onClick={() => take(p)}
+                className={`hindi-pick ${i === 0 ? "hindi-pick-on" : ""}`}>
+                {p}
+              </button>
+            ))}
+            <span className="text-[11px] text-[var(--faint)]">space to accept</span>
+          </div>
+        )}
+
+        <form onSubmit={submit} className="flex items-end gap-2 p-3">
+          <button type="button" onClick={() => setLanguage(!hindi)}
+            title={hindi ? "Switch to English" : "हिंदी में लिखें"}
+            className={`hindi-chip mb-[7px] ${hindi ? "hindi-chip-on" : ""}`}>
+            {hindi ? "अ" : "A"}
+          </button>
+          <textarea
+            ref={inputRef}
+            rows={1}
+            value={text + buf}
+            lang={hindi ? "hi" : "en"}
+            placeholder={hindi ? "संदेश लिखें" : "Write a message"}
+            className="textarea max-h-32 flex-1 resize-none"
+            onChange={(e) => compose(e.currentTarget.value)}
+            onInput={(e) => {
+              const el = e.currentTarget;
+              el.style.height = "auto";
+              el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+            }}
+            onKeyDown={(e) => {
+              // Enter sends, Shift+Enter starts a line
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                e.currentTarget.form?.requestSubmit();
+              }
+            }}
+          />
+          <button className="btn btn-primary" type="submit">Send</button>
+        </form>
+      </div>
     </div>
   );
 }
