@@ -6,7 +6,6 @@ import {
   contactsFor, isMember, listConversations, markRead, readMessages,
 } from "@/lib/chat";
 import Thread from "./Thread";
-import Live from "./Live";
 import StartChat from "./StartChat";
 
 export const metadata = { title: "Messages · FreePathshala CMS" };
@@ -30,8 +29,6 @@ export default async function MessagesPage({
   if (open) await markRead(open, user.uid);
 
   const current = conversations.find((c) => c.id === open) ?? null;
-  // the stream resumes from the newest message already on the page
-  const after = messages.length ? messages[messages.length - 1].id : 0;
 
   return (
     <>
@@ -39,8 +36,6 @@ export default async function MessagesPage({
         title="Messages"
         subtitle="Talk to anyone at your centre, or across the organisation"
       />
-
-      <Live after={after} />
 
       <Card pad={false} className="overflow-hidden">
         <div className="grid min-h-[32rem] md:grid-cols-[19rem_minmax(0,1fr)]">

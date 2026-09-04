@@ -3,8 +3,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import {
-  IconGrid, IconUsers, IconChat, IconCal, IconChart,
-  IconBuilding, IconLayers, IconCheck, IconBook, IconBox, IconChevron,
+  IconGrid, IconUsers, IconChat, IconCal, IconChart, IconClock, IconAward,
+  IconBuilding, IconLayers, IconCheck, IconBook, IconBox, IconChevron, IconReport,
 } from "./icons";
 import { can, canAdmitStudents, type Feature, type Role } from "@/lib/roles";
 
@@ -34,7 +34,6 @@ const isGroup = (n: Node): n is Group => "children" in n;
  */
 const MENU: Node[] = [
   { href: "/dashboard", label: "Dashboard", icon: IconGrid },
-  { href: "/messages", label: "Messages", icon: IconChat, feature: "messages" },
 
   {
     label: "Students", icon: IconUsers, children: [
@@ -107,6 +106,60 @@ const MENU: Node[] = [
   { href: "/manual", label: "Training Manual", icon: IconBook },
 ];
 
+/**
+ * What sits in the dock at the foot of a phone screen: the four things that
+ * role opens every day, with everything else a tap away behind "More". Chosen
+ * per role rather than taking the first four of the menu, because a teacher's
+ * day and an administrator's have almost nothing in common.
+ */
+const DOCK: Record<Role, { href: string; label: string; icon: Icon }[]> = {
+  teacher: [
+    { href: "/dashboard", label: "Home", icon: IconGrid },
+    { href: "/attendance", label: "Register", icon: IconCheck },
+    { href: "/my-attendance", label: "Check in", icon: IconClock },
+    { href: "/calendar", label: "Calendar", icon: IconCal },
+  ],
+  backup_teacher: [
+    { href: "/dashboard", label: "Home", icon: IconGrid },
+    { href: "/attendance", label: "Register", icon: IconCheck },
+    { href: "/my-attendance", label: "Check in", icon: IconClock },
+    { href: "/calendar", label: "Calendar", icon: IconCal },
+  ],
+  center_manager: [
+    { href: "/dashboard", label: "Home", icon: IconGrid },
+    { href: "/attendance", label: "Register", icon: IconCheck },
+    { href: "/students", label: "Students", icon: IconUsers },
+    { href: "/supplies", label: "Supplies", icon: IconBox },
+  ],
+  mentor: [
+    { href: "/dashboard", label: "Home", icon: IconGrid },
+    { href: "/counselling", label: "Referrals", icon: IconAward },
+    { href: "/ptm", label: "PTM", icon: IconUsers },
+    { href: "/follow-ups", label: "Follow-ups", icon: IconClock },
+  ],
+  admin: [
+    { href: "/dashboard", label: "Home", icon: IconGrid },
+    { href: "/students", label: "Students", icon: IconUsers },
+    { href: "/reports", label: "Reports", icon: IconReport },
+    { href: "/statistics", label: "Insights", icon: IconChart },
+  ],
+  super_admin: [
+    { href: "/dashboard", label: "Home", icon: IconGrid },
+    { href: "/students", label: "Students", icon: IconUsers },
+    { href: "/reports", label: "Reports", icon: IconReport },
+    { href: "/statistics", label: "Insights", icon: IconChart },
+  ],
+};
+
+/** Only the entries this role can actually reach. */
+export function dockFor(role: Role) {
+  const reachable = new Set(
+    MENU.filter((n) => visible(n, role)).flatMap(leaves)
+      .filter((l) => visible(l, role)).map((l) => l.href),
+  );
+  return DOCK[role].filter((d) => reachable.has(d.href));
+}
+
 /* ------------------------------------------------------------------ helpers */
 
 function allowed(n: Node, role: Role): boolean {
@@ -148,8 +201,8 @@ function contains(n: Node, href: string): boolean {
 
 /* -------------------------------------------------------------- the vertical */
 
-function Row({ node, role, active, depth, unread = 0 }: {
-  node: Node; role: Role; active: string | null; depth: number; unread?: number;
+function Row({ node, role, active, depth }: {
+  node: Node; role: Role; active: string | null; depth: number;
 }) {
   const holdsActive = active !== null && contains(node, active);
   const [open, setOpen] = useState(holdsActive);
@@ -170,9 +223,6 @@ function Row({ node, role, active, depth, unread = 0 }: {
         style={depth ? { paddingLeft: `${0.75 + depth * 0.9}rem` } : undefined}>
         {Icon ? <Icon className="h-[18px] w-[18px] flex-none" /> : <span className="nav-dot" />}
         <span className="truncate">{node.label}</span>
-        {node.href === "/messages" && unread > 0 && (
-          <span className="nav-badge">{unread > 99 ? "99+" : unread}</span>
-        )}
       </Link>
     );
   }
@@ -194,7 +244,7 @@ function Row({ node, role, active, depth, unread = 0 }: {
           style={{ marginLeft: "0.9rem" }}>
           {node.children.filter((c) => visible(c, role)).map((c) => (
             <Row key={isGroup(c) ? c.label : c.href} node={c} role={role}
-              active={active} depth={0} unread={unread} />
+              active={active} depth={0} />
           ))}
         </div>
       )}
@@ -208,8 +258,7 @@ function Row({ node, role, active, depth, unread = 0 }: {
  * On a phone the tree becomes two rows: the sections, then the pages inside
  * whichever section you are in. Tapping a section switches the second row.
  */
-function Horizontal({ role, active, unread = 0 }:
-  { role: Role; active: string | null; unread?: number }) {
+function Horizontal({ role, active }: { role: Role; active: string | null }) {
   const top = MENU.filter((n) => visible(n, role));
   const current = top.find((n) => active !== null && contains(n, active));
   const [picked, setPicked] = useState<string | null>(null);
@@ -227,9 +276,6 @@ function Horizontal({ role, active, unread = 0 }:
                 data-active={active === n.href} onClick={() => setPicked(null)}>
                 {LeafIcon && <LeafIcon className="h-[18px] w-[18px] flex-none" />}
                 <span>{n.label}</span>
-                {n.href === "/messages" && unread > 0 && (
-                  <span className="nav-badge">{unread > 99 ? "99+" : unread}</span>
-                )}
               </Link>
             );
           }
@@ -267,18 +313,18 @@ function Horizontal({ role, active, unread = 0 }:
 
 /* ------------------------------------------------------------------- export */
 
-export default function Sidebar({ role, horizontal = false, unread = 0 }:
-  { role: Role; horizontal?: boolean; unread?: number }) {
+export default function Sidebar({ role, horizontal = false }:
+  { role: Role; horizontal?: boolean }) {
   const path = usePathname();
   const active = activeHref(path, role);
 
-  if (horizontal) return <Horizontal role={role} active={active} unread={unread} />;
+  if (horizontal) return <Horizontal role={role} active={active} />;
 
   return (
     <nav className="flex flex-col gap-0.5 px-3 pb-6">
       {MENU.filter((n) => visible(n, role)).map((n) => (
         <Row key={isGroup(n) ? n.label : n.href} node={n} role={role}
-          active={active} depth={0} unread={unread} />
+          active={active} depth={0} />
       ))}
     </nav>
   );

@@ -91,6 +91,21 @@ export async function unreadTotal(userId: number): Promise<number> {
   return Number(row?.n ?? 0);
 }
 
+/**
+ * The newest message id in anything this person is in. The live stream starts
+ * here, so opening a page means "tell me what happens from now" rather than
+ * replaying the day.
+ */
+export async function latestMessageId(userId: number): Promise<number> {
+  const row = await one<{ id: string | null }>(
+    `SELECT max(x.id) AS id
+       FROM messages x
+       JOIN conversation_members m
+         ON m.conversation_id = x.conversation_id AND m.user_id = $1`,
+    [userId]);
+  return Number(row?.id ?? 0);
+}
+
 export async function isMember(conversationId: number, userId: number) {
   const row = await one<{ user_id: number }>(
     "SELECT user_id FROM conversation_members WHERE conversation_id = $1 AND user_id = $2",

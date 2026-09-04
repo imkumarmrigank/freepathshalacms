@@ -219,6 +219,87 @@ table.tbl tbody tr:hover { background: #fafaff; }
   .doc-task { break-inside: avoid; border-top-color: #ddd; }
 }
 
+/* --------------------------------------------------- the phone and the app */
+
+.dock-hamburger {
+  display: grid; place-items: center; flex: none;
+  width: 2.375rem; height: 2.375rem; margin-left: -0.35rem;
+  border: 0; background: none; border-radius: 10px;
+  color: var(--text); cursor: pointer;
+}
+.dock-hamburger:active { background: #f1f1f8; }
+
+.dock {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+  background: #fff; border-top: 1px solid var(--border);
+  /* clear of the phone's own home indicator */
+  padding-bottom: env(safe-area-inset-bottom);
+  box-shadow: 0 -1px 12px rgba(22, 25, 43, .06);
+}
+.dock-item {
+  display: flex; flex-direction: column; align-items: center; gap: 0.15rem;
+  padding: 0.5rem 0.25rem 0.4rem;
+  border: 0; background: none; cursor: pointer;
+  color: var(--faint); font: inherit;
+}
+.dock-item[data-on="true"] { color: var(--brand); }
+.dock-label { font-size: 0.625rem; font-weight: 600; letter-spacing: .01em; }
+.drawer-scrim {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(22, 25, 43, .45);
+  animation: fp-fade .12s ease-out;
+}
+.drawer {
+  position: absolute; inset: 0 20% 0 0; min-width: 17rem; max-width: 21rem;
+  display: flex; flex-direction: column;
+  background: #fff; box-shadow: 2px 0 24px rgba(22, 25, 43, .18);
+  animation: fp-slide .16s ease-out;
+}
+@keyframes fp-fade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes fp-slide { from { transform: translateX(-100%) } to { transform: none } }
+@media (prefers-reduced-motion: reduce) {
+  .drawer-scrim, .drawer { animation: none; }
+}
+
+/* ------------------------------------------------- the messages bubble */
+.chat-fab {
+  position: fixed; z-index: 35;
+  right: 1.1rem;
+  /* clear of the dock on a phone, off the corner on a desktop */
+  bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  display: grid; place-items: center;
+  width: 3.25rem; height: 3.25rem; border-radius: 999px;
+  background: var(--brand); color: #fff;
+  box-shadow: 0 6px 20px -6px rgba(27, 71, 190, .55), 0 2px 6px rgba(22, 25, 43, .18);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+@media (min-width: 1024px) { .chat-fab { bottom: 1.5rem; right: 1.5rem; } }
+.chat-fab:hover { transform: translateY(-2px); }
+.chat-fab:active { transform: translateY(0); }
+.chat-fab:focus-visible { outline: 3px solid var(--brand-soft); outline-offset: 2px; }
+
+.chat-fab-count {
+  position: absolute; top: -3px; right: -3px;
+  min-width: 1.25rem; height: 1.25rem; padding: 0 0.3rem;
+  border-radius: 999px; background: var(--bad); color: #fff;
+  border: 2px solid #fff;
+  font-size: 0.6875rem; font-weight: 700; line-height: 1.05rem; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Unread asks for attention, but from across a room rather than in your face:
+   a slow ring rather than a flash. */
+.chat-fab-alert { animation: fp-attention 1.8s ease-out infinite; }
+@keyframes fp-attention {
+  0%   { box-shadow: 0 6px 20px -6px rgba(27,71,190,.55), 0 0 0 0 rgba(27,71,190,.45); }
+  70%  { box-shadow: 0 6px 20px -6px rgba(27,71,190,.55), 0 0 0 14px rgba(27,71,190,0); }
+  100% { box-shadow: 0 6px 20px -6px rgba(27,71,190,.55), 0 0 0 0 rgba(27,71,190,0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-fab-alert { animation: none; }
+}
+
 /* ------------------------------------------------------------------- chat */
 .chat-bubble {
   max-width: min(34rem, 78%); border-radius: 14px;
@@ -245,13 +326,6 @@ table.tbl tbody tr:hover { background: #fafaff; }
   font-size: 0.75rem; color: var(--muted); cursor: pointer;
 }
 .chip:hover { border-color: var(--brand); color: var(--brand); }
-
-.nav-badge {
-  margin-left: auto; min-width: 1.125rem; height: 1.125rem; padding: 0 0.3rem;
-  border-radius: 999px; background: var(--brand); color: #fff;
-  font-size: 0.625rem; font-weight: 700; line-height: 1.125rem; text-align: center;
-}
-.nav-item[data-active="true"] .nav-badge { background: #fff; color: var(--brand); }
 
 .hindi-chip {
   display: grid; place-items: center; min-width: 1.75rem; height: 1.75rem;

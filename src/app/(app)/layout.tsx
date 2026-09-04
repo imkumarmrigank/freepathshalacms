@@ -2,7 +2,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
-import { unreadTotal } from "@/lib/chat";
+import MobileNav from "@/components/MobileNav";
+import ChatBubble from "@/components/ChatBubble";
+import Live from "@/app/(app)/messages/Live";
+import { latestMessageId, unreadTotal } from "@/lib/chat";
 import { Avatar } from "@/components/ui";
 import { IconLogout } from "@/components/icons";
 import { destroySession, getSession } from "@/lib/auth";
@@ -20,8 +23,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await getSession();
   if (!user) redirect("/login");
 
-  // the badge beside Messages, so an unread note is visible from any page
-  const unread = await unreadTotal(user.uid);
+  // The bubble must be able to light up wherever the reader is, so the live
+  // stream belongs to the shell rather than to the messages page. It resumes
+  // from the newest message already written, so nothing is replayed.
+  const [unread, since] = await Promise.all([
+    unreadTotal(user.uid),
+    latestMessageId(user.uid),
+  ]);
 
   // A stand-in has no home centre — say where they are actually covering.
   let scopeLabel = "All centres";
@@ -50,7 +58,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </Link>
 
         <div className="flex-1 overflow-y-auto">
-          <Sidebar role={user.role} unread={unread} />
+          <Sidebar role={user.role} />
         </div>
 
         <div className="border-t border-[var(--border)] p-3">
@@ -73,25 +81,33 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-[var(--border)] bg-white/85 px-5 py-3 backdrop-blur lg:px-8">
+        <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-[var(--border)] bg-white/85 px-4 py-3 backdrop-blur lg:px-8">
+          <MobileNav
+            role={user.role}
+            name={user.name}
+            centerName={user.centerName ?? null}
+            scopeLabel={scopeLabel}
+            logout={logout}
+          />
           <Link href="/dashboard" className="lg:hidden">
             <Image src="/logo.png" alt="FreePathshala" width={500} height={153}
-              className="h-auto w-[132px]" priority />
+              className="h-auto w-[124px]" priority />
           </Link>
           <div className="hidden text-[13px] text-[var(--muted)] lg:block">
             {user.centerName ?? scopeLabel}
           </div>
-          <div className="text-[13px] text-[var(--muted)]">{fmtDate(new Date())}</div>
+          <div className="ml-auto text-[13px] text-[var(--muted)]">{fmtDate(new Date())}</div>
         </header>
 
-        <div className="border-b border-[var(--border)] bg-white lg:hidden">
-          <div className="overflow-x-auto"><Sidebar role={user.role} horizontal unread={unread} /></div>
-        </div>
-
-        <main className="mx-auto w-full max-w-[1180px] flex-1 px-5 py-6 lg:px-8 lg:py-8">
+        {/* the foot of a phone screen belongs to the dock, so leave room for it */}
+        <main className="mx-auto w-full max-w-[1180px] flex-1 px-5 py-6 pb-[calc(5.25rem+env(safe-area-inset-bottom))] lg:px-8 lg:py-8 lg:pb-8">
           {children}
         </main>
       </div>
+
+      {/* messages ride along on every page rather than living in a menu */}
+      <Live after={since} />
+      <ChatBubble unread={unread} />
     </div>
   );
 }

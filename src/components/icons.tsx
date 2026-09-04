@@ -36,3 +36,6 @@ export const IconReport = s("M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0
 
 /** Points right when a group is closed; rotated by CSS when it opens. */
 export const IconChevron = s("m9 6 6 6-6 6");
+
+export const IconMenu = s("M4 7h16M4 12h16M4 17h16");
+export const IconClose = s("M6 6l12 12M18 6L6 18");
