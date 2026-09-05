@@ -80,6 +80,53 @@ export async function cancelVisit(_prev: unknown, form: FormData) {
   return { ok: "Visit cancelled." };
 }
 
+/**
+ * An auditor walking into a centre and starting an audit on the spot.
+ *
+ * Scheduling by an admin still exists, but it is not the only way in: an
+ * auditor turns up unannounced, picks the centre in front of them, and begins.
+ * Requiring a booking first would make a surprise visit impossible to carry out
+ * without warning the office, which defeats the point of having one.
+ *
+ * An audit already open at this centre is reopened rather than duplicated —
+ * otherwise a second tap on the button leaves two half-filled reports.
+ */
+export async function openVisitAt(_prev: unknown, form: FormData) {
+  const user = await requireUser();
+  if (!canConductAudit(user.role))
+    return { error: "Only an auditor starts a visit." };
+
+  const centerId = num(form, "center_id");
+  const kind = String(form.get("kind") ?? "special") as VisitKind;
+  if (!centerId) return { error: "Pick a centre." };
+  if (!VISIT_KINDS.includes(kind)) return { error: "Pick the kind of visit." };
+
+  const centre = await one<{ id: number }>(
+    "SELECT id FROM centers WHERE id = $1 AND is_active", [centerId]);
+  if (!centre) return { error: "That centre is not open." };
+
+  const open = await one<{ id: number }>(
+    `SELECT id FROM audit_visits
+      WHERE center_id = $1 AND auditor_id = $2 AND status IN ('planned','in_progress')
+      ORDER BY id DESC LIMIT 1`, [centerId, user.uid]);
+
+  const id = open?.id ?? (await one<{ id: number }>(
+    `INSERT INTO audit_visits (center_id, auditor_id, kind, status, visited_on)
+     VALUES ($1,$2,$3,'in_progress',$4) RETURNING id`,
+    [centerId, user.uid, kind, today()]))!.id;
+
+  // a booked visit the auditor is now actually making starts properly
+  if (open) {
+    await query(
+      `UPDATE audit_visits
+          SET status = 'in_progress', visited_on = COALESCE(visited_on, $2), updated_at = now()
+        WHERE id = $1 AND status = 'planned'`, [id, today()]);
+  }
+
+  revalidatePath("/audits");
+  redirect(`/audits/${id}`);
+}
+
 /* ------------------------------------------------------------- the visit */
 
 /** The auditor's own visit, still open for editing. */

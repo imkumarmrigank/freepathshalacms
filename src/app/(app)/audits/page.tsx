@@ -6,11 +6,14 @@ import { pageFrom, pageWindow } from "@/lib/paginate";
 import { fmtDate } from "@/lib/format";
 import { canScheduleVisits, seesAllAudits } from "@/lib/roles";
 import {
-  CENTRE_PRIORITY_LABEL, OVERALL_LABEL, VISIT_KIND_LABEL, VISIT_STATUS_LABEL,
-  countVisits, listVisits, standings,
+  CENTRE_PRIORITY_LABEL, OVERALL_LABEL, PRIORITY_LABEL, SUGGESTION_STATUS_LABEL,
+  VISIT_KIND_LABEL, VISIT_STATUS_LABEL,
+  countVisits, listVisits, outstandingForCentre, standings,
   type CentrePriority, type VisitStatus,
 } from "@/lib/audits";
 import ScheduleVisit from "./ScheduleVisit";
+import StartVisit from "./StartVisit";
+import { listCenters } from "@/lib/queries";
 
 export const metadata = { title: "Centre audits · Pehchaan" };
 
@@ -34,17 +37,25 @@ export default async function AuditsPage({
   const centreScope = all ? null : user.centerId;
 
   const pg = pageFrom(sp, 20);
+  const picked = sp.center ? Number(sp.center) : null;
   const filter = {
-    centerId: sp.center ? Number(sp.center) : centreScope,
+    centerId: picked ?? centreScope,
     status: (sp.status as VisitStatus) || null,
-    auditorId: mine && sp.all !== "1" ? user.uid : null,
+    // "my visits" is the auditor's default view, but asking for a centre means
+    // "show me this centre" — filtering that down to their own visits as well
+    // is how a centre nobody has audited yet came back as a blank page.
+    auditorId: mine && sp.all !== "1" && !picked ? user.uid : null,
   };
 
-  const [board, visits, total] = await Promise.all([
+  const [board, visits, total, centres] = await Promise.all([
     standings(all ? null : user.centerId),
     listVisits(user, { ...filter, limit: pg.size, offset: pg.offset }),
     countVisits(user, filter),
+    mine ? listCenters() : Promise.resolve([]),
   ]);
+  // what this centre still owes, so an auditor arriving reads it before looking
+  const owed = picked ? await outstandingForCentre(picked) : [];
+  const pickedCentre = picked ? board.find((b) => b.center_id === picked) : null;
   const win = pageWindow(pg, visits.length, total);
 
   return (
@@ -56,6 +67,8 @@ export default async function AuditsPage({
           : "Your centre's visits and what came out of them"}
         right={canScheduleVisits(user.role) ? <ScheduleVisit /> : null}
       />
+
+      {mine && <StartVisit centres={centres} preset={picked} />}
 
       {/* ------------------------------------------------------- the board */}
       {board.length > 0 && (
@@ -120,13 +133,55 @@ export default async function AuditsPage({
         </Card>
       )}
 
+      {/* ------------------------------- what this centre still owes */}
+      {picked && owed.length > 0 && (
+        <Card className="mt-6" pad={false}>
+          <div className="border-b border-[var(--border)] px-5 py-3">
+            <h2 className="text-[14px] font-semibold">
+              Still owed here — {owed.length} item{owed.length === 1 ? "" : "s"}
+            </h2>
+            <p className="text-[12.5px] text-[var(--muted)]">
+              Raised at earlier visits and not yet closed off. Read these before you look around.
+            </p>
+          </div>
+          <ul>
+            {owed.map((s) => (
+              <li key={s.id} className="border-t border-[#f1f1f6] first:border-0">
+                <Link href={`/audits/suggestions/${s.id}`}
+                  className="block px-5 py-3 hover:bg-[#fafafd]">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[13.5px] font-medium">{s.title}</span>
+                    <Badge tone={s.priority === "critical" ? "bad"
+                      : s.priority === "high" ? "warn" : "mute"}>
+                      {PRIORITY_LABEL[s.priority]}
+                    </Badge>
+                    <Badge tone={s.status === "done" ? "info" : "mute"}>
+                      {SUGGESTION_STATUS_LABEL[s.status]}
+                    </Badge>
+                    {s.overdue && <Badge tone="bad" dot={false}>Overdue</Badge>}
+                  </div>
+                  <div className="mt-0.5 text-[12.5px] text-[var(--muted)]">
+                    {s.due_on ? `due ${fmtDate(s.due_on)}` : "no date"}
+                    {Number(s.replies) > 0
+                      ? ` · ${s.replies} repl${Number(s.replies) === 1 ? "y" : "ies"} from the centre`
+                      : " · centre has not replied"}
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
       {/* ------------------------------------------------------- the visits */}
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-[15px] font-semibold">
-          {mine && sp.all !== "1" ? "Your visits" : "Visits"}
+          {pickedCentre ? `${pickedCentre.center_name} — every visit`
+            : mine && sp.all !== "1" ? "Your visits" : "Visits"}
         </h2>
         <div className="flex gap-2 text-[13px]">
-          {mine && (
+          {picked && <Link href="/audits" className="btn btn-ghost">Clear centre</Link>}
+          {mine && !picked && (
             <Link href={sp.all === "1" ? "/audits" : "/audits?all=1"}
               className="btn btn-ghost">
               {sp.all === "1" ? "Only mine" : "Every auditor"}
@@ -139,10 +194,15 @@ export default async function AuditsPage({
 
       <Card className="mt-3" pad={false}>
         {visits.length === 0 ? (
-          <Empty title="No visits yet"
-            hint={canScheduleVisits(user.role)
-              ? "Schedule one with the button above."
-              : "An admin schedules these."} />
+          <Empty
+            title={pickedCentre
+              ? `${pickedCentre.center_name} has never been audited`
+              : "No visits yet"}
+            hint={mine
+              ? "Pick it above and press Start to audit it now."
+              : canScheduleVisits(user.role)
+                ? "Schedule one with the button above."
+                : "An auditor has not been here yet."} />
         ) : (
           <ul>
             {visits.map((v) => (
