@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import Image from "next/image";
 import { fmtDate, fullName } from "@/lib/format";
-import { EXAM_TYPE_LABEL, grade, percentage } from "@/lib/exam-meta";
+import { EXAM_TYPE_LABEL, conductLabel, grade, percentage } from "@/lib/exam-meta";
 import type { ReportCardData } from "@/lib/report-card";
 
 const cell = "border border-[#e5e7eb] px-2.5 py-1.5";
@@ -24,7 +24,8 @@ function Head({ labels, rightFrom }: { labels: string[]; rightFrom: number }) {
 
 /** One student's progress report, laid out for A4. */
 export default function ReportCard({ data }: { data: ReportCardData }) {
-  const { student, enrollment, tests, totalObtained, totalMax, overallPct, anyGraded, attendance } = data;
+  const { student, enrollment, tests, totalObtained, totalMax, overallPct, anyGraded,
+    anyCo, attendance } = data;
 
   const centreLines = [
     student.center_address,
@@ -34,8 +35,25 @@ export default function ReportCard({ data }: { data: ReportCardData }) {
 
   const graded = tests.filter((t) => t.graded > 0);
 
+  // Three tests to a row, which is what fits across an A4 sheet on its side.
+  // Subjects run down the page and terms across it, so a parent reads one line
+  // to see how a child moved through the year rather than flipping between
+  // nine separate tables.
+  const TERMS_PER_ROW = 3;
+  const bands: typeof graded[] = [];
+  for (let i = 0; i < graded.length; i += TERMS_PER_ROW) {
+    bands.push(graded.slice(i, i + TERMS_PER_ROW));
+  }
+  /** Every subject in this band, in the order the first test lists them. */
+  const subjectsOf = (band: typeof graded) => {
+    const out: string[] = [];
+    for (const t of band) for (const p of t.papers) if (!out.includes(p.subject)) out.push(p.subject);
+    return out;
+  };
+
   return (
-    <div className="sheet card card-pad bg-white" style={{ maxWidth: 820, margin: "0 auto" }}>
+    <div className="sheet report-sheet card card-pad bg-white"
+      style={{ maxWidth: 1120, margin: "0 auto" }}>
       {/* ------------------------------------------------------------ letterhead */}
       <div className="flex items-start justify-between gap-6 border-b-2 border-[var(--brand)] pb-4">
         <Image src="/logo.png" alt="Pehchaan" width={500} height={153}
@@ -100,61 +118,88 @@ export default function ReportCard({ data }: { data: ReportCardData }) {
         </p>
       ) : (
         <>
-          {graded.map((t) => {
-            const pct = t.max > 0 ? percentage(t.obtained, t.max) : null;
+          {bands.map((band, bi) => {
+            const subjects = subjectsOf(band);
             return (
-              <div key={t.key} className="mb-5">
-                <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-2">
-                  <h3 className="text-[13px] font-semibold">
-                    {t.title}
-                    <span className="ml-2 font-normal text-[var(--muted)]">
-                      {EXAM_TYPE_LABEL[t.type] ?? t.type} · {fmtDate(t.date)}
-                    </span>
-                  </h3>
-                  <span className="text-[12px] text-[var(--muted)]">
-                    {t.papers.length} subject{t.papers.length === 1 ? "" : "s"}
-                  </span>
-                </div>
-                <table className="w-full border-collapse text-[12.5px]">
-                  <Head labels={["Subject", "Max", "Obtained", "%", "Grade"]} rightFrom={1} />
-                  <tbody>
-                    {t.papers.map((paper) => {
-                      const sp = paper.obtained === null
-                        ? null : percentage(paper.obtained, paper.max);
-                      const failed = paper.pass !== null && paper.obtained !== null
-                        && paper.obtained < paper.pass;
+              <table key={bi} className="mb-5 w-full border-collapse text-[12px]">
+                <thead>
+                  <tr className="bg-[#fafaff]">
+                    <th className={`${headCell} text-left`} rowSpan={2}>Subject</th>
+                    {band.map((t) => (
+                      <th key={t.key} colSpan={3} className={`${headCell} text-center`}>
+                        {t.title}
+                        <span className="ml-1 font-normal normal-case tracking-normal">
+                          {fmtDate(t.date)}
+                        </span>
+                      </th>
+                    ))}
+                  </tr>
+                  <tr className="bg-[#fafaff]">
+                    {band.map((t) => (
+                      <Fragment key={t.key}>
+                        <th className={`${headCell} text-right`}>Max</th>
+                        <th className={`${headCell} text-right`}>Got</th>
+                        <th className={`${headCell} text-right`}>%</th>
+                      </Fragment>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {subjects.map((sub) => (
+                    <tr key={sub}>
+                      <td className={cell}>{sub}</td>
+                      {band.map((t) => {
+                        const p = t.papers.find((x) => x.subject === sub);
+                        const pct = p && p.obtained !== null
+                          ? percentage(p.obtained, p.max) : null;
+                        const failed = p && p.pass !== null && p.obtained !== null
+                          && p.obtained < p.pass;
+                        return (
+                          <Fragment key={t.key}>
+                            <td className={`${cell} text-right tabular-nums`}>{p ? p.max : "—"}</td>
+                            <td className={`${cell} text-right tabular-nums ${failed ? "text-[var(--bad)]" : ""}`}>
+                              {!p ? "—"
+                                : p.isAbsent ? "Ab"
+                                : p.obtained === null
+                                  ? <span className="text-[var(--faint)]">—</span>
+                                  : p.obtained}
+                            </td>
+                            <td className={`${cell} text-right tabular-nums`}>
+                              {pct === null ? "—" : `${pct}%`}
+                            </td>
+                          </Fragment>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                  <tr className="bg-[#fafaff] font-semibold">
+                    <td className={cell}>Total</td>
+                    {band.map((t) => {
+                      const pct = t.max > 0 ? percentage(t.obtained, t.max) : null;
                       return (
-                        <tr key={paper.subject}>
-                          <td className={cell}>{paper.subject}</td>
-                          <td className={`${cell} text-right tabular-nums`}>{paper.max}</td>
-                          <td className={`${cell} text-right tabular-nums ${failed ? "text-[var(--bad)]" : ""}`}>
-                            {paper.isAbsent
-                              ? "Absent"
-                              : paper.obtained === null
-                                ? <span className="text-[var(--faint)]">Not graded</span>
-                                : paper.obtained}
-                          </td>
+                        <Fragment key={t.key}>
+                          <td className={`${cell} text-right tabular-nums`}>{t.max}</td>
+                          <td className={`${cell} text-right tabular-nums`}>{t.obtained}</td>
                           <td className={`${cell} text-right tabular-nums`}>
-                            {sp === null ? "—" : `${sp}%`}
+                            {pct === null ? "—" : `${pct}%`}
                           </td>
-                          <td className={`${cell} text-right font-medium`}>
-                            {sp === null ? "—" : grade(sp)}
-                          </td>
-                        </tr>
+                        </Fragment>
                       );
                     })}
-                    <tr className="bg-[#fafaff] font-semibold">
-                      <td className={cell}>Total</td>
-                      <td className={`${cell} text-right tabular-nums`}>{t.max}</td>
-                      <td className={`${cell} text-right tabular-nums`}>{t.obtained}</td>
-                      <td className={`${cell} text-right tabular-nums`}>
-                        {pct === null ? "—" : `${pct}%`}
-                      </td>
-                      <td className={`${cell} text-right`}>{pct === null ? "—" : grade(pct)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+                  </tr>
+                  <tr>
+                    <td className={`${cell} text-[var(--muted)]`}>Grade</td>
+                    {band.map((t) => {
+                      const pct = t.max > 0 ? percentage(t.obtained, t.max) : null;
+                      return (
+                        <td key={t.key} colSpan={3} className={`${cell} text-right font-medium`}>
+                          {pct === null ? "—" : grade(pct)}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                </tbody>
+              </table>
             );
           })}
 
@@ -191,6 +236,47 @@ export default function ReportCard({ data }: { data: ReportCardData }) {
                   {overallPct === null ? "—" : grade(overallPct)}
                 </td>
               </tr>
+            </tbody>
+          </table>
+        </>
+      )}
+
+      {/* -------------------------------------------------- activities & conduct */}
+      {anyCo && (
+        <>
+          <h2 className="mb-2 mt-6 text-[14px] font-semibold">Activities &amp; conduct</h2>
+          <p className="mb-2 text-[12px] text-[var(--muted)]">
+            Recorded alongside each test, and deliberately kept out of the marks
+            total above — how a child behaves is worth knowing, not worth adding
+            to their English score.
+          </p>
+          <table className="w-full border-collapse text-[12.5px]">
+            <Head labels={["Test", "Date", "Item", "Max", "Recorded", "Reading"]} rightFrom={3} />
+            <tbody>
+              {tests.flatMap((t) =>
+                t.co
+                  .filter((p) => p.obtained !== null || p.isAbsent)
+                  .map((p, i) => (
+                    <tr key={`${t.key}-${p.subject}`}>
+                      <td className={cell}>{i === 0 ? t.title : ""}</td>
+                      <td className={`${cell} whitespace-nowrap`}>
+                        {i === 0 ? fmtDate(t.date) : ""}
+                      </td>
+                      <td className={cell}>{p.subject}</td>
+                      <td className={`${cell} text-right tabular-nums`}>{p.max}</td>
+                      <td className={`${cell} text-right tabular-nums`}>
+                        {p.isAbsent
+                          ? "Absent"
+                          : p.obtained === null
+                            ? <span className="text-[var(--faint)]">—</span>
+                            : p.obtained}
+                      </td>
+                      <td className={`${cell} text-right font-medium`}>
+                        {p.isAbsent ? "—" : conductLabel(p.obtained, p.max) ?? "—"}
+                      </td>
+                    </tr>
+                  )),
+              )}
             </tbody>
           </table>
         </>

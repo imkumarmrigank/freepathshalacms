@@ -414,6 +414,12 @@ button.nav-item {
 @media print {
   @page { size: A4 portrait; margin: 12mm; }
 
+  /* A report card runs terms across the page, so it needs the sheet on its
+     side. A named page turns just this one landscape and leaves every other
+     printable page — the manual, the registers — upright. */
+  @page report-card { size: A4 landscape; margin: 10mm; }
+  .report-sheet { page: report-card; }
+
   /* the app chrome is not part of the document being printed */
   aside, header, .no-print { display: none !important; }
   .print-only { display: block !important; }

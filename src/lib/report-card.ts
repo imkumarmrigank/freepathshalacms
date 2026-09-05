@@ -1,6 +1,6 @@
 import "server-only";
 import { one, query } from "./db";
-import { percentage } from "./exam-meta";
+import { isCoScholastic, percentage } from "./exam-meta";
 
 export type Paper = {
   subject: string;
@@ -16,6 +16,8 @@ export type TestBlock = {
   type: string;
   date: string;
   papers: Paper[];
+  /** Behaviour, activities and the like — shown, but never added to the total. */
+  co: Paper[];
   obtained: number;
   max: number;
   graded: number;
@@ -38,6 +40,8 @@ export type ReportCardData = {
   totalMax: number;
   overallPct: number | null;
   anyGraded: boolean;
+  /** True when any test recorded behaviour or activities worth showing. */
+  anyCo: boolean;
   attendance: { present: number; marked: number; pct: number | null };
 };
 
@@ -95,16 +99,21 @@ export async function loadReportCard(
     let t = byTest.get(key);
     if (!t) {
       t = { key, title: m.term_label ?? m.title, type: m.exam_type, date: m.exam_date,
-            papers: [], obtained: 0, max: 0, graded: 0 };
+            papers: [], co: [], obtained: 0, max: 0, graded: 0 };
       byTest.set(key, t);
     }
     const obtained = m.is_absent || m.marks_obtained === null ? null : Number(m.marks_obtained);
-    t.papers.push({
+    const paper: Paper = {
       subject: m.subject, max: Number(m.max_marks), obtained,
       isAbsent: m.is_absent, pass: m.pass_marks === null ? null : Number(m.pass_marks),
-    });
-    // an ungraded paper must not drag the total down
-    if (obtained !== null) { t.obtained += obtained; t.max += Number(m.max_marks); t.graded += 1; }
+    };
+    if (isCoScholastic(m.subject)) {
+      t.co.push(paper);
+    } else {
+      t.papers.push(paper);
+      // an ungraded paper must not drag the total down
+      if (obtained !== null) { t.obtained += obtained; t.max += Number(m.max_marks); t.graded += 1; }
+    }
     if (m.exam_date < t.date) t.date = m.exam_date;
   }
   const tests = [...byTest.values()].sort((a, b) => a.date.localeCompare(b.date));
@@ -129,6 +138,7 @@ export async function loadReportCard(
     totalMax,
     overallPct: totalMax > 0 ? percentage(totalObtained, totalMax) : null,
     anyGraded: tests.some((t) => t.graded > 0),
+    anyCo: tests.some((t) => t.co.some((p) => p.obtained !== null || p.isAbsent)),
     attendance: {
       present, marked,
       pct: marked > 0 ? Math.round((present / marked) * 1000) / 10 : null,
