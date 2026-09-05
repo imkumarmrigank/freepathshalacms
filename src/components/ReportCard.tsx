@@ -116,17 +116,27 @@ export default function ReportCard({ data }: { data: ReportCardData }) {
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="mb-5 w-full border-collapse text-[12px]">
+            <table className="mb-5 w-full border-collapse text-[11.5px]">
               <thead>
                 <tr className="bg-[#fafaff]">
-                  <th className={`${headCell} text-left`}>Subject</th>
+                  <th className={`${headCell} text-left`} rowSpan={2}>Subject</th>
                   {graded.map((t) => (
-                    <th key={t.key} className={`${headCell} text-right whitespace-nowrap`}>
-                      {t.title.replace(/\s*(Exam|Final Exam)\s*/i, " ").trim()}
+                    <th key={t.key} colSpan={3}
+                      className={`${headCell} border-l-2 border-l-[#d4d4e0] text-center`}>
+                      {t.title}
                       <span className="block font-normal normal-case tracking-normal">
                         {fmtDate(t.date)}
                       </span>
                     </th>
+                  ))}
+                </tr>
+                <tr className="bg-[#fafaff]">
+                  {graded.map((t) => (
+                    <Fragment key={t.key}>
+                      <th className={`${headCell} border-l-2 border-l-[#d4d4e0] text-right`}>Max</th>
+                      <th className={`${headCell} text-right`}>Obt</th>
+                      <th className={`${headCell} text-right`}>%</th>
+                    </Fragment>
                   ))}
                 </tr>
               </thead>
@@ -136,42 +146,45 @@ export default function ReportCard({ data }: { data: ReportCardData }) {
                     <td className={`${cell} whitespace-nowrap`}>{sub}</td>
                     {graded.map((t) => {
                       const p = t.papers.find((x) => x.subject === sub);
+                      const pct = p && p.obtained !== null ? percentage(p.obtained, p.max) : null;
                       const failed = p && p.pass !== null && p.obtained !== null
                         && p.obtained < p.pass;
                       return (
-                        <td key={t.key}
-                          className={`${cell} text-right tabular-nums whitespace-nowrap ${
-                            failed ? "text-[var(--bad)]" : ""}`}>
-                          {!p
-                            ? <span className="text-[var(--faint)]">—</span>
-                            : p.isAbsent
-                              ? "Ab"
+                        <Fragment key={t.key}>
+                          <td className={`${cell} border-l-2 border-l-[#d4d4e0] text-right tabular-nums`}>
+                            {p ? p.max : "—"}
+                          </td>
+                          <td className={`${cell} text-right tabular-nums ${failed ? "text-[var(--bad)]" : ""}`}>
+                            {!p ? "—"
+                              : p.isAbsent ? "Ab"
                               : p.obtained === null
                                 ? <span className="text-[var(--faint)]">—</span>
-                                : <>{p.obtained}<span className="text-[var(--faint)]">/{p.max}</span></>}
-                        </td>
+                                : p.obtained}
+                          </td>
+                          <td className={`${cell} text-right tabular-nums`}>
+                            {pct === null ? "—" : `${pct}%`}
+                          </td>
+                        </Fragment>
                       );
                     })}
                   </tr>
                 ))}
                 <tr className="bg-[#fafaff] font-semibold">
                   <td className={cell}>Total</td>
-                  {graded.map((t) => (
-                    <td key={t.key} className={`${cell} text-right tabular-nums whitespace-nowrap`}>
-                      {t.graded > 0
-                        ? <>{t.obtained}<span className="font-normal text-[var(--faint)]">/{t.max}</span></>
-                        : "—"}
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <td className={`${cell} text-[var(--muted)]`}>Percentage</td>
                   {graded.map((t) => {
                     const pct = t.max > 0 ? percentage(t.obtained, t.max) : null;
                     return (
-                      <td key={t.key} className={`${cell} text-right tabular-nums`}>
-                        {pct === null ? "—" : `${pct}%`}
-                      </td>
+                      <Fragment key={t.key}>
+                        <td className={`${cell} border-l-2 border-l-[#d4d4e0] text-right tabular-nums`}>
+                          {t.graded > 0 ? t.max : "—"}
+                        </td>
+                        <td className={`${cell} text-right tabular-nums`}>
+                          {t.graded > 0 ? t.obtained : "—"}
+                        </td>
+                        <td className={`${cell} text-right tabular-nums`}>
+                          {pct === null ? "—" : `${pct}%`}
+                        </td>
+                      </Fragment>
                     );
                   })}
                 </tr>
@@ -180,7 +193,8 @@ export default function ReportCard({ data }: { data: ReportCardData }) {
                   {graded.map((t) => {
                     const pct = t.max > 0 ? percentage(t.obtained, t.max) : null;
                     return (
-                      <td key={t.key} className={`${cell} text-right font-medium`}>
+                      <td key={t.key} colSpan={3}
+                        className={`${cell} border-l-2 border-l-[#d4d4e0] text-right font-medium`}>
                         {pct === null ? "—" : grade(pct)}
                       </td>
                     );
