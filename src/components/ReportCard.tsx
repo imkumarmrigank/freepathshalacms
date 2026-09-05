@@ -33,7 +33,11 @@ export default function ReportCard({ data }: { data: ReportCardData }) {
     [student.center_state, student.center_pincode].filter(Boolean).join(" "),
   ].filter((l) => l && l.trim() !== "");
 
-  const graded = tests.filter((t) => t.graded > 0);
+  // Every test the class sat, not only the ones this child scored in. A term
+  // where a child was absent is part of their record — dropping it silently
+  // made April and May disappear from a card and left the year looking shorter
+  // than it was.
+  const graded = tests;
 
   // Three tests to a row, which is what fits across an A4 sheet on its side.
   // Subjects run down the page and terms across it, so a parent reads one line
@@ -178,8 +182,12 @@ export default function ReportCard({ data }: { data: ReportCardData }) {
                       const pct = t.max > 0 ? percentage(t.obtained, t.max) : null;
                       return (
                         <Fragment key={t.key}>
-                          <td className={`${cell} text-right tabular-nums`}>{t.max}</td>
-                          <td className={`${cell} text-right tabular-nums`}>{t.obtained}</td>
+                          <td className={`${cell} text-right tabular-nums`}>
+                            {t.graded > 0 ? t.max : "—"}
+                          </td>
+                          <td className={`${cell} text-right tabular-nums`}>
+                            {t.graded > 0 ? t.obtained : "—"}
+                          </td>
                           <td className={`${cell} text-right tabular-nums`}>
                             {pct === null ? "—" : `${pct}%`}
                           </td>
@@ -214,8 +222,12 @@ export default function ReportCard({ data }: { data: ReportCardData }) {
                     <td className={cell}>{t.title}</td>
                     <td className={cell}>{EXAM_TYPE_LABEL[t.type] ?? t.type}</td>
                     <td className={`${cell} whitespace-nowrap`}>{fmtDate(t.date)}</td>
-                    <td className={`${cell} text-right tabular-nums`}>{t.obtained}</td>
-                    <td className={`${cell} text-right tabular-nums`}>{t.max}</td>
+                    <td className={`${cell} text-right tabular-nums`}>
+                      {t.graded > 0 ? t.obtained : "—"}
+                    </td>
+                    <td className={`${cell} text-right tabular-nums`}>
+                      {t.graded > 0 ? t.max : "—"}
+                    </td>
                     <td className={`${cell} text-right tabular-nums`}>
                       {pct === null ? "—" : `${pct}%`}
                     </td>

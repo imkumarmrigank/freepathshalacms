@@ -88,6 +88,10 @@ export async function loadReportCard(
       WHERE x.session_id = $2 AND x.center_id = $3
         AND x.class_level_id = (SELECT class_level_id FROM enrollments
                                  WHERE student_id = $1 AND session_id = $2)
+        -- a session runs April to March; an exam dated outside it belongs to
+        -- another year's report, whatever session row it happens to carry
+        AND x.exam_date BETWEEN (SELECT start_date FROM academic_sessions WHERE id = $2)
+                            AND (SELECT end_date   FROM academic_sessions WHERE id = $2)
       ORDER BY x.exam_date, x.subject`,
     [studentId, sessionId, student.center_id],
   );
