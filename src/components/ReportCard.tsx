@@ -174,7 +174,8 @@ export default function ReportCard({ data }: { data: ReportCardData }) {
                 <tr className="bg-[#fafaff] font-semibold">
                   <td className={cell}>Total</td>
                   {graded.map((t) => {
-                    const pct = t.max > 0 ? percentage(t.obtained, t.max) : null;
+                    const pct = t.graded > 0 && t.max > 0
+                      ? percentage(t.obtained, t.max) : null;
                     return (
                       <Fragment key={t.key}>
                         <td className={`${cell} border-l-2 border-l-[#d4d4e0] text-right tabular-nums`}>
@@ -193,7 +194,8 @@ export default function ReportCard({ data }: { data: ReportCardData }) {
                 <tr>
                   <td className={`${cell} text-[var(--muted)]`}>Grade</td>
                   {graded.map((t) => {
-                    const pct = t.max > 0 ? percentage(t.obtained, t.max) : null;
+                    const pct = t.graded > 0 && t.max > 0
+                      ? percentage(t.obtained, t.max) : null;
                     return (
                       <td key={t.key} colSpan={3}
                         className={`${cell} border-l-2 border-l-[#d4d4e0] text-right font-medium`}>

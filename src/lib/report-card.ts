@@ -115,15 +115,24 @@ export async function loadReportCard(
       t.co.push(paper);
     } else {
       t.papers.push(paper);
-      // an ungraded paper must not drag the total down
-      if (obtained !== null) { t.obtained += obtained; t.max += Number(m.max_marks); t.graded += 1; }
+      // The maximum counts every paper in the test, whether the child sat it or
+      // not, so the Max column on the card adds up to the figure beneath it.
+      // Totalling only the graded papers made a test out of 70 report itself as
+      // out of 40, and turned 14 marks into 35% instead of 20%.
+      t.max += Number(m.max_marks);
+      if (obtained !== null) { t.obtained += obtained; t.graded += 1; }
     }
     if (m.exam_date < t.date) t.date = m.exam_date;
   }
   const tests = [...byTest.values()].sort((a, b) => a.date.localeCompare(b.date));
 
-  const totalObtained = tests.reduce((n, t) => n + t.obtained, 0);
-  const totalMax = tests.reduce((n, t) => n + t.max, 0);
+  // A test the child partly sat counts in full — that is the point of the change
+  // above. A test with nothing graded at all counts for nothing: it is as likely
+  // to mean the paper was never entered as that the child scored zero, and a
+  // teacher's unfinished paperwork should not read as a child's failure.
+  const sat = tests.filter((t) => t.graded > 0);
+  const totalObtained = sat.reduce((n, t) => n + t.obtained, 0);
+  const totalMax = sat.reduce((n, t) => n + t.max, 0);
 
   const att = await one<{ present: string; marked: string }>(
     `SELECT count(*) FILTER (WHERE status IN ('present','late','half_day')) AS present,
