@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import Image from "next/image";
 import { fmtDate, fullName } from "@/lib/format";
-import { EXAM_TYPE_LABEL, conductLabel, grade, percentage } from "@/lib/exam-meta";
+import { conductLabel, grade, percentage } from "@/lib/exam-meta";
 import type { ReportCardData } from "@/lib/report-card";
 
 const cell = "border border-[#e5e7eb] px-2.5 py-1.5";
@@ -52,9 +52,17 @@ export default function ReportCard({ data }: { data: ReportCardData }) {
     <div className="sheet report-sheet card card-pad bg-white"
       style={{ maxWidth: 1120, margin: "0 auto" }}>
       {/* ------------------------------------------------------------ letterhead */}
-      <div className="flex items-start justify-between gap-6 border-b-2 border-[var(--brand)] pb-4">
+      <div className="grid items-center gap-6 border-b-2 border-[var(--brand)] pb-4
+        [grid-template-columns:1fr_auto_1fr]">
         <Image src="/logo.png" alt="Pehchaan" width={500} height={153}
           className="h-auto w-[150px]" />
+        {/* the title belongs between the two marks of identity, not under them */}
+        <div className="text-center">
+          <h1 className="text-[20px] font-semibold tracking-[-0.01em]">Progress Report</h1>
+          <p className="text-[13px] text-[var(--muted)]">
+            Academic session {enrollment?.session_name ?? "\u2014"}
+          </p>
+        </div>
         <div className="text-right text-[12px] leading-relaxed text-[var(--muted)]">
           <div className="text-[15px] font-semibold text-[var(--text)]">{student.center_name}</div>
           <div className="text-[11px] uppercase tracking-[0.08em]">
@@ -65,12 +73,6 @@ export default function ReportCard({ data }: { data: ReportCardData }) {
         </div>
       </div>
 
-      <h1 className="mt-5 text-center text-[19px] font-semibold tracking-[-0.01em]">
-        Progress Report
-      </h1>
-      <p className="mb-5 text-center text-[13px] text-[var(--muted)]">
-        Academic session {enrollment?.session_name ?? "—"}
-      </p>
 
       {/* -------------------------------------------------------- student details */}
       <div className="flex items-start gap-4">
@@ -203,104 +205,103 @@ export default function ReportCard({ data }: { data: ReportCardData }) {
               </tbody>
             </table>
           </div>
+        </>
+      )}
 
-          <h2 className="mb-2 mt-6 text-[14px] font-semibold">Overall</h2>
+      {/* ------------- the three summaries, side by side across the sheet ------- */}
+      <div className="mt-6 grid gap-5 md:grid-cols-3">
+        {/* --------------------------------------------------------- the year */}
+        <div>
+          <h2 className="mb-2 text-[14px] font-semibold">Overall</h2>
           <table className="w-full border-collapse text-[12.5px]">
-            <Head labels={["Test", "Type", "Date", "Obtained", "Out of", "%", "Grade"]} rightFrom={3} />
             <tbody>
-              {graded.map((t) => {
-                const pct = t.max > 0 ? percentage(t.obtained, t.max) : null;
-                return (
-                  <tr key={t.key}>
-                    <td className={cell}>{t.title}</td>
-                    <td className={cell}>{EXAM_TYPE_LABEL[t.type] ?? t.type}</td>
-                    <td className={`${cell} whitespace-nowrap`}>{fmtDate(t.date)}</td>
-                    <td className={`${cell} text-right tabular-nums`}>
-                      {t.graded > 0 ? t.obtained : "—"}
-                    </td>
-                    <td className={`${cell} text-right tabular-nums`}>
-                      {t.graded > 0 ? t.max : "—"}
-                    </td>
-                    <td className={`${cell} text-right tabular-nums`}>
-                      {pct === null ? "—" : `${pct}%`}
-                    </td>
-                    <td className={`${cell} text-right font-medium`}>
-                      {pct === null ? "—" : grade(pct)}
-                    </td>
-                  </tr>
-                );
-              })}
-              <tr className="bg-[#fafaff] font-semibold">
-                <td className={cell} colSpan={3}>Grand total</td>
-                <td className={`${cell} text-right tabular-nums`}>{totalObtained}</td>
-                <td className={`${cell} text-right tabular-nums`}>{totalMax}</td>
-                <td className={`${cell} text-right tabular-nums`}>
-                  {overallPct === null ? "—" : `${overallPct}%`}
+              <tr>
+                <td className={`${cell} bg-[#fafaff] text-[var(--muted)]`}>Tests graded</td>
+                <td className={`${cell} text-right font-medium tabular-nums`}>
+                  {graded.filter((t) => t.graded > 0).length} of {graded.length}
                 </td>
-                <td className={`${cell} text-right`}>
-                  {overallPct === null ? "—" : grade(overallPct)}
+              </tr>
+              <tr>
+                <td className={`${cell} bg-[#fafaff] text-[var(--muted)]`}>Marks obtained</td>
+                <td className={`${cell} text-right font-medium tabular-nums`}>{totalObtained}</td>
+              </tr>
+              <tr>
+                <td className={`${cell} bg-[#fafaff] text-[var(--muted)]`}>Out of</td>
+                <td className={`${cell} text-right font-medium tabular-nums`}>{totalMax}</td>
+              </tr>
+              <tr>
+                <td className={`${cell} bg-[#fafaff] text-[var(--muted)]`}>Percentage</td>
+                <td className={`${cell} text-right font-medium tabular-nums`}>
+                  {overallPct === null ? "\u2014" : `${overallPct}%`}
+                </td>
+              </tr>
+              <tr>
+                <td className={`${cell} bg-[#fafaff] text-[var(--muted)]`}>Grade</td>
+                <td className={`${cell} text-right font-semibold`}>
+                  {overallPct === null ? "\u2014" : grade(overallPct)}
                 </td>
               </tr>
             </tbody>
           </table>
-        </>
-      )}
+        </div>
 
-      {/* -------------------------------------------------- activities & conduct */}
-      {anyCo && (
-        <>
-          <h2 className="mb-2 mt-6 text-[14px] font-semibold">Activities &amp; conduct</h2>
-          <p className="mb-2 text-[12px] text-[var(--muted)]">
-            Recorded alongside each test, and deliberately kept out of the marks
-            total above — how a child behaves is worth knowing, not worth adding
-            to their English score.
+        {/* ------------------------------------------- activities and conduct */}
+        <div>
+          <h2 className="mb-2 text-[14px] font-semibold">Activities &amp; conduct</h2>
+          {anyCo ? (
+            <table className="w-full border-collapse text-[12.5px]">
+              <Head labels={["Test", "Mark", "Reading"]} rightFrom={1} />
+              <tbody>
+                {tests.flatMap((t) =>
+                  t.co
+                    .filter((p) => p.obtained !== null || p.isAbsent)
+                    .map((p) => (
+                      <tr key={`${t.key}-${p.subject}`}>
+                        <td className={cell}>{t.title.replace(/\s*Exam\s*/i, " ").trim()}</td>
+                        <td className={`${cell} text-right tabular-nums`}>
+                          {p.isAbsent ? "Ab" : `${p.obtained}/${p.max}`}
+                        </td>
+                        <td className={`${cell} text-right font-medium`}>
+                          {p.isAbsent ? "\u2014" : conductLabel(p.obtained, p.max) ?? "\u2014"}
+                        </td>
+                      </tr>
+                    )),
+                )}
+              </tbody>
+            </table>
+          ) : (
+            <p className="rounded-[9px] bg-[#fafaff] px-3.5 py-3 text-[12.5px] text-[var(--muted)]">
+              Nothing recorded this session.
+            </p>
+          )}
+          <p className="mt-1.5 text-[11.5px] leading-snug text-[var(--muted)]">
+            Kept out of the marks total above.
           </p>
+        </div>
+
+        {/* ------------------------------------------------------- attendance */}
+        <div>
+          <h2 className="mb-2 text-[14px] font-semibold">Attendance</h2>
           <table className="w-full border-collapse text-[12.5px]">
-            <Head labels={["Test", "Date", "Item", "Max", "Recorded", "Reading"]} rightFrom={3} />
             <tbody>
-              {tests.flatMap((t) =>
-                t.co
-                  .filter((p) => p.obtained !== null || p.isAbsent)
-                  .map((p, i) => (
-                    <tr key={`${t.key}-${p.subject}`}>
-                      <td className={cell}>{i === 0 ? t.title : ""}</td>
-                      <td className={`${cell} whitespace-nowrap`}>
-                        {i === 0 ? fmtDate(t.date) : ""}
-                      </td>
-                      <td className={cell}>{p.subject}</td>
-                      <td className={`${cell} text-right tabular-nums`}>{p.max}</td>
-                      <td className={`${cell} text-right tabular-nums`}>
-                        {p.isAbsent
-                          ? "Absent"
-                          : p.obtained === null
-                            ? <span className="text-[var(--faint)]">—</span>
-                            : p.obtained}
-                      </td>
-                      <td className={`${cell} text-right font-medium`}>
-                        {p.isAbsent ? "—" : conductLabel(p.obtained, p.max) ?? "—"}
-                      </td>
-                    </tr>
-                  )),
-              )}
+              <tr>
+                <td className={`${cell} bg-[#fafaff] text-[var(--muted)]`}>Days marked</td>
+                <td className={`${cell} text-right font-medium tabular-nums`}>{attendance.marked}</td>
+              </tr>
+              <tr>
+                <td className={`${cell} bg-[#fafaff] text-[var(--muted)]`}>Days present</td>
+                <td className={`${cell} text-right font-medium tabular-nums`}>{attendance.present}</td>
+              </tr>
+              <tr>
+                <td className={`${cell} bg-[#fafaff] text-[var(--muted)]`}>Attendance</td>
+                <td className={`${cell} text-right font-semibold tabular-nums`}>
+                  {attendance.pct === null ? "\u2014" : `${attendance.pct}%`}
+                </td>
+              </tr>
             </tbody>
           </table>
-        </>
-      )}
-
-      {/* ------------------------------------------------------------- attendance */}
-      <h2 className="mb-2 mt-6 text-[14px] font-semibold">Attendance</h2>
-      <table className="w-full border-collapse text-[13px]">
-        <tbody>
-          <tr>
-            <td className={`w-[25%] ${cell} bg-[#fafaff] text-[var(--muted)]`}>Days marked</td>
-            <td className={`w-[25%] ${cell} font-medium tabular-nums`}>{attendance.marked}</td>
-            <td className={`w-[25%] ${cell} bg-[#fafaff] text-[var(--muted)]`}>Days present</td>
-            <td className={`w-[25%] ${cell} font-medium tabular-nums`}>
-              {attendance.present}{attendance.pct === null ? "" : `  (${attendance.pct}%)`}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+        </div>
+      </div>
 
       {/* ------------------------------------------------------------- signatures */}
       <div className="mt-12 grid grid-cols-3 gap-8 text-center text-[12px] text-[var(--muted)]">
