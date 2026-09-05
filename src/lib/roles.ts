@@ -4,7 +4,8 @@ export type Role =
   | "mentor"
   | "center_manager"
   | "teacher"
-  | "backup_teacher";
+  | "backup_teacher"
+  | "auditor";
 
 export const ROLE_LABEL: Record<Role, string> = {
   super_admin: "Super Admin",
@@ -13,6 +14,7 @@ export const ROLE_LABEL: Record<Role, string> = {
   center_manager: "Centre Manager",
   teacher: "Teacher",
   backup_teacher: "Backup Teacher",
+  auditor: "Auditor",
 };
 
 export const ROLE_BLURB: Record<Role, string> = {
@@ -22,11 +24,13 @@ export const ROLE_BLURB: Record<Role, string> = {
   center_manager: "One centre: its teachers, students, timetable and register.",
   teacher: "One centre: marks the register, records PTMs, writes teaching plans.",
   backup_teacher: "Stands in for an absent teacher at whichever centre is assigned.",
+  auditor: "Visits centres, rates them, and leaves suggestions to act on.",
 };
 
 /** Roles that work across every centre rather than being pinned to one. */
 export function isGlobalRole(role: Role) {
-  return role === "super_admin" || role === "admin" || role === "mentor";
+  return role === "super_admin" || role === "admin" || role === "mentor"
+    || role === "auditor";
 }
 
 /** Structural settings — sessions, classes, promotion, centres, admins. */
@@ -46,12 +50,14 @@ export function isTeaching(role: Role) {
  *   manager     -> teachers at their own centre
  */
 export const CREATABLE_ROLES: Record<Role, Role[]> = {
-  super_admin: ["super_admin", "admin", "mentor", "center_manager", "teacher", "backup_teacher"],
-  admin: ["mentor", "center_manager", "teacher", "backup_teacher"],
+  super_admin: ["super_admin", "admin", "mentor", "center_manager", "teacher",
+    "backup_teacher", "auditor"],
+  admin: ["mentor", "center_manager", "teacher", "backup_teacher", "auditor"],
   mentor: [],
   center_manager: ["teacher"],
   teacher: [],
   backup_teacher: [],
+  auditor: [],
 };
 
 export function canCreateRole(actor: Role, target: Role) {
@@ -118,7 +124,11 @@ export type Feature =
   | "students" | "attendance" | "timetable" | "teachingPlans" | "exams"
   | "progressReports" | "calendar" | "ptm" | "followUps" | "supplies"
   | "statistics" | "reports" | "staff" | "centres" | "coverage" | "ownCheckIn"
-  | "counselling" | "teacherRemarks" | "messages";
+  | "counselling" | "teacherRemarks" | "messages"
+  // audits: "audits" is the auditor's own work — rating a centre and raising
+  // suggestions. "auditReports" is reading them. A centre reads its own report
+  // and answers its own suggestions; it never scores itself.
+  | "audits" | "auditReports";
 
 /** One explicit list per role — no inference, so a gate is read, not deduced. */
 const FEATURES: Record<Role, Feature[]> = {
@@ -126,11 +136,13 @@ const FEATURES: Record<Role, Feature[]> = {
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
     "calendar", "ptm", "followUps", "supplies", "statistics", "reports",
     "staff", "centres", "coverage", "counselling", "teacherRemarks", "messages",
+    "audits", "auditReports",
   ],
   admin: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
     "calendar", "ptm", "followUps", "supplies", "statistics", "reports",
     "staff", "centres", "coverage", "counselling", "teacherRemarks", "messages",
+    "audits", "auditReports",
   ],
   // the whole point of the mentor role is that this list is short
   mentor: [
@@ -140,16 +152,22 @@ const FEATURES: Record<Role, Feature[]> = {
   center_manager: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
     "calendar", "ptm", "followUps", "supplies", "statistics", "reports",
-    "staff", "ownCheckIn", "counselling", "messages",
+    "staff", "ownCheckIn", "counselling", "messages", "auditReports",
   ],
   teacher: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
     "calendar", "ptm", "followUps", "reports", "ownCheckIn", "counselling", "messages",
+    "auditReports",
   ],
   backup_teacher: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
     "calendar", "ptm", "followUps", "reports", "ownCheckIn", "counselling", "messages",
+    "auditReports",
   ],
+  // Deliberately the shortest list in the file. An auditor judges centres; they
+  // do not run one, and they see nothing of a child beyond the roll numbers on
+  // the day of a visit.
+  auditor: ["audits", "auditReports", "calendar", "messages"],
 };
 
 export function can(role: Role, feature: Feature): boolean {
@@ -172,4 +190,39 @@ export function canAdmitStudents(role: Role) {
 /** Taking a child off the roll is an administrator's decision, never a centre's. */
 export function canMarkDropout(role: Role) {
   return role === "super_admin" || role === "admin";
+}
+
+/* ---------------------------------------------------------------- audits */
+
+/** Rates a centre and raises suggestions. Only the auditor does the visit. */
+export function canConductAudit(role: Role) {
+  return role === "auditor";
+}
+
+/**
+ * Scheduling a visit, and appointing the auditor who makes it. Deliberately not
+ * the auditor's own — an auditor who picks their own dates and centres is not
+ * auditing, and a surprise visit is only a surprise if the centre cannot learn
+ * of it from the person being audited.
+ */
+export function canScheduleVisits(role: Role) {
+  return role === "super_admin" || role === "admin";
+}
+
+/** Reworking the checklist itself, and the weighting behind the award. */
+export function canEditAuditCriteria(role: Role) {
+  return role === "super_admin";
+}
+
+/**
+ * Answering a suggestion: what the centre did about it. The manager owns the
+ * item, but a teacher who did the work can say so.
+ */
+export function canAnswerSuggestions(role: Role) {
+  return role === "center_manager" || isTeaching(role);
+}
+
+/** Reads every centre's audit history rather than just their own. */
+export function seesAllAudits(role: Role) {
+  return role === "super_admin" || role === "admin" || role === "auditor";
 }

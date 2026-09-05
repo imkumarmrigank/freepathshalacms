@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import {
   IconGrid, IconUsers, IconChat, IconCal, IconChart, IconClock, IconAward,
-  IconBuilding, IconLayers, IconCheck, IconBook, IconBox, IconChevron, IconReport,
+  IconBuilding, IconLayers, IconCheck, IconBook, IconBox, IconChevron, IconReport, IconClipboard, IconFlag,
 } from "./icons";
 import { can, canAdmitStudents, type Feature, type Role } from "@/lib/roles";
 
@@ -67,6 +67,17 @@ const MENU: Node[] = [
       { href: "/ptm", label: "PTM interactions", feature: "ptm" },
       { href: "/follow-ups", label: "Follow-ups", feature: "followUps" },
       { href: "/counselling", label: "Counselling", feature: "counselling" },
+    ],
+  },
+
+  {
+    label: "Centre audits", icon: IconClipboard, feature: "auditReports", children: [
+      { href: "/audits", label: "Visits & standing", feature: "auditReports" },
+      { href: "/audits/suggestions", label: "Suggestions", icon: IconFlag,
+        feature: "auditReports" },
+      { href: "/audits/board", label: "Best centre", feature: "auditReports" },
+      { href: "/manage/audit-criteria", label: "What is checked",
+        roles: ["super_admin"] },
     ],
   },
 
@@ -142,6 +153,14 @@ const DOCK: Record<Role, { href: string; label: string; icon: Icon }[]> = {
     { href: "/students", label: "Students", icon: IconUsers },
     { href: "/reports", label: "Reports", icon: IconReport },
     { href: "/statistics", label: "Insights", icon: IconChart },
+  ],
+  // an auditor's day is one screen: the visits they owe, and the centre in
+  // front of them
+  auditor: [
+    { href: "/dashboard", label: "Home", icon: IconGrid },
+    { href: "/audits", label: "Visits", icon: IconClipboard },
+    { href: "/audits/suggestions", label: "Actions", icon: IconFlag },
+    { href: "/calendar", label: "Calendar", icon: IconCal },
   ],
   super_admin: [
     { href: "/dashboard", label: "Home", icon: IconGrid },

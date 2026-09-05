@@ -39,3 +39,5 @@ export const IconChevron = s("m9 6 6 6-6 6");
 
 export const IconMenu = s("M4 7h16M4 12h16M4 17h16");
 export const IconClose = s("M6 6l12 12M18 6L6 18");
+export const IconClipboard = s("M9 3h6a1 1 0 0 1 1 1v1H8V4a1 1 0 0 1 1-1M8 5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 12h6M9 16h4");
+export const IconFlag = s("M4 21V4M4 5h11l-1.5 3L15 11H4");

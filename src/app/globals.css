@@ -446,3 +446,24 @@ button.nav-item {
   }
   a { text-decoration: none !important; color: inherit !important; }
 }
+
+/* -------------------------------------------------------------- audits
+   A described choice rather than a bare radio: the auditor is picking
+   between "90% or more of the roll present" and "below 50% present", not
+   between 4 and 1, so the whole card is the target — which also makes it
+   usable with a thumb, standing in a centre. */
+.pick {
+  display: flex; align-items: flex-start; gap: 0.625rem;
+  border: 1px solid var(--border-strong); border-radius: 10px;
+  padding: 0.625rem 0.75rem; cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+.pick:hover { border-color: var(--brand); }
+.pick:has(input:checked) { border-color: var(--brand); background: var(--brand-soft); }
+.pick input { margin-top: 0.1875rem; accent-color: var(--brand); flex: none; }
+.pick > span { display: block; min-width: 0; }
+.pick b { display: block; font-size: 0.8438rem; font-weight: 600; line-height: 1.35; }
+.pick em {
+  display: block; font-style: normal; font-size: 0.75rem;
+  color: var(--muted); margin-top: 0.0625rem;
+}

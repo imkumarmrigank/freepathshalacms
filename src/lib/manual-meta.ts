@@ -35,7 +35,7 @@ export type Manual = {
 };
 
 /** The four manuals that exist. */
-export const MANUAL_KEYS = ["teacher", "center_manager", "mentor", "admin"] as const;
+export const MANUAL_KEYS = ["teacher", "center_manager", "mentor", "admin", "auditor"] as const;
 export type ManualKey = (typeof MANUAL_KEYS)[number];
 
 export const MANUAL_LABEL: Record<ManualKey, string> = {
@@ -43,6 +43,7 @@ export const MANUAL_LABEL: Record<ManualKey, string> = {
   center_manager: "Centre Manager",
   mentor: "Mentor",
   admin: "Administrator",
+  auditor: "Auditor",
 };
 
 /** Who reads which one. */
@@ -51,6 +52,7 @@ export const MANUAL_AUDIENCE: Record<ManualKey, string> = {
   center_manager: "Centre managers",
   mentor: "Mentors",
   admin: "Admins and super admins",
+  auditor: "Auditors",
 };
 
 /**
@@ -90,6 +92,7 @@ const OF_ROLE: Record<Role, ManualKey> = {
   mentor: "mentor",
   admin: "admin",
   super_admin: "admin",
+  auditor: "auditor",
 };
 
 export function manualKeyFor(role: Role): ManualKey {

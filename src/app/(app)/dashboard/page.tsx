@@ -9,7 +9,9 @@ import { eventsBetween } from "@/lib/calendar";
 import { EVENT_LABEL, EVENT_TONE } from "@/lib/calendar-meta";
 import { isGlobalRole, canAdmitStudents, can } from "@/lib/roles";
 import { counsellingLoad, strugglingStudents } from "@/lib/statistics";
+import { standings } from "@/lib/audits";
 import DailyByCentre, { type CentreDay } from "./DailyByCentre";
+import AuditStanding from "./AuditStanding";
 
 const ENGAGEMENT_TONE: Record<string, string> = {
   attentive: "ok", neutral: "warn", resistant: "bad",
@@ -46,6 +48,13 @@ export default async function Dashboard({
         counsellingLoad(centerId),
       ])
     : [[], null];
+
+  // Where the auditor left this centre, and what it still owes. Shown to
+  // everyone who can act on it — the manager and teachers who do the work, and
+  // the administrators watching every centre.
+  const audit = can(user.role, "auditReports")
+    ? await standings(isGlobalRole(user.role) ? null : user.centerId)
+    : [];
 
   const [students] = await query<{ n: string }>(
     `SELECT count(*) AS n FROM enrollments WHERE session_id = $1 AND status = 'active'${scope}`,
@@ -178,6 +187,8 @@ export default async function Dashboard({
           </Alert>
         </div>
       )}
+
+      <AuditStanding rows={audit} everyCentre={isGlobalRole(user.role)} />
 
       <div className="mb-6">
         <div className="label-cap">{greeting}</div>
