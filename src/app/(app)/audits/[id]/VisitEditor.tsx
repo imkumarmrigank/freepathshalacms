@@ -23,13 +23,15 @@ import CriterionRow from "./CriterionRow";
  * so each rating is its own small save.
  */
 export default function VisitEditor({
-  visit, criteria, ratings, suggestions, outstanding,
+  visit, criteria, ratings, suggestions, outstanding, roll,
 }: {
   visit: VisitRow;
   criteria: Criterion[];
   ratings: RatingRow[];
   suggestions: SuggestionRow[];
   outstanding: SuggestionRow[];
+  /** What the system has on the roll here — a starting figure, not an answer. */
+  roll: { children: number; staff: number } | null;
 }) {
   const done = useMemo(
     () => new Map(ratings.map((r) => [r.criterion_id, r])), [ratings]);
@@ -80,7 +82,7 @@ export default function VisitEditor({
       )}
 
       {/* ------------------------------------------------------- the snapshot */}
-      <Snapshot visit={visit} />
+      <Snapshot visit={visit} roll={roll} />
 
       {/* -------------------------------------------------------- the checks */}
       {sections.map(([name, list]) => (
@@ -107,11 +109,20 @@ export default function VisitEditor({
 
 /* ------------------------------------------------------------------ pieces */
 
-function Snapshot({ visit }: { visit: VisitRow }) {
+function Snapshot({ visit, roll }: {
+  visit: VisitRow; roll: { children: number; staff: number } | null;
+}) {
   const [state, action] = useActionState(saveVisitDetails, null);
   return (
     <Card className="mt-5">
-      <h2 className="mb-3 text-[14px] font-semibold">Today&rsquo;s snapshot</h2>
+      <h2 className="mb-1 text-[14px] font-semibold">Today&rsquo;s snapshot</h2>
+      <p className="mb-3 text-[12.5px] text-[var(--muted)]">
+        {roll
+          ? `On roll here: ${roll.children} children, ${roll.staff} staff expected today —
+             filled in for you. Correct them if the records are out of date, and count
+             the children present yourself.`
+          : "Count the children and staff actually present."}
+      </p>
       <form action={action}>
         <FormMessage state={state} />
         <input type="hidden" name="visit_id" value={visit.id} />
@@ -122,7 +133,7 @@ function Snapshot({ visit }: { visit: VisitRow }) {
           </Field>
           <Field label="Children on roll">
             <input className="input" type="number" min="0" name="children_on_roll"
-              defaultValue={visit.children_on_roll ?? ""} />
+              defaultValue={visit.children_on_roll ?? roll?.children ?? ""} />
           </Field>
           <Field label="Staff present">
             <input className="input" type="number" min="0" name="staff_present"
@@ -130,7 +141,7 @@ function Snapshot({ visit }: { visit: VisitRow }) {
           </Field>
           <Field label="Staff expected">
             <input className="input" type="number" min="0" name="staff_on_roll"
-              defaultValue={visit.staff_on_roll ?? ""} />
+              defaultValue={visit.staff_on_roll ?? roll?.staff ?? ""} />
           </Field>
         </div>
 

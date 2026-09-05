@@ -389,3 +389,47 @@ export async function freezeScore(visitId: number) {
     [visitId, score]);
   return score;
 }
+
+/* ------------------------------------------------------------- the roll */
+
+/**
+ * What the system believes is on the roll at a centre today: children enrolled
+ * in the current session, and the staff expected to be there.
+ *
+ * The auditor still counts heads themselves — that is the whole point of a
+ * visit — but they should not have to look up the denominator. It is offered as
+ * a starting figure they can overwrite, never written on their behalf.
+ *
+ * Staff counts the centre's own manager and teachers, plus any backup teacher
+ * standing in there today, and leaves out anyone on approved leave — the
+ * question is "how many should be here", not "how many are on the payroll".
+ */
+export async function rollFor(centerId: number, on: string) {
+  const [kids, staff] = await Promise.all([
+    one<{ n: string }>(
+      `SELECT count(*) AS n
+         FROM enrollments e
+         JOIN students s ON s.id = e.student_id
+         JOIN academic_sessions a ON a.id = e.session_id AND a.is_current
+        WHERE e.center_id = $1 AND e.status = 'active' AND s.status = 'active'`,
+      [centerId]),
+    one<{ n: string }>(
+      `SELECT count(DISTINCT u.id) AS n
+         FROM users u
+        WHERE u.is_active
+          AND (
+            (u.role IN ('center_manager','teacher') AND u.center_id = $1)
+            OR EXISTS (
+              SELECT 1 FROM teacher_coverage tc
+               WHERE tc.backup_id = u.id AND tc.center_id = $1
+                 AND tc.starts_on <= $2
+                 AND (tc.ends_on IS NULL OR tc.ends_on >= $2))
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM staff_attendance sa
+             WHERE sa.user_id = u.id AND sa.att_date = $2
+               AND sa.status IN ('leave','holiday'))`,
+      [centerId, on]),
+  ]);
+  return { children: Number(kids?.n ?? 0), staff: Number(staff?.n ?? 0) };
+}

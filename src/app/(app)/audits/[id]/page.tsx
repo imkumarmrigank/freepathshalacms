@@ -2,12 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireFeature } from "@/lib/auth";
 import { Badge, Card, PageHeader } from "@/components/ui";
-import { fmtDate } from "@/lib/format";
+import { fmtDate, today } from "@/lib/format";
 import {
   BAND_LABEL, OVERALL_BLURB, OVERALL_LABEL, PRIORITY_LABEL,
   SUGGESTION_STATUS_LABEL, VERDICT_LABEL, VISIT_KIND_BLURB, VISIT_KIND_LABEL,
   VISIT_STATUS_LABEL,
   getVisit, listCriteria, listSuggestions, outstandingForCentre, ratingsFor,
+  rollFor,
 } from "@/lib/audits";
 import VisitEditor from "./VisitEditor";
 
@@ -33,11 +34,16 @@ export default async function VisitPage({
     && visit.auditor_id === user.uid
     && visit.status !== "submitted" && visit.status !== "cancelled";
 
-  const [ratings, suggestions, criteria, outstanding] = await Promise.all([
+  const [ratings, suggestions, criteria, outstanding, onRoll] = await Promise.all([
     ratingsFor(visitId),
     listSuggestions(user, { visitId }),
     editing ? listCriteria() : Promise.resolve([]),
     editing ? outstandingForCentre(visit.center_id) : Promise.resolve([]),
+    // what the system thinks is on the roll, so the auditor only has to count
+    // the heads in front of them
+    editing
+      ? rollFor(visit.center_id, visit.visited_on ?? today())
+      : Promise.resolve(null),
   ]);
 
   if (editing) {
@@ -48,6 +54,7 @@ export default async function VisitPage({
         ratings={ratings}
         suggestions={suggestions}
         outstanding={outstanding.filter((s) => s.visit_id !== visitId)}
+        roll={onRoll}
       />
     );
   }
