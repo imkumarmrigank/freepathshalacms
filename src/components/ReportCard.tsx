@@ -39,21 +39,14 @@ export default function ReportCard({ data }: { data: ReportCardData }) {
   // than it was.
   const graded = tests;
 
-  // Three tests to a row, which is what fits across an A4 sheet on its side.
-  // Subjects run down the page and terms across it, so a parent reads one line
-  // to see how a child moved through the year rather than flipping between
-  // nine separate tables.
-  const TERMS_PER_ROW = 3;
-  const bands: typeof graded[] = [];
-  for (let i = 0; i < graded.length; i += TERMS_PER_ROW) {
-    bands.push(graded.slice(i, i + TERMS_PER_ROW));
+  // Subjects down the page, every term across it, on one grid. Each cell
+  // carries its own maximum because the terms are not marked on one scale — a
+  // monthly is out of 10 and the August final out of 50, and a bare "39" would
+  // mean nothing without knowing which.
+  const subjects: string[] = [];
+  for (const t of graded) {
+    for (const p of t.papers) if (!subjects.includes(p.subject)) subjects.push(p.subject);
   }
-  /** Every subject in this band, in the order the first test lists them. */
-  const subjectsOf = (band: typeof graded) => {
-    const out: string[] = [];
-    for (const t of band) for (const p of t.papers) if (!out.includes(p.subject)) out.push(p.subject);
-    return out;
-  };
 
   return (
     <div className="sheet report-sheet card card-pad bg-white"
@@ -122,94 +115,80 @@ export default function ReportCard({ data }: { data: ReportCardData }) {
         </p>
       ) : (
         <>
-          {bands.map((band, bi) => {
-            const subjects = subjectsOf(band);
-            return (
-              <table key={bi} className="mb-5 w-full border-collapse text-[12px]">
-                <thead>
-                  <tr className="bg-[#fafaff]">
-                    <th className={`${headCell} text-left`} rowSpan={2}>Subject</th>
-                    {band.map((t) => (
-                      <th key={t.key} colSpan={3} className={`${headCell} text-center`}>
-                        {t.title}
-                        <span className="ml-1 font-normal normal-case tracking-normal">
-                          {fmtDate(t.date)}
-                        </span>
-                      </th>
-                    ))}
-                  </tr>
-                  <tr className="bg-[#fafaff]">
-                    {band.map((t) => (
-                      <Fragment key={t.key}>
-                        <th className={`${headCell} text-right`}>Max</th>
-                        <th className={`${headCell} text-right`}>Got</th>
-                        <th className={`${headCell} text-right`}>%</th>
-                      </Fragment>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {subjects.map((sub) => (
-                    <tr key={sub}>
-                      <td className={cell}>{sub}</td>
-                      {band.map((t) => {
-                        const p = t.papers.find((x) => x.subject === sub);
-                        const pct = p && p.obtained !== null
-                          ? percentage(p.obtained, p.max) : null;
-                        const failed = p && p.pass !== null && p.obtained !== null
-                          && p.obtained < p.pass;
-                        return (
-                          <Fragment key={t.key}>
-                            <td className={`${cell} text-right tabular-nums`}>{p ? p.max : "—"}</td>
-                            <td className={`${cell} text-right tabular-nums ${failed ? "text-[var(--bad)]" : ""}`}>
-                              {!p ? "—"
-                                : p.isAbsent ? "Ab"
-                                : p.obtained === null
-                                  ? <span className="text-[var(--faint)]">—</span>
-                                  : p.obtained}
-                            </td>
-                            <td className={`${cell} text-right tabular-nums`}>
-                              {pct === null ? "—" : `${pct}%`}
-                            </td>
-                          </Fragment>
-                        );
-                      })}
-                    </tr>
+          <div className="overflow-x-auto">
+            <table className="mb-5 w-full border-collapse text-[12px]">
+              <thead>
+                <tr className="bg-[#fafaff]">
+                  <th className={`${headCell} text-left`}>Subject</th>
+                  {graded.map((t) => (
+                    <th key={t.key} className={`${headCell} text-right whitespace-nowrap`}>
+                      {t.title.replace(/\s*(Exam|Final Exam)\s*/i, " ").trim()}
+                      <span className="block font-normal normal-case tracking-normal">
+                        {fmtDate(t.date)}
+                      </span>
+                    </th>
                   ))}
-                  <tr className="bg-[#fafaff] font-semibold">
-                    <td className={cell}>Total</td>
-                    {band.map((t) => {
-                      const pct = t.max > 0 ? percentage(t.obtained, t.max) : null;
+                </tr>
+              </thead>
+              <tbody>
+                {subjects.map((sub) => (
+                  <tr key={sub}>
+                    <td className={`${cell} whitespace-nowrap`}>{sub}</td>
+                    {graded.map((t) => {
+                      const p = t.papers.find((x) => x.subject === sub);
+                      const failed = p && p.pass !== null && p.obtained !== null
+                        && p.obtained < p.pass;
                       return (
-                        <Fragment key={t.key}>
-                          <td className={`${cell} text-right tabular-nums`}>
-                            {t.graded > 0 ? t.max : "—"}
-                          </td>
-                          <td className={`${cell} text-right tabular-nums`}>
-                            {t.graded > 0 ? t.obtained : "—"}
-                          </td>
-                          <td className={`${cell} text-right tabular-nums`}>
-                            {pct === null ? "—" : `${pct}%`}
-                          </td>
-                        </Fragment>
-                      );
-                    })}
-                  </tr>
-                  <tr>
-                    <td className={`${cell} text-[var(--muted)]`}>Grade</td>
-                    {band.map((t) => {
-                      const pct = t.max > 0 ? percentage(t.obtained, t.max) : null;
-                      return (
-                        <td key={t.key} colSpan={3} className={`${cell} text-right font-medium`}>
-                          {pct === null ? "—" : grade(pct)}
+                        <td key={t.key}
+                          className={`${cell} text-right tabular-nums whitespace-nowrap ${
+                            failed ? "text-[var(--bad)]" : ""}`}>
+                          {!p
+                            ? <span className="text-[var(--faint)]">—</span>
+                            : p.isAbsent
+                              ? "Ab"
+                              : p.obtained === null
+                                ? <span className="text-[var(--faint)]">—</span>
+                                : <>{p.obtained}<span className="text-[var(--faint)]">/{p.max}</span></>}
                         </td>
                       );
                     })}
                   </tr>
-                </tbody>
-              </table>
-            );
-          })}
+                ))}
+                <tr className="bg-[#fafaff] font-semibold">
+                  <td className={cell}>Total</td>
+                  {graded.map((t) => (
+                    <td key={t.key} className={`${cell} text-right tabular-nums whitespace-nowrap`}>
+                      {t.graded > 0
+                        ? <>{t.obtained}<span className="font-normal text-[var(--faint)]">/{t.max}</span></>
+                        : "—"}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td className={`${cell} text-[var(--muted)]`}>Percentage</td>
+                  {graded.map((t) => {
+                    const pct = t.max > 0 ? percentage(t.obtained, t.max) : null;
+                    return (
+                      <td key={t.key} className={`${cell} text-right tabular-nums`}>
+                        {pct === null ? "—" : `${pct}%`}
+                      </td>
+                    );
+                  })}
+                </tr>
+                <tr>
+                  <td className={`${cell} text-[var(--muted)]`}>Grade</td>
+                  {graded.map((t) => {
+                    const pct = t.max > 0 ? percentage(t.obtained, t.max) : null;
+                    return (
+                      <td key={t.key} className={`${cell} text-right font-medium`}>
+                        {pct === null ? "—" : grade(pct)}
+                      </td>
+                    );
+                  })}
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
           <h2 className="mb-2 mt-6 text-[14px] font-semibold">Overall</h2>
           <table className="w-full border-collapse text-[12.5px]">
