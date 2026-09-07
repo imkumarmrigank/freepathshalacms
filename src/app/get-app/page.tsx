@@ -40,9 +40,10 @@ export default function GetAppPage() {
         <Image src="/icons/icon-192.png" alt="" width={64} height={64}
           className="rounded-[14px] border border-[var(--border)]" />
         <div>
-          <h1 className="text-[24px] font-semibold tracking-[-0.02em]">Pehchaan for Android</h1>
+          <h1 className="text-[24px] font-semibold tracking-[-0.02em]">Get the Pehchaan app</h1>
           <p className="mt-0.5 text-[14px] text-[var(--muted)]">
-            The same system as the website, in an app on your phone.
+            The same system as the website, in an app on your phone — Android below,
+            iPhone further down.
           </p>
         </div>
       </div>
@@ -82,6 +83,38 @@ export default function GetAppPage() {
           </li>
         ))}
       </ol>
+
+      {/* ------------------------------------------------------------- iPhone */}
+      <div className="card card-pad mt-9">
+        <h2 className="text-[16px] font-semibold">On an iPhone or iPad</h2>
+        <p className="mt-1 text-[14px] leading-relaxed text-[var(--muted)]">
+          Apple does not allow an app to be installed from a file the way Android does,
+          so there is no .apk to download. Pehchaan installs straight from Safari
+          instead — you get the same icon on your home screen and the same full-screen
+          app, without going through the App Store.
+        </p>
+        <ol className="mt-4 space-y-3">
+          {[
+            "Open sms.freepathshala.in in Safari. It has to be Safari — Chrome on iPhone cannot install it.",
+            "Tap the Share button at the bottom of the screen — the square with an arrow coming out of the top.",
+            "Scroll down the list and tap “Add to Home Screen”.",
+            "Tap Add. The Pehchaan icon appears on your home screen like any other app.",
+          ].map((t, i) => (
+            <li key={t} className="flex gap-3">
+              <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-[var(--brand)] text-[12px] font-semibold text-white">
+                {i + 1}
+              </span>
+              <span className="text-[14px] leading-relaxed">{t}</span>
+            </li>
+          ))}
+        </ol>
+        <p className="mt-3 text-[13px] leading-relaxed text-[var(--muted)]">
+          Signing in works the same way, and staying signed in works the same way. The one
+          difference from Android: iPhone will ask for location the first time you check in,
+          and you must choose <strong>While Using the App</strong> — Pehchaan cannot verify a
+          check-in without it.
+        </p>
+      </div>
 
       <div className="card card-pad mt-9">
         <h2 className="text-[15px] font-semibold">Would rather not install anything?</h2>
