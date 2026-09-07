@@ -31,6 +31,26 @@ export type ReportMeta = {
 
 export const REPORTS: ReportMeta[] = [
   {
+    key: "dropouts",
+    label: "Children who left",
+    group: "Students",
+    description:
+      "Every child taken off the roll in the period: the reason given, the remarks, "
+      + "and which administrator recorded it.",
+    filters: ["dates", "center", "class"],
+    roles: ["super_admin", "admin"],
+  },
+  {
+    key: "dropout-reasons",
+    label: "Why children leave",
+    group: "Students",
+    description:
+      "The same departures counted by reason and by centre, so a pattern shows before "
+      + "it becomes a term's worth of empty seats.",
+    filters: ["dates", "center"],
+    roles: ["super_admin", "admin"],
+  },
+  {
     key: "student-attendance-summary",
     label: "Student attendance summary",
     group: "Attendance",

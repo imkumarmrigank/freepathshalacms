@@ -66,6 +66,8 @@ export async function runReport(
   const period = `${p.from} to ${p.to}`;
 
   switch (key) {
+    case "dropouts":                     return dropouts(scoped, period);
+    case "dropout-reasons":              return dropoutReasons(scoped, period);
     case "student-attendance-summary":   return studentAttendanceSummary(scoped, period);
     case "student-attendance-trend":     return studentAttendanceTrend(scoped, period);
     case "staff-attendance-trend":       return staffAttendanceTrend(scoped, period);
@@ -1326,5 +1328,96 @@ async function timetableReport(p: ReportParams): Promise<ReportResult> {
       start_time: r.start_time.slice(0, 5), end_time: r.end_time.slice(0, 5),
       subject: r.subject, teacher: r.teacher, room: r.room,
     })),
+  };
+}
+
+
+/* ------------------------------------------------------------- who left, and why */
+
+/**
+ * Every child taken off the roll in the period.
+ *
+ * Only administrators can mark a child dropped, and only administrators can read
+ * this — the point of both is that a centre cannot quietly shrink the roll it is
+ * measured on. The name of whoever recorded it is part of the row for the same
+ * reason.
+ */
+async function dropouts(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND s.center_id = $${params.length}`; }
+  if (p.classId) {
+    params.push(p.classId);
+    where += ` AND EXISTS (SELECT 1 FROM enrollments e
+                            WHERE e.student_id = s.id AND e.class_level_id = $${params.length})`;
+  }
+
+  const rows = await query<ReportRow>(
+    `SELECT s.dropout_date::text AS dropout_date, s.enrollment_no,
+            trim(s.first_name || ' ' || COALESCE(s.last_name,'')) AS student,
+            ce.name AS center_name,
+            (SELECT cl.name FROM enrollments e
+               JOIN class_levels cl ON cl.id = e.class_level_id
+              WHERE e.student_id = s.id ORDER BY e.id DESC LIMIT 1) AS class_name,
+            s.dropout_reason, s.dropout_remarks,
+            s.father_name, s.primary_phone,
+            u.name AS marked_by, s.dropout_marked_at::date::text AS marked_on
+       FROM students s
+       JOIN centers ce ON ce.id = s.center_id
+       LEFT JOIN users u ON u.id = s.dropout_marked_by
+      WHERE s.status = 'dropped'
+        AND COALESCE(s.dropout_date, s.dropout_marked_at::date) BETWEEN $1 AND $2 ${where}
+      ORDER BY s.dropout_date DESC NULLS LAST, ce.code`,
+    params,
+  );
+
+  return {
+    title: "Children who left",
+    subtitle: period,
+    columns: [
+      { key: "dropout_date", label: "Left on", width: 13 },
+      { key: "enrollment_no", label: "Enrolment No", width: 16 },
+      { key: "student", label: "Student", width: 24 },
+      { key: "class_name", label: "Class", width: 12 },
+      { key: "center_name", label: "Centre", width: 16 },
+      { key: "dropout_reason", label: "Reason", width: 28 },
+      { key: "dropout_remarks", label: "Remarks", width: 36 },
+      { key: "father_name", label: "Father", width: 20 },
+      { key: "primary_phone", label: "Phone", width: 14 },
+      { key: "marked_by", label: "Recorded by", width: 20 },
+      { key: "marked_on", label: "Recorded on", width: 13 },
+    ],
+    rows,
+  };
+}
+
+/** The same departures counted by reason, so the pattern is visible at a glance. */
+async function dropoutReasons(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND s.center_id = $${params.length}`; }
+
+  const rows = await query<ReportRow>(
+    `SELECT COALESCE(s.dropout_reason, 'Not recorded') AS reason,
+            ce.name AS center_name,
+            count(*)::int AS children
+       FROM students s
+       JOIN centers ce ON ce.id = s.center_id
+      WHERE s.status = 'dropped'
+        AND COALESCE(s.dropout_date, s.dropout_marked_at::date) BETWEEN $1 AND $2 ${where}
+      GROUP BY 1, 2
+      ORDER BY count(*) DESC, 1`,
+    params,
+  );
+
+  return {
+    title: "Why children leave",
+    subtitle: period,
+    columns: [
+      { key: "reason", label: "Reason", width: 32 },
+      { key: "center_name", label: "Centre", width: 18 },
+      { key: "children", label: "Children", width: 10, numeric: true },
+    ],
+    rows,
   };
 }

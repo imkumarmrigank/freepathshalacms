@@ -84,4 +84,7 @@ export type Student = {
   tc_date: string | null;
   dropout_reason: string | null;
   dropout_date: string | null;
+  dropout_remarks: string | null;
+  dropout_marked_by: number | null;
+  dropout_marked_at: string | null;
 };

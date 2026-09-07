@@ -36,8 +36,10 @@ export default async function StudentPage({
   const { created, flag: openFlag } = await searchParams;
   const sid = Number(id);
 
-  const student = await one<Student & { center_name: string }>(
-    `SELECT s.*, c.name AS center_name FROM students s
+  const student = await one<Student & { center_name: string; dropout_marked_by_name: string | null }>(
+    `SELECT s.*, c.name AS center_name,
+            (SELECT u.name FROM users u WHERE u.id = s.dropout_marked_by) AS dropout_marked_by_name
+       FROM students s
        JOIN centers c ON c.id = s.center_id WHERE s.id = $1`, [sid],
   );
   if (!student) notFound();
@@ -289,7 +291,10 @@ export default async function StudentPage({
 
           {canMarkDropout(user.role) && (
             <DropoutControl studentId={student.id} status={student.status}
-              reason={student.dropout_reason} on={student.dropout_date} />
+              reason={student.dropout_reason} on={student.dropout_date}
+              remarks={student.dropout_remarks}
+              markedBy={student.dropout_marked_by_name}
+              markedAt={student.dropout_marked_at} />
           )}
 
           <Card>

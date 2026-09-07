@@ -4,41 +4,39 @@ import { markDropout, reinstateStudent } from "../actions";
 import { Card, Field } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
 import { fmtDate, today } from "@/lib/format";
-
-/** Reasons the centres actually give, so the report groups instead of guessing. */
-const REASONS = [
-  "Family moved away",
-  "Went back to the village",
-  "Admitted to a government school",
-  "Admitted to another school",
-  "Started working",
-  "Long illness",
-  "Too young to continue",
-  "Parents withdrew the child",
-  "Stopped attending, reason unknown",
-] as const;
+import { DROPOUT_REASONS } from "@/lib/dropout-meta";
 
 export default function DropoutControl({
-  studentId, status, reason, on,
+  studentId, status, reason, on, remarks, markedBy, markedAt,
 }: {
   studentId: number;
   status: string;
   reason: string | null;
   on: string | null;
+  remarks?: string | null;
+  markedBy?: string | null;
+  markedAt?: string | null;
 }) {
   const [markState, mark] = useActionState(markDropout, null);
   const [backState, back] = useActionState(reinstateStudent, null);
   const [open, setOpen] = useState(false);
-  const [picked, setPicked] = useState<string>(REASONS[0]);
+  const [picked, setPicked] = useState<string>(DROPOUT_REASONS[0]);
 
   if (status === "dropped") {
     return (
       <Card>
         <h2 className="mb-1 text-[15px] font-semibold text-[var(--bad)]">Dropped out</h2>
-        <p className="mb-3 text-[13px] text-[var(--muted)]">
+        <p className="text-[13px] font-medium">
           {reason ?? "No reason recorded"}
-          {on ? ` · ${fmtDate(on)}` : ""}
+          {on ? <span className="font-normal text-[var(--muted)]"> · {fmtDate(on)}</span> : null}
         </p>
+        {remarks && <p className="mt-1 text-[13px] text-[var(--muted)]">{remarks}</p>}
+        {markedBy && (
+          <p className="mt-1 text-[12px] text-[var(--faint)]">
+            Marked by {markedBy}{markedAt ? ` on ${fmtDate(markedAt)}` : ""}
+          </p>
+        )}
+        <div className="mb-3" />
         <form action={back}>
           <FormMessage state={backState} />
           <input type="hidden" name="id" value={studentId} />
@@ -73,18 +71,21 @@ export default function DropoutControl({
         <FormMessage state={markState} />
         <input type="hidden" name="id" value={studentId} />
         <Field label="Reason *">
-          <select className="select" value={picked} onChange={(e) => setPicked(e.target.value)}
-            name={picked === "Other" ? undefined : "dropout_reason"}>
-            {REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
-            <option value="Other">Other — type it below</option>
+          {/* the reason is always one of the listed ones, so the report can
+              group by it; anything particular to this child goes in remarks */}
+          <select className="select" name="dropout_reason" value={picked}
+            onChange={(e) => setPicked(e.target.value)}>
+            {DROPOUT_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
         </Field>
-        {picked === "Other" && (
-          <Field label="What happened *">
-            <textarea className="textarea" name="dropout_reason" rows={2} required
-              placeholder="In the centre's own words" />
-          </Field>
-        )}
+        <Field label={picked === "Other" ? "What happened *" : "Remarks"}
+          hint={picked === "Other"
+            ? "Other on its own tells the mentor nothing — say what happened."
+            : "Anything the mentor should know if they follow this child up."}>
+          <textarea className="textarea" name="dropout_remarks" rows={2}
+            required={picked === "Other"}
+            placeholder="In the centre's own words" />
+        </Field>
         <Field label="Date">
           <input className="input" type="date" name="dropout_date"
             defaultValue={today()} />

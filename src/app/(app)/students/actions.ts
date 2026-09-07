@@ -7,6 +7,7 @@ import { tx, query, one } from "@/lib/db";
 import { nextEnrollmentNo } from "@/lib/enrollment";
 import { currentSession } from "@/lib/queries";
 import { isGlobalRole, isTeaching, canMarkDropout } from "@/lib/roles";
+import { isDropoutReason } from "@/lib/dropout-meta";
 import { RECOMMENDERS, PTM_RECOMMENDER } from "@/lib/promotion-meta";
 
 const str = (f: FormData, k: string) => {
@@ -214,8 +215,14 @@ export async function markDropout(_prev: unknown, form: FormData) {
 
   const id = Number(form.get("id"));
   const reason = str(form, "dropout_reason");
+  const remarks = str(form, "dropout_remarks");
   const on = str(form, "dropout_date") ?? today();
   if (!reason) return { error: "Give a reason — it is what the follow-up works from." };
+  if (!isDropoutReason(reason))
+    return { error: "Choose one of the listed reasons." };
+  // "Other" says nothing on its own; the remarks are the reason in that case
+  if (reason === "Other" && !remarks)
+    return { error: "Choose Other only with a note saying what happened." };
 
   const existing = await one<{ center_id: number; status: string }>(
     "SELECT center_id, status FROM students WHERE id = $1", [id]);
@@ -225,8 +232,9 @@ export async function markDropout(_prev: unknown, form: FormData) {
   await tx(async (c) => {
     await c.query(
       `UPDATE students SET status = 'dropped', dropout_reason = $2, dropout_date = $3,
+          dropout_remarks = $4, dropout_marked_by = $5, dropout_marked_at = now(),
           updated_at = now() WHERE id = $1`,
-      [id, reason, on]);
+      [id, reason, on, remarks, user.uid]);
     await c.query(
       "UPDATE enrollments SET status = 'left' WHERE student_id = $1 AND status = 'active'",
       [id]);
@@ -253,6 +261,7 @@ export async function reinstateStudent(_prev: unknown, form: FormData) {
   await tx(async (c) => {
     await c.query(
       `UPDATE students SET status = 'active', dropout_reason = NULL, dropout_date = NULL,
+          dropout_remarks = NULL, dropout_marked_by = NULL, dropout_marked_at = NULL,
           updated_at = now() WHERE id = $1`, [id]);
     if (session)
       await c.query(
