@@ -101,6 +101,77 @@ function ReviewRow({ label, value }: { label: string; value: React.ReactNode }) 
 
 /* ------------------------------------------------------------- the wizard */
 
+/* ------------------------------------------------------ parent/guardian card */
+/**
+ * One parent or guardian.
+ *
+ * Declared here, at module scope, and not inside AdmissionWizard. A component
+ * defined inside another is a brand-new function on every render, so React
+ * treats it as a different component, throws the subtree away and builds a
+ * fresh one — which destroyed the input being typed into and dropped the
+ * caret after every single keystroke.
+ */
+function PersonCard({ kind, label, open, onToggle, v, set, photoId }: {
+  kind: string;
+  label: string;
+  open: boolean;
+  onToggle: () => void;
+  v: (k: string) => string;
+  set: (k: string, val: unknown) => void;
+  photoId: number | null;
+}) {
+  const filled = Boolean(v(`${kind}_name`));
+  return (
+    <div className="mb-3 overflow-hidden rounded-[10px] border border-[var(--border)]">
+      <button type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between gap-3 bg-[#fafaff] px-4 py-3 text-left">
+        <span className="text-[14px] font-medium">
+          {label}’s Details
+          {filled && <span className="ml-2 text-[12px] font-normal text-[var(--muted)]">
+            {v(`${kind}_name`)}
+          </span>}
+        </span>
+        <span className="text-[13px] text-[var(--muted)]">{open ? "Hide" : "Edit"}</span>
+      </button>
+      {open && (
+        <div className="px-4 pb-1 pt-4">
+          <PhotoUpload label={`${label} Photo`} size={88}
+            value={photoId}
+            onChange={(id) => set(`${kind}_photo_media_id`, id)} />
+          <div className="grid gap-x-4 sm:grid-cols-2">
+            <Text label={`${label} Name`} name={`${kind}_name`} value={v(`${kind}_name`)}
+              placeholder={`Enter ${label.toLowerCase()}'s full name`}
+              onChange={(x) => set(`${kind}_name`, x)} />
+            <Select label="Qualification" name={`${kind}_qualification`}
+              value={v(`${kind}_qualification`)} options={QUALIFICATIONS}
+              placeholder="Select Qualification"
+              onChange={(x) => set(`${kind}_qualification`, x)} />
+            <Select label="Occupation" name={`${kind}_occupation`}
+              value={v(`${kind}_occupation`)} options={OCCUPATIONS}
+              placeholder="Select Occupation"
+              onChange={(x) => set(`${kind}_occupation`, x)} />
+            {v(`${kind}_occupation`) === "Other" && (
+              <Text label="Please specify occupation" name={`${kind}_occupation_other`}
+                value={v(`${kind}_occupation_other`)} placeholder="Enter occupation"
+                onChange={(x) => set(`${kind}_occupation_other`, x)} />
+            )}
+            <Text label="Annual Income" name={`${kind}_income`} value={v(`${kind}_income`)}
+              inputMode="numeric" placeholder="Enter annual income"
+              onChange={(x) => set(`${kind}_income`, x)} />
+            <Text label="Email" name={`${kind}_email`} value={v(`${kind}_email`)}
+              type="email" placeholder="Enter email address"
+              onChange={(x) => set(`${kind}_email`, x)} />
+            <Text label="Mobile Number" name={`${kind}_mobile`} value={v(`${kind}_mobile`)}
+              inputMode="tel" maxLength={10} placeholder="Enter mobile number"
+              onChange={(x) => set(`${kind}_mobile`, x)} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdmissionWizard({
   centers, classes, sessionName, draft, draftId: initialDraftId,
 }: {
@@ -193,60 +264,6 @@ export default function AdmissionWizard({
       router.refresh();
     });
 
-  /* ------------------------------------------------------ parent/guardian card */
-  function PersonCard({ kind, label }: { kind: string; label: string }) {
-    const open = openCard === kind;
-    const filled = Boolean(v(`${kind}_name`));
-    return (
-      <div className="mb-3 overflow-hidden rounded-[10px] border border-[var(--border)]">
-        <button type="button"
-          onClick={() => setOpenCard(open ? null : kind)}
-          className="flex w-full items-center justify-between gap-3 bg-[#fafaff] px-4 py-3 text-left">
-          <span className="text-[14px] font-medium">
-            {label}’s Details
-            {filled && <span className="ml-2 text-[12px] font-normal text-[var(--muted)]">
-              {v(`${kind}_name`)}
-            </span>}
-          </span>
-          <span className="text-[13px] text-[var(--muted)]">{open ? "Hide" : "Edit"}</span>
-        </button>
-        {open && (
-          <div className="px-4 pb-1 pt-4">
-            <PhotoUpload label={`${label} Photo`} size={88}
-              value={data[`${kind}_photo_media_id`] as number ?? null}
-              onChange={(id) => set(`${kind}_photo_media_id`, id)} />
-            <div className="grid gap-x-4 sm:grid-cols-2">
-              <Text label={`${label} Name`} name={`${kind}_name`} value={v(`${kind}_name`)}
-                placeholder={`Enter ${label.toLowerCase()}'s full name`}
-                onChange={(x) => set(`${kind}_name`, x)} />
-              <Select label="Qualification" name={`${kind}_qualification`}
-                value={v(`${kind}_qualification`)} options={QUALIFICATIONS}
-                placeholder="Select Qualification"
-                onChange={(x) => set(`${kind}_qualification`, x)} />
-              <Select label="Occupation" name={`${kind}_occupation`}
-                value={v(`${kind}_occupation`)} options={OCCUPATIONS}
-                placeholder="Select Occupation"
-                onChange={(x) => set(`${kind}_occupation`, x)} />
-              {v(`${kind}_occupation`) === "Other" && (
-                <Text label="Please specify occupation" name={`${kind}_occupation_other`}
-                  value={v(`${kind}_occupation_other`)} placeholder="Enter occupation"
-                  onChange={(x) => set(`${kind}_occupation_other`, x)} />
-              )}
-              <Text label="Annual Income" name={`${kind}_income`} value={v(`${kind}_income`)}
-                inputMode="numeric" placeholder="Enter annual income"
-                onChange={(x) => set(`${kind}_income`, x)} />
-              <Text label="Email" name={`${kind}_email`} value={v(`${kind}_email`)}
-                type="email" placeholder="Enter email address"
-                onChange={(x) => set(`${kind}_email`, x)} />
-              <Text label="Mobile Number" name={`${kind}_mobile`} value={v(`${kind}_mobile`)}
-                inputMode="tel" maxLength={10} placeholder="Enter mobile number"
-                onChange={(x) => set(`${kind}_mobile`, x)} />
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
 
   return (
     <>
@@ -403,7 +420,11 @@ export default function AdmissionWizard({
           <SectionTitle title="Parent / Guardian Information"
             sub="Add the details of the student's parents or guardian." />
           {GUARDIAN_KINDS.map((g) => (
-            <PersonCard key={g.key} kind={g.key} label={g.label} />
+            <PersonCard key={g.key} kind={g.key} label={g.label}
+              open={openCard === g.key}
+              onToggle={() => setOpenCard(openCard === g.key ? null : g.key)}
+              v={v} set={set}
+              photoId={(data[`${g.key}_photo_media_id`] as number) ?? null} />
           ))}
         </Card>
       )}
