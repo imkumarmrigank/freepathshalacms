@@ -1,12 +1,27 @@
 /** Shared by server and client — no "use client", no server-only imports. */
 
-/** The four kinds of test a centre sets. These are what the form offers. */
+/** The two kinds of test a centre sets. These are what the form offers. */
 export const EXAM_TYPES = [
   { value: "monthly", label: "Monthly" },
-  { value: "promotional_t1", label: "Promotional - T1" },
-  { value: "promotional_t2", label: "Promotional - T2" },
-  { value: "promotional_t3", label: "Promotional - T3" },
+  { value: "promotional", label: "Promotional" },
 ] as const;
+
+/**
+ * A test is named for the month it is held in, chosen from a list rather than
+ * typed. Free text gave us "Monthly Exam June 2026", "Monthly may Exam 2026"
+ * and "Monthly Fab Exam 2026" for what were the same three months, and the
+ * report card had to guess which were the same test.
+ */
+export const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+] as const;
+
+export type Month = (typeof MONTHS)[number];
+
+export function isMonth(v: string): v is Month {
+  return (MONTHS as readonly string[]).includes(v);
+}
 
 /**
  * Names that are no longer offered but still sit on tests already filed. A
@@ -14,6 +29,9 @@ export const EXAM_TYPES = [
  * left out of the picker above.
  */
 const RETIRED_TYPES: Record<string, string> = {
+  promotional_t1: "Promotional - T1",
+  promotional_t2: "Promotional - T2",
+  promotional_t3: "Promotional - T3",
   unit_test: "Unit test",
   quarterly: "Quarterly",
   half_yearly: "Half yearly",

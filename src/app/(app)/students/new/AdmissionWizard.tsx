@@ -4,6 +4,7 @@ import { today } from "@/lib/format";
 import { useRouter } from "next/navigation";
 import { Alert, Card } from "@/components/ui";
 import PhotoUpload from "./PhotoUpload";
+import DocUpload from "./DocUpload";
 import { saveDraft, submitAdmission, type AdmissionPayload } from "./actions";
 import {
   BLOOD_GROUPS, CATEGORIES, COUNTRIES, GENDERS, GUARDIAN_KINDS, NATIONALITIES,
@@ -111,7 +112,7 @@ function ReviewRow({ label, value }: { label: string; value: React.ReactNode }) 
  * fresh one — which destroyed the input being typed into and dropped the
  * caret after every single keystroke.
  */
-function PersonCard({ kind, label, open, onToggle, v, set, photoId }: {
+function PersonCard({ kind, label, open, onToggle, v, set, photoId, aadhaarId, error }: {
   kind: string;
   label: string;
   open: boolean;
@@ -119,6 +120,8 @@ function PersonCard({ kind, label, open, onToggle, v, set, photoId }: {
   v: (k: string) => string;
   set: (k: string, val: unknown) => void;
   photoId: number | null;
+  aadhaarId: number | null;
+  error?: string;
 }) {
   const filled = Boolean(v(`${kind}_name`));
   return (
@@ -165,7 +168,15 @@ function PersonCard({ kind, label, open, onToggle, v, set, photoId }: {
             <Text label="Mobile Number" name={`${kind}_mobile`} value={v(`${kind}_mobile`)}
               inputMode="tel" maxLength={10} placeholder="Enter mobile number"
               onChange={(x) => set(`${kind}_mobile`, x)} />
+            <Text label="Aadhaar Number" name={`${kind}_aadhaar_number`}
+              value={v(`${kind}_aadhaar_number`)} inputMode="numeric" maxLength={12}
+              placeholder="12 digits" error={error}
+              onChange={(x) => set(`${kind}_aadhaar_number`, x)} />
           </div>
+          <DocUpload label={`${label}'s Aadhaar Card`}
+            hint="A photo or scan of the card. JPEG, PNG or PDF, up to 3 MB."
+            value={aadhaarId}
+            onChange={(id) => set(`${kind}_aadhaar_media_id`, id)} />
         </div>
       )}
     </div>
@@ -211,6 +222,13 @@ export default function AdmissionWizard({
       if (!v("first_name")) e.first_name = "Please enter this information.";
       if (!v("dob")) e.dob = "Please enter this information.";
       if (!v("gender")) e.gender = "Please enter this information.";
+    }
+    if (which === 2) {
+      for (const g of GUARDIAN_KINDS) {
+        const n = v(`${g.key}_aadhaar_number`);
+        if (n && !/^\d{12}$/.test(n.replace(/\D/g, "")))
+          e[`${g.key}_aadhaar_number`] = "Please enter a valid Aadhaar number.";
+      }
     }
     if (which === 1) {
       if (!v("primary_phone")) e.primary_phone = "Please enter this information.";
@@ -424,7 +442,9 @@ export default function AdmissionWizard({
               open={openCard === g.key}
               onToggle={() => setOpenCard(openCard === g.key ? null : g.key)}
               v={v} set={set}
-              photoId={(data[`${g.key}_photo_media_id`] as number) ?? null} />
+              photoId={(data[`${g.key}_photo_media_id`] as number) ?? null}
+              aadhaarId={(data[`${g.key}_aadhaar_media_id`] as number) ?? null}
+              error={errors[`${g.key}_aadhaar_number`]} />
           ))}
         </Card>
       )}

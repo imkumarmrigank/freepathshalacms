@@ -40,6 +40,7 @@ export type Student = {
   rte_application_no: string | null;
   apaar_id: string | null;
   aadhaar_number: string | null;
+  aadhaar_media_id: number | null;
 
   mother_qualification: string | null;
   mother_occupation: string | null;
@@ -49,6 +50,7 @@ export type Student = {
   mother_mobile: string | null;
   mother_photo_media_id: number | null;
   mother_aadhaar_number: string | null;
+  mother_aadhaar_media_id: number | null;
   mother_residential_address: string | null;
   mother_official_address: string | null;
 
@@ -60,6 +62,7 @@ export type Student = {
   father_mobile: string | null;
   father_photo_media_id: number | null;
   father_aadhaar_number: string | null;
+  father_aadhaar_media_id: number | null;
   father_residential_address: string | null;
   father_official_address: string | null;
 
@@ -71,6 +74,7 @@ export type Student = {
   guardian_mobile: string | null;
   guardian_photo_media_id: number | null;
   guardian_aadhaar_number: string | null;
+  guardian_aadhaar_media_id: number | null;
   guardian_residential_address: string | null;
   guardian_official_address: string | null;
 

@@ -120,6 +120,18 @@ export async function submitAdmission(payload: AdmissionPayload, draftId: number
   if (!b(payload, "declaration"))
     return { error: "Please confirm the declaration before submitting.", step: 4 };
 
+  // A parent's Aadhaar is optional, but a wrong one is worse than none — it is
+  // what an RTE claim is checked against.
+  const parentAadhaar = (kind: string) => {
+    const v = s(payload, `${kind}_aadhaar_number`);
+    return v === null ? null : v.replace(/\D/g, "");
+  };
+  for (const kind of ["father", "mother", "guardian"]) {
+    const v = s(payload, `${kind}_aadhaar_number`);
+    if (v && !isAadhaar(v))
+      return { error: `Please enter a valid Aadhaar number for the ${kind}.`, step: 2 };
+  }
+
   const aadhaar = s(payload, "aadhaar_number");
   if (aadhaar && !isAadhaar(aadhaar))
     return { error: "Please enter a valid Aadhaar number.", step: 3 };
@@ -155,12 +167,15 @@ export async function submitAdmission(payload: AdmissionPayload, draftId: number
            mother_income, mother_email, mother_mobile, mother_photo_media_id,
            guardian_name, guardian_qualification, guardian_occupation, guardian_occupation_other,
            guardian_income, guardian_email, guardian_mobile, guardian_photo_media_id,
-           udise, rte_application_no, apaar_id, aadhaar_number,
+           udise, rte_application_no, apaar_id, aadhaar_number, aadhaar_media_id,
+           father_aadhaar_number, father_aadhaar_media_id,
+           mother_aadhaar_number, mother_aadhaar_media_id,
+           guardian_aadhaar_number, guardian_aadhaar_media_id,
            admission_date, notes, created_by)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
                  $21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,
                  $39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51,$52,$53,$54,$55,
-                 $56,$57,$58)
+                 $56,$57,$58,$59,$60,$61,$62,$63,$64,$65)
          RETURNING id`,
         [enrollmentNo, admissionNo, registrationNo, centerId,
          firstName, s(payload, "last_name"), gender.toLowerCase(), dob,
@@ -188,6 +203,10 @@ export async function submitAdmission(payload: AdmissionPayload, draftId: number
          mediaId(payload, "guardian_photo_media_id"),
          payload.udise === null || payload.udise === undefined ? null : b(payload, "udise"),
          s(payload, "rte_application_no"), s(payload, "apaar_id"), aadhaar,
+         mediaId(payload, "aadhaar_media_id"),
+         parentAadhaar("father"), mediaId(payload, "father_aadhaar_media_id"),
+         parentAadhaar("mother"), mediaId(payload, "mother_aadhaar_media_id"),
+         parentAadhaar("guardian"), mediaId(payload, "guardian_aadhaar_media_id"),
          admissionDate, s(payload, "notes"), user.uid],
       );
       const studentId = rows[0].id;

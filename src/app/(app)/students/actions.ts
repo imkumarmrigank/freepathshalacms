@@ -87,15 +87,71 @@ export async function updateStudent(_prev: unknown, form: FormData) {
   if (existing.status === "dropped" && status !== "dropped" && !canMarkDropout(user.role))
     return { error: "Only an administrator can bring a dropped-out student back." };
 
+  // Everything the admission record shows, except the admission number and the
+  // Admission & scheme block — those have their own controls and their own audit.
+  const digits = (k: string) => {
+    const v = str(form, k);
+    return v === null ? null : v.replace(/\D/g, "") || null;
+  };
+  for (const k of ["aadhaar_number", "father_aadhaar_number",
+                   "mother_aadhaar_number", "guardian_aadhaar_number"]) {
+    const v = digits(k);
+    if (v && v.length !== 12)
+      return { error: "An Aadhaar number must be 12 digits." };
+  }
+  const media = (k: string) => {
+    const v = str(form, k);
+    const n = v === null ? NaN : Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  const tri = (k: string) => {
+    const v = str(form, k);
+    return v === "yes" ? true : v === "no" ? false : null;
+  };
+  const money = (k: string) => {
+    const v = digits(k);
+    return v === null ? null : Number(v);
+  };
+
+  const cols = [
+    "first_name", "last_name", "gender", "dob", "registration_no", "place_of_birth",
+    "blood_group", "nationality", "religion", "caste", "category", "medium", "apaar_id",
+    "disability_details",
+    "primary_phone", "whatsapp_number", "alt_phone", "email",
+    "house_block", "pincode", "city", "state", "country", "address",
+    "father_name", "father_qualification", "father_occupation", "father_occupation_other",
+    "father_email", "father_mobile", "father_residential_address", "father_official_address",
+    "mother_name", "mother_qualification", "mother_occupation", "mother_occupation_other",
+    "mother_email", "mother_mobile", "mother_residential_address", "mother_official_address",
+    "guardian_name", "guardian_qualification", "guardian_occupation", "guardian_occupation_other",
+    "guardian_email", "guardian_mobile", "guardian_residential_address", "guardian_official_address",
+    "notes",
+  ];
+  const values: unknown[] = [id, ...cols.map((c) => str(form, c))];
+  const sets = cols.map((c, i) => `${c}=$${i + 2}`);
+  const extra: [string, unknown][] = [
+    ["has_disability", tri("has_disability")],
+    ["status", status],
+    ["aadhaar_number", digits("aadhaar_number")],
+    ["aadhaar_media_id", media("aadhaar_media_id")],
+    ["father_aadhaar_number", digits("father_aadhaar_number")],
+    ["father_aadhaar_media_id", media("father_aadhaar_media_id")],
+    ["father_income", money("father_income")],
+    ["mother_aadhaar_number", digits("mother_aadhaar_number")],
+    ["mother_aadhaar_media_id", media("mother_aadhaar_media_id")],
+    ["mother_income", money("mother_income")],
+    ["guardian_aadhaar_number", digits("guardian_aadhaar_number")],
+    ["guardian_aadhaar_media_id", media("guardian_aadhaar_media_id")],
+    ["guardian_income", money("guardian_income")],
+  ];
+  for (const [col, val] of extra) {
+    values.push(val);
+    sets.push(`${col}=$${values.length}`);
+  }
+
   await query(
-    `UPDATE students SET first_name=$2, last_name=$3, gender=$4, dob=$5, father_name=$6,
-        mother_name=$7, guardian_name=$8, primary_phone=$9, alt_phone=$10, email=$11,
-        address=$12, status=$13, notes=$14, updated_at=now()
-      WHERE id=$1`,
-    [id, str(form, "first_name"), str(form, "last_name"), str(form, "gender"), str(form, "dob"),
-     str(form, "father_name"), str(form, "mother_name"), str(form, "guardian_name"),
-     str(form, "primary_phone"), str(form, "alt_phone"), str(form, "email"),
-     str(form, "address"), status, str(form, "notes")],
+    `UPDATE students SET ${sets.join(", ")}, updated_at=now() WHERE id=$1`,
+    values,
   );
   revalidatePath(`/students/${id}`);
   return { ok: "Saved." };

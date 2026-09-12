@@ -4,7 +4,7 @@ import { today } from "@/lib/format";
 import { createExam } from "./actions";
 import { Card, Field } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
-import { EXAM_TYPES } from "@/lib/exam-meta";
+import { EXAM_TYPES, MONTHS } from "@/lib/exam-meta";
 
 const COMMON_SUBJECTS = [
   "English", "Hindi", "Mathematics", "Science", "Social Science",
@@ -118,8 +118,11 @@ export default function NewExamForm({
       </p>
       <form action={action}>
         <FormMessage state={state} />
-        <Field label="Test name *" hint="For example September Monthly Test">
-          <input className="input" name="title" required placeholder="September Monthly Test" />
+        <Field label="Test name *" hint="The month the test is held in.">
+          <select className="select" name="title" required defaultValue="">
+            <option value="" disabled>Choose a month</option>
+            {MONTHS.map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
         </Field>
         <Field label="Type *">
           <select className="select" name="exam_type" defaultValue="monthly">

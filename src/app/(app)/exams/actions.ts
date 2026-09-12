@@ -5,7 +5,7 @@ import { requireUser, canTouchCenter, effectiveTeacherIds } from "@/lib/auth";
 import { one, query, tx } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
-import { isSettableExamType } from "@/lib/exam-meta";
+import { isMonth, isSettableExamType } from "@/lib/exam-meta";
 
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
@@ -49,7 +49,9 @@ export async function createExam(_prev: unknown, form: FormData) {
   const defaultPass = defaultPassRaw === null ? null : Number(defaultPassRaw);
 
   if (!title || classLevelIds.length === 0 || !examDate)
-    return { error: "Title, class and date are all required." };
+    return { error: "Month, class and date are all required." };
+  // the name is a month chosen from the list, not free text
+  if (!isMonth(title)) return { error: "Choose the month the test is held in." };
   if (!Number.isFinite(defaultMax) || defaultMax <= 0)
     return { error: "Maximum marks must be greater than zero." };
 
