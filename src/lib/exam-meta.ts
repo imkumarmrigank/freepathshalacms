@@ -1,15 +1,35 @@
 /** Shared by server and client — no "use client", no server-only imports. */
+
+/** The four kinds of test a centre sets. These are what the form offers. */
 export const EXAM_TYPES = [
-  { value: "unit_test", label: "Unit test" },
   { value: "monthly", label: "Monthly" },
-  { value: "quarterly", label: "Quarterly" },
-  { value: "half_yearly", label: "Half yearly" },
-  { value: "yearly", label: "Yearly" },
-  { value: "other", label: "Other" },
+  { value: "promotional_t1", label: "Promotional - T1" },
+  { value: "promotional_t2", label: "Promotional - T2" },
+  { value: "promotional_t3", label: "Promotional - T3" },
 ] as const;
 
-export const EXAM_TYPE_LABEL: Record<string, string> =
-  Object.fromEntries(EXAM_TYPES.map((t) => [t.value, t.label]));
+/**
+ * Names that are no longer offered but still sit on tests already filed. A
+ * report or a report card must keep reading them, so they are labelled here and
+ * left out of the picker above.
+ */
+const RETIRED_TYPES: Record<string, string> = {
+  unit_test: "Unit test",
+  quarterly: "Quarterly",
+  half_yearly: "Half yearly",
+  yearly: "Yearly",
+  other: "Other",
+};
+
+export const EXAM_TYPE_LABEL: Record<string, string> = {
+  ...RETIRED_TYPES,
+  ...Object.fromEntries(EXAM_TYPES.map((t) => [t.value, t.label])),
+};
+
+/** Rejects a type the form no longer offers, without disturbing old records. */
+export function isSettableExamType(v: string): boolean {
+  return EXAM_TYPES.some((t) => t.value === v);
+}
 
 /** Percentage -> grade, the common Indian school scale. */
 export function grade(pct: number | null) {

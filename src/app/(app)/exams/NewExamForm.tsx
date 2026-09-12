@@ -70,7 +70,6 @@ export default function NewExamForm({
   const [state, action] = useActionState(createExam, null);
   const [rows, setRows] = useState<Row[]>([blank(), blank(), blank()]);
   const [pickedClasses, setPickedClasses] = useState<number[]>([]);
-  const [pickedCentres, setPickedCentres] = useState<number[]>([]);
 
   const update = (i: number, patch: Partial<Row>) =>
     setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
@@ -93,7 +92,8 @@ export default function NewExamForm({
 
   const filled = rows.filter((r) => r.subject.trim() !== "").length;
   const classCount = pickedClasses.length;
-  const centreCount = isAdmin ? pickedCentres.length : 1;
+  // an administrator sets the test for the whole organisation at once
+  const centreCount = isAdmin ? centers.length : 1;
   const sheets = filled * classCount * centreCount;
 
   if (isTeacher && classes.length === 0) {
@@ -112,9 +112,9 @@ export default function NewExamForm({
     <Card>
       <h2 className="mb-1 text-[15px] font-semibold">Set up a test</h2>
       <p className="mb-4 text-[13px] text-[var(--muted)]">
-        One window for the whole schedule: pick the subjects, the classes and{" "}
-        {isAdmin ? "the centres" : "your centre"}. Each subject gets its own marks sheet,
-        and they appear together on the progress report.
+        One window for the whole schedule: pick the classes and the subjects.
+        Each subject gets its own marks sheet, and they appear together on the
+        progress report.
       </p>
       <form action={action}>
         <FormMessage state={state} />
@@ -127,10 +127,13 @@ export default function NewExamForm({
           </select>
         </Field>
         {isAdmin && (
-          <PickMany name="center_id" label="Centres *"
-            hint="Every centre you tick gets its own marks sheet for each class."
-            options={centers.map((c) => ({ id: c.id, label: `${c.code} · ${c.name}` }))}
-            value={pickedCentres} onChange={setPickedCentres} />
+          <div className="mb-3.5 rounded-[9px] bg-[var(--brand-soft)] px-3.5 py-2.5">
+            <p className="text-[13px]">
+              <strong>Every centre.</strong> A test you set goes to all{" "}
+              {centers.length} open centres, and each gets its own marks sheet for
+              every class you pick below.
+            </p>
+          </div>
         )}
         <PickMany name="class_level_id" label="Classes *"
           hint={isTeacher ? "Only classes you are allotted" : undefined}

@@ -5,6 +5,7 @@ import { requireUser, canTouchCenter, effectiveTeacherIds } from "@/lib/auth";
 import { one, query, tx } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
+import { isSettableExamType } from "@/lib/exam-meta";
 
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
@@ -78,12 +79,17 @@ export async function createExam(_prev: unknown, form: FormData) {
 
   if (papers.length === 0) return { error: "Add at least one subject." };
 
-  // One window schedules the whole thing: pick any number of centres and any
-  // number of classes, and every combination gets the same set of papers.
+  // A test set by an administrator is the organisation's test, so it goes to
+  // every open centre without anybody having to tick twelve boxes. A centre's
+  // own staff still set tests only for their centre.
   const centerIds = isGlobalRole(user.role)
-    ? form.getAll("center_id").map(Number).filter(Boolean)
+    ? (await query<{ id: number }>(
+        "SELECT id FROM centers WHERE is_active ORDER BY code")).map((c) => c.id)
     : (user.centerId ? [user.centerId] : []);
-  if (centerIds.length === 0) return { error: "Pick at least one centre." };
+  if (centerIds.length === 0)
+    return { error: isGlobalRole(user.role)
+      ? "There are no open centres to set a test for."
+      : "You are not attached to a centre." };
   for (const id of centerIds)
     if (!canTouchCenter(user, id)) return { error: "One of those centres is not yours." };
 
@@ -96,6 +102,7 @@ export async function createExam(_prev: unknown, form: FormData) {
   }
 
   const examType = String(form.get("exam_type") ?? "monthly");
+  if (!isSettableExamType(examType)) return { error: "Pick the kind of test." };
   // the label is what ties the subjects together, so never leave it empty
   const termLabel = str(form, "term_label") ?? title;
 
@@ -145,9 +152,9 @@ export async function updateExam(_prev: unknown, form: FormData) {
 
   const exam = await one<{
     id: number; center_id: number; class_level_id: number; session_id: number;
-    term_label: string | null; title: string; max_marks: string;
+    term_label: string | null; title: string; max_marks: string; exam_type: string;
   }>(
-    `SELECT id, center_id, class_level_id, session_id, term_label, title, max_marks
+    `SELECT id, center_id, class_level_id, session_id, term_label, title, max_marks, exam_type
        FROM exams WHERE id = $1`, [examId]);
   if (!exam) return { error: "Test not found." };
 
@@ -158,6 +165,10 @@ export async function updateExam(_prev: unknown, form: FormData) {
   const subject = str(form, "subject");
   const examDate = str(form, "exam_date");
   const examType = String(form.get("exam_type") ?? "monthly");
+  // A test filed under a name the form no longer offers keeps that name; only a
+  // change has to be to one of the four.
+  if (!isSettableExamType(examType) && examType !== exam.exam_type)
+    return { error: "Pick the kind of test." };
   const termLabel = str(form, "term_label") ?? title;
   const max = Number(form.get("max_marks"));
   const passRaw = str(form, "pass_marks");

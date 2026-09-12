@@ -3,7 +3,7 @@ import { useActionState, useState } from "react";
 import { updateExam } from "../actions";
 import { Card, Field } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
-import { EXAM_TYPES } from "@/lib/exam-meta";
+import { EXAM_TYPES, EXAM_TYPE_LABEL, isSettableExamType } from "@/lib/exam-meta";
 
 export type ExamForEdit = {
   id: number; title: string; subject: string; exam_type: string; exam_date: string;
@@ -54,6 +54,14 @@ export default function EditExam({ exam, siblings }:
           </Field>
           <Field label="Type *">
             <select className="select" name="exam_type" defaultValue={exam.exam_type}>
+              {/* A test set before the list was narrowed keeps its own name as an
+                  option, so opening it to fix a date does not quietly refile it
+                  as a Monthly. */}
+              {!isSettableExamType(exam.exam_type) && (
+                <option value={exam.exam_type}>
+                  {EXAM_TYPE_LABEL[exam.exam_type] ?? exam.exam_type} (no longer offered)
+                </option>
+              )}
               {EXAM_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
           </Field>
