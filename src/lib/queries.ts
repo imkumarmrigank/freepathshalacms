@@ -8,6 +8,7 @@ export type Center = {
   address: string | null; phone: string | null;
   latitude: number | null; longitude: number | null; geofence_radius_m: number;
   manager_id: number | null; manager_name?: string | null; is_active: boolean;
+  center_type: string | null;
 };
 
 export type AcademicSession = {

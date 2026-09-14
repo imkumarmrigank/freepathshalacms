@@ -1,4 +1,5 @@
 "use server";
+import { isCentreType } from "@/lib/centre-meta";
 import { revalidatePath } from "next/cache";
 import { requireRole, requireUser, hashPassword, canTouchCenter } from "@/lib/auth";
 import { canCreateCentre, canCreateRole, canManageStaff, isGlobalRole, type Role, isTeaching, needsCentre } from "@/lib/roles";
@@ -16,7 +17,10 @@ const numOrNull = (f: FormData, k: string) => {
 
 /* ------------------------------------------------------------------ centres */
 export async function saveCenter(_prev: unknown, form: FormData) {
-  const actor = await requireRole("super_admin", "mentor");
+  // An admin maintains the centres that exist, as roles.ts has always said; the
+  // page was locked to super admin and mentor, so an admin saw the menu entry
+  // and was turned away. Opening a new centre is still the super admin's alone.
+  const actor = await requireRole("super_admin", "admin", "mentor");
   const id = numOrNull(form, "id");
   // a mentor maintains the centres that exist; opening a new one is the admin's call
   if (!id && !canCreateCentre(actor.role))
@@ -24,6 +28,13 @@ export async function saveCenter(_prev: unknown, form: FormData) {
   const code = str(form, "code")?.toUpperCase();
   const name = str(form, "name");
   if (!code || !name) return { error: "Centre code and name are required." };
+
+  const centreType = str(form, "center_type");
+  if (centreType !== null && !isCentreType(centreType))
+    return { error: "Choose whether the centre is in a park or inside a school." };
+  // a new centre must say where it runs; an existing one may still be unset
+  if (!id && centreType === null)
+    return { error: "Choose whether the centre is in a park or inside a school." };
 
   const lat = numOrNull(form, "latitude");
   const lng = numOrNull(form, "longitude");
@@ -44,18 +55,19 @@ export async function saveCenter(_prev: unknown, form: FormData) {
       await query(
         `UPDATE centers SET code=$2, name=$3, area=$4, address=$5, city=$6, state=$7,
             pincode=$8, phone=$9, latitude=$10, longitude=$11, geofence_radius_m=$12,
-            is_active=$13 WHERE id=$1`,
+            is_active=$13, center_type=$14 WHERE id=$1`,
         [id, code, name, str(form, "area"), str(form, "address"), str(form, "city"),
          str(form, "state"), str(form, "pincode"), str(form, "phone"), lat, lng, radius,
-         form.get("is_active") === "on"],
+         form.get("is_active") === "on", centreType],
       );
     } else {
       await query(
         `INSERT INTO centers (code, name, area, address, city, state, pincode, phone,
-            latitude, longitude, geofence_radius_m)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+            latitude, longitude, geofence_radius_m, center_type)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
         [code, name, str(form, "area"), str(form, "address"), str(form, "city"),
-         str(form, "state"), str(form, "pincode"), str(form, "phone"), lat, lng, radius],
+         str(form, "state"), str(form, "pincode"), str(form, "phone"), lat, lng, radius,
+         centreType],
       );
     }
   } catch (err) {

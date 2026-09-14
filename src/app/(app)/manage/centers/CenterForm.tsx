@@ -5,6 +5,7 @@ import { Card, Field } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
 import type { Center } from "@/lib/queries";
 import { GEOFENCE_DEFAULT_M, GEOFENCE_MAX_M, GEOFENCE_MIN_M } from "@/lib/geo";
+import { CENTRE_TYPES } from "@/lib/centre-meta";
 
 export default function CenterForm({ center }: { center?: Center | null }) {
   const [state, action] = useActionState(saveCenter, null);
@@ -40,6 +41,17 @@ export default function CenterForm({ center }: { center?: Center | null }) {
           </Field>
           <Field label="Centre name *">
             <input className="input" name="name" defaultValue={center?.name ?? ""} required />
+          </Field>
+          <Field label={center ? "Type of centre" : "Type of centre *"} wide>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {CENTRE_TYPES.map((t) => (
+                <label key={t.value} className="pick">
+                  <input type="radio" name="center_type" value={t.value}
+                    required={!center} defaultChecked={center?.center_type === t.value} />
+                  <span><b>{t.label}</b><em>{t.hint}</em></span>
+                </label>
+              ))}
+            </div>
           </Field>
           <Field label="Area / locality">
             <input className="input" name="area" defaultValue={center?.area ?? ""} />

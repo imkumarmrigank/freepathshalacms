@@ -5,16 +5,17 @@ import { canCreateCentre } from "@/lib/roles";
 import { Alert, Badge, Card, Empty, PageHeader } from "@/components/ui";
 import Link from "next/link";
 import CenterForm from "./CenterForm";
+import { CENTRE_TYPE_LABEL } from "@/lib/centre-meta";
 import ManagerPicker from "./ManagerPicker";
 
 export default async function CentersPage({
   searchParams,
 }: { searchParams: Promise<{ edit?: string }> }) {
-  const user = await requireRole("super_admin", "mentor");
+  const user = await requireRole("super_admin", "admin", "mentor");
   const { edit } = await searchParams;
   const canCreate = canCreateCentre(user.role);
   const [centers, editing, staff] = await Promise.all([
-    user.role === "super_admin" ? listCenters(false) : centersForUser(user),
+    user.role === "super_admin" || user.role === "admin" ? listCenters(false) : centersForUser(user),
     edit ? getCenter(Number(edit)) : Promise.resolve(null),
     query<{ id: number; name: string; email: string }>(
       "SELECT id, name, email FROM users WHERE role IN ('center_manager','teacher') AND is_active ORDER BY name",
@@ -31,6 +32,15 @@ export default async function CentersPage({
 
   return (
     <>
+      {centers.some((c) => !c.center_type) && (
+        <div className="mb-5">
+          <Alert kind="warn">
+            {centers.filter((c) => !c.center_type).length} centre
+            {centers.filter((c) => !c.center_type).length === 1 ? " has" : "s have"} no type
+            set. Choose Edit and say whether it runs in a park or inside a school.
+          </Alert>
+        </div>
+      )}
       {centers.some((c) => c.latitude == null) && (
         <div className="mb-5">
           <Alert kind="warn">
@@ -64,7 +74,12 @@ export default async function CentersPage({
                           <div className="text-[12px] text-[var(--muted)]">
                             {[c.area, c.city].filter(Boolean).join(", ") || "—"}
                           </div>
-                          {!c.is_active && <Badge tone="mute">Inactive</Badge>}
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {c.center_type
+                              ? <Badge tone="info" dot={false}>{CENTRE_TYPE_LABEL[c.center_type]}</Badge>
+                              : <Badge tone="warn">Type not set</Badge>}
+                            {!c.is_active && <Badge tone="mute">Inactive</Badge>}
+                          </div>
                         </td>
                         <td>
                           <ManagerPicker centerId={c.id} managerId={c.manager_id}
