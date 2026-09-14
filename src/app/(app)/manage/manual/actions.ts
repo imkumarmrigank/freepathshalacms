@@ -38,7 +38,7 @@ function notesOf(form: FormData): Note[] {
 }
 
 export async function saveIntro(_prev: unknown, form: FormData) {
-  const user = await requireRole("super_admin");
+  const user = await requireRole("super_admin", "admin");
   const book = bookOf(form);
   if (!book) return { error: "Unknown manual." };
 
@@ -64,7 +64,7 @@ export async function saveIntro(_prev: unknown, form: FormData) {
 }
 
 export async function saveTask(_prev: unknown, form: FormData) {
-  const user = await requireRole("super_admin");
+  const user = await requireRole("super_admin", "admin");
   const book = bookOf(form);
   if (!book) return { error: "Unknown manual." };
 
@@ -106,7 +106,7 @@ export async function saveTask(_prev: unknown, form: FormData) {
 }
 
 export async function deleteTask(_prev: unknown, form: FormData) {
-  await requireRole("super_admin");
+  await requireRole("super_admin", "admin");
   await query("DELETE FROM manual_tasks WHERE id = $1", [Number(form.get("id"))]);
   revalidatePath("/manage/manual");
   revalidatePath("/manual");
@@ -115,7 +115,7 @@ export async function deleteTask(_prev: unknown, form: FormData) {
 
 /** Swaps a task with its neighbour, which is all reordering ever needs to be. */
 export async function moveTask(_prev: unknown, form: FormData) {
-  await requireRole("super_admin");
+  await requireRole("super_admin", "admin");
   const id = Number(form.get("id"));
   const up = String(form.get("direction")) === "up";
 
@@ -139,7 +139,7 @@ export async function moveTask(_prev: unknown, form: FormData) {
 }
 
 export async function savePitfall(_prev: unknown, form: FormData) {
-  const user = await requireRole("super_admin");
+  const user = await requireRole("super_admin", "admin");
   const book = bookOf(form);
   if (!book) return { error: "Unknown manual." };
 
@@ -169,7 +169,7 @@ export async function savePitfall(_prev: unknown, form: FormData) {
 }
 
 export async function deletePitfall(_prev: unknown, form: FormData) {
-  await requireRole("super_admin");
+  await requireRole("super_admin", "admin");
   await query("DELETE FROM manual_pitfalls WHERE id = $1", [Number(form.get("id"))]);
   revalidatePath("/manage/manual");
   revalidatePath("/manual");

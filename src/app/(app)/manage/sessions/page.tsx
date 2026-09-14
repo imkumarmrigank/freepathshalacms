@@ -10,7 +10,7 @@ import MakeCurrent from "./MakeCurrent";
 export default async function SessionsPage({
   searchParams,
 }: { searchParams: Promise<{ edit?: string }> }) {
-  await requireRole("super_admin");
+  await requireRole("super_admin", "admin");
   const { edit } = await searchParams;
   const sessions = await listSessions();
   const editing = edit

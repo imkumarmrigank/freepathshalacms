@@ -77,7 +77,7 @@ export function needsCentre(role: Role) {
 
 /** Only the super admin opens a new centre; an admin maintains existing ones. */
 export function canCreateCentre(role: Role) {
-  return role === "super_admin";
+  return role === "super_admin" || role === "admin";
 }
 
 /** Centres, and the supply chain from HQ to centre to student. */

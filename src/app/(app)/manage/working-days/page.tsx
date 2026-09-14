@@ -7,7 +7,7 @@ import WeekForm from "./WeekForm";
 export const metadata = { title: "Working days · Pehchaan" };
 
 export default async function WorkingDaysPage() {
-  await requireRole("super_admin");
+  await requireRole("super_admin", "admin");
   const off = await weekOffDays();
 
   return (

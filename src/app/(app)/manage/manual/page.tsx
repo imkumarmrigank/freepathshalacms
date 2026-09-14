@@ -12,7 +12,7 @@ export const metadata = { title: "Edit manuals · Pehchaan" };
 export default async function ManageManualPage({
   searchParams,
 }: { searchParams: Promise<{ book?: string; lang?: string }> }) {
-  await requireRole("super_admin");
+  await requireRole("super_admin", "admin");
   const sp = await searchParams;
   const book = sp.book && isManualKey(sp.book) ? sp.book : "teacher";
   const lang = isLang(sp.lang) ? sp.lang : "en";

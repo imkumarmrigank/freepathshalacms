@@ -8,7 +8,7 @@ import ClassForm from "./ClassForm";
 export default async function ClassesPage({
   searchParams,
 }: { searchParams: Promise<{ edit?: string }> }) {
-  await requireRole("super_admin");
+  await requireRole("super_admin", "admin");
   const { edit } = await searchParams;
   const classes = await listClasses(false);
   const editing = edit

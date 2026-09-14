@@ -105,11 +105,11 @@ const MENU: Node[] = [
       {
         label: "Setup", icon: IconLayers, children: [
           { href: "/manage/centers", label: "Centres", feature: "centres" },
-          { href: "/manage/classes", label: "Classes", roles: ["super_admin"] },
-          { href: "/manage/sessions", label: "Sessions", roles: ["super_admin"] },
-          { href: "/manage/working-days", label: "Working days", roles: ["super_admin"] },
+          { href: "/manage/classes", label: "Classes", roles: ["super_admin", "admin"] },
+          { href: "/manage/sessions", label: "Sessions", roles: ["super_admin", "admin"] },
+          { href: "/manage/working-days", label: "Working days", roles: ["super_admin", "admin"] },
           { href: "/manage/syllabus", label: "Syllabus", roles: ["super_admin", "admin"] },
-          { href: "/manage/manual", label: "Training manuals", roles: ["super_admin"] },
+          { href: "/manage/manual", label: "Training manuals", roles: ["super_admin", "admin"] },
         ],
       },
     ],

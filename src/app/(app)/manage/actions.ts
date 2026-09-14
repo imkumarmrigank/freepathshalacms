@@ -79,7 +79,7 @@ export async function saveCenter(_prev: unknown, form: FormData) {
 }
 
 export async function assignManager(_prev: unknown, form: FormData) {
-  await requireRole("super_admin", "mentor");
+  await requireRole("super_admin", "admin", "mentor");
   const centerId = Number(form.get("center_id"));
   const userId = numOrNull(form, "manager_id");
   if (userId) {
@@ -160,7 +160,7 @@ export async function saveStaff(_prev: unknown, form: FormData) {
 
 /* ----------------------------------------------------------------- sessions */
 export async function saveSession(_prev: unknown, form: FormData) {
-  await requireRole("super_admin");
+  await requireRole("super_admin", "admin");
   const id = numOrNull(form, "id");
   const name = str(form, "name");
   const start = str(form, "start_date");
@@ -191,7 +191,7 @@ export async function saveSession(_prev: unknown, form: FormData) {
 }
 
 export async function setCurrentSession(_prev: unknown, form: FormData) {
-  await requireRole("super_admin");
+  await requireRole("super_admin", "admin");
   const id = Number(form.get("id"));
   await query("UPDATE academic_sessions SET is_current = FALSE WHERE is_current");
   await query("UPDATE academic_sessions SET is_current = TRUE, is_locked = FALSE WHERE id = $1", [id]);
@@ -202,7 +202,7 @@ export async function setCurrentSession(_prev: unknown, form: FormData) {
 
 /* ------------------------------------------------------------------ classes */
 export async function saveClass(_prev: unknown, form: FormData) {
-  await requireRole("super_admin");
+  await requireRole("super_admin", "admin");
   const id = numOrNull(form, "id");
   const name = str(form, "name");
   const sequence = numOrNull(form, "sequence");

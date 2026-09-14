@@ -10,7 +10,7 @@ import { WEEK_OFF_KEY, formatWeekOff, describeWeekOff } from "@/lib/week";
  * closes itself on from here on, and how the calendar draws the week.
  */
 export async function saveWorkingDays(_prev: unknown, form: FormData) {
-  await requireRole("super_admin");
+  await requireRole("super_admin", "admin");
 
   // the form posts the days that ARE worked; everything else is a day off
   const worked = new Set(form.getAll("working_day").map((v) => Number(v)));

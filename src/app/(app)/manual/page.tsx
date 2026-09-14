@@ -54,7 +54,7 @@ export default async function ManualPage({
         right={
           <>
             <LanguagePicker available={available} current={m.lang} />
-            {user.role === "super_admin" && (
+            {(user.role === "super_admin" || user.role === "admin") && (
               <Link href={`/manage/manual?book=${key}`} className="btn btn-ghost no-print">
                 Edit manuals
               </Link>
