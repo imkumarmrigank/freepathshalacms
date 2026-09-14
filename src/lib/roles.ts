@@ -128,7 +128,8 @@ export type Feature =
   // audits: "audits" is the auditor's own work — rating a centre and raising
   // suggestions. "auditReports" is reading them. A centre reads its own report
   // and answers its own suggestions; it never scores itself.
-  | "audits" | "auditReports";
+  | "audits" | "auditReports"
+  | "syllabus";
 
 /** One explicit list per role — no inference, so a gate is read, not deduced. */
 const FEATURES: Record<Role, Feature[]> = {
@@ -136,13 +137,13 @@ const FEATURES: Record<Role, Feature[]> = {
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
     "calendar", "ptm", "followUps", "supplies", "statistics", "reports",
     "staff", "centres", "coverage", "counselling", "teacherRemarks", "messages",
-    "audits", "auditReports",
+    "audits", "auditReports", "syllabus",
   ],
   admin: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
     "calendar", "ptm", "followUps", "supplies", "statistics", "reports",
     "staff", "centres", "coverage", "counselling", "teacherRemarks", "messages",
-    "audits", "auditReports",
+    "audits", "auditReports", "syllabus",
   ],
   // the whole point of the mentor role is that this list is short
   mentor: [
@@ -152,17 +153,17 @@ const FEATURES: Record<Role, Feature[]> = {
   center_manager: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
     "calendar", "ptm", "followUps", "supplies", "statistics", "reports",
-    "staff", "ownCheckIn", "counselling", "messages", "auditReports",
+    "staff", "ownCheckIn", "counselling", "messages", "auditReports", "syllabus",
   ],
   teacher: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
     "calendar", "ptm", "followUps", "reports", "ownCheckIn", "counselling", "messages",
-    "auditReports",
+    "auditReports", "syllabus",
   ],
   backup_teacher: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
     "calendar", "ptm", "followUps", "reports", "ownCheckIn", "counselling", "messages",
-    "auditReports",
+    "auditReports", "syllabus",
   ],
   // Deliberately the shortest list in the file. An auditor judges centres; they
   // do not run one, and they see nothing of a child beyond the roll numbers on
@@ -225,4 +226,20 @@ export function canAnswerSuggestions(role: Role) {
 /** Reads every centre's audit history rather than just their own. */
 export function seesAllAudits(role: Role) {
   return role === "super_admin" || role === "admin" || role === "auditor";
+}
+
+/* -------------------------------------------------------------- syllabus */
+
+/**
+ * Setting what is to be taught. Centrally decided so that twelve centres
+ * teaching Class 1 Hindi are teaching the same Class 1 Hindi — a teacher
+ * follows the syllabus and records progress against it, but does not rewrite it.
+ */
+export function canEditSyllabus(role: Role) {
+  return role === "super_admin" || role === "admin";
+}
+
+/** Recording how far a centre has got. The teacher's own work. */
+export function canMarkSyllabus(role: Role) {
+  return role === "center_manager" || isTeaching(role);
 }

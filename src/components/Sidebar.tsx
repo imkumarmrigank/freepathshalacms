@@ -56,6 +56,7 @@ const MENU: Node[] = [
   {
     label: "Teaching", icon: IconBook, children: [
       { href: "/timetable", label: "Timetable", feature: "timetable" },
+      { href: "/syllabus", label: "Syllabus", feature: "syllabus" },
       { href: "/teaching-plans", label: "Teaching plans", feature: "teachingPlans" },
       { href: "/exams", label: "Tests & marks", feature: "exams" },
       { href: "/teacher-remarks", label: "Teacher remarks", feature: "teacherRemarks" },
@@ -107,6 +108,7 @@ const MENU: Node[] = [
           { href: "/manage/classes", label: "Classes", roles: ["super_admin"] },
           { href: "/manage/sessions", label: "Sessions", roles: ["super_admin"] },
           { href: "/manage/working-days", label: "Working days", roles: ["super_admin"] },
+          { href: "/manage/syllabus", label: "Syllabus", roles: ["super_admin", "admin"] },
           { href: "/manage/manual", label: "Training manuals", roles: ["super_admin"] },
         ],
       },
