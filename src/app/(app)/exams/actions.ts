@@ -6,6 +6,7 @@ import { one, query, tx } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
 import { isMonth, isSettableExamType } from "@/lib/exam-meta";
+import { isCentreType } from "@/lib/centre-meta";
 
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
@@ -81,17 +82,23 @@ export async function createExam(_prev: unknown, form: FormData) {
 
   if (papers.length === 0) return { error: "Add at least one subject." };
 
-  // A test set by an administrator is the organisation's test, so it goes to
-  // every open centre without anybody having to tick twelve boxes. A centre's
-  // own staff still set tests only for their centre.
-  const centerIds = isGlobalRole(user.role)
-    ? (await query<{ id: number }>(
-        "SELECT id FROM centers WHERE is_active ORDER BY code")).map((c) => c.id)
-    : (user.centerId ? [user.centerId] : []);
-  if (centerIds.length === 0)
-    return { error: isGlobalRole(user.role)
-      ? "There are no open centres to set a test for."
-      : "You are not attached to a centre." };
+  // An administrator sets a test by kind of centre — every park centre, every
+  // school centre, or both — and it reaches each open centre of that kind. A
+  // centre's own staff still set tests for their centre alone.
+  let centerIds: number[];
+  if (isGlobalRole(user.role)) {
+    const types = form.getAll("center_type").map(String).filter(isCentreType);
+    if (types.length === 0)
+      return { error: "Choose which kind of centre the test is for." };
+    centerIds = (await query<{ id: number }>(
+      `SELECT id FROM centers WHERE is_active AND center_type = ANY($1) ORDER BY code`,
+      [types])).map((c) => c.id);
+    if (centerIds.length === 0)
+      return { error: "No open centre has that type yet. Set each centre's type under Administration → Centres first." };
+  } else {
+    centerIds = user.centerId ? [user.centerId] : [];
+    if (centerIds.length === 0) return { error: "You are not attached to a centre." };
+  }
   for (const id of centerIds)
     if (!canTouchCenter(user, id)) return { error: "One of those centres is not yours." };
 

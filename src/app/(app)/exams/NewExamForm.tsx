@@ -5,6 +5,7 @@ import { createExam } from "./actions";
 import { Card, Field } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
 import { EXAM_TYPES, MONTHS } from "@/lib/exam-meta";
+import { CENTRE_TYPES } from "@/lib/centre-meta";
 
 const COMMON_SUBJECTS = [
   "English", "Hindi", "Mathematics", "Science", "Social Science",
@@ -63,7 +64,7 @@ export default function NewExamForm({
   classes, centers, isAdmin, isTeacher,
 }: {
   classes: { id: number; name: string }[];
-  centers: { id: number; code: string; name: string }[];
+  centers: { id: number; code: string; name: string; center_type: string | null }[];
   isAdmin: boolean;
   isTeacher: boolean;
 }) {
@@ -92,8 +93,12 @@ export default function NewExamForm({
 
   const filled = rows.filter((r) => r.subject.trim() !== "").length;
   const classCount = pickedClasses.length;
-  // an administrator sets the test for the whole organisation at once
-  const centreCount = isAdmin ? centers.length : 1;
+  const [pickedTypes, setPickedTypes] = useState<string[]>([]);
+  const untyped = centers.filter((c) => !c.center_type).length;
+  // the centres a type-scoped test will actually reach
+  const centreCount = isAdmin
+    ? centers.filter((c) => c.center_type && pickedTypes.includes(c.center_type)).length
+    : 1;
   const sheets = filled * classCount * centreCount;
 
   if (isTeacher && classes.length === 0) {
@@ -130,12 +135,31 @@ export default function NewExamForm({
           </select>
         </Field>
         {isAdmin && (
-          <div className="mb-3.5 rounded-[9px] bg-[var(--brand-soft)] px-3.5 py-2.5">
-            <p className="text-[13px]">
-              <strong>Every centre.</strong> A test you set goes to all{" "}
-              {centers.length} open centres, and each gets its own marks sheet for
-              every class you pick below.
-            </p>
+          <div className="field">
+            <span>Kind of centre *</span>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {CENTRE_TYPES.map((t) => {
+                const n = centers.filter((c) => c.center_type === t.value).length;
+                const on = pickedTypes.includes(t.value);
+                return (
+                  <label key={t.value} className="pick">
+                    <input type="checkbox" name="center_type" value={t.value} checked={on}
+                      onChange={() => setPickedTypes((p) =>
+                        on ? p.filter((x) => x !== t.value) : [...p, t.value])} />
+                    <span>
+                      <b>{t.label}</b>
+                      <em>{n} centre{n === 1 ? "" : "s"}</em>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            {untyped > 0 && (
+              <span className="mt-1.5 block text-[12px] font-normal text-[var(--warn)]">
+                {untyped} centre{untyped === 1 ? " has" : "s have"} no type set and will not get
+                this test until one is chosen under Administration → Centres.
+              </span>
+            )}
           </div>
         )}
         <PickMany name="class_level_id" label="Classes *"
