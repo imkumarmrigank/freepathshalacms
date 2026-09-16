@@ -7,6 +7,8 @@ import { REPORTS } from "@/lib/report-meta";
 import { runReport, type ReportParams, type ReportResult } from "@/lib/reports";
 import { IconDownload } from "@/components/icons";
 import ReportPicker from "./ReportPicker";
+import Pager from "@/components/Pager";
+import { pageFrom, pageWindow } from "@/lib/paginate";
 import { isGlobalRole } from "@/lib/roles";
 
 const PREVIEW_ROWS = 60;
@@ -56,6 +58,15 @@ export default async function ReportsPage({
     ...(params.role ? { role: params.role } : {}),
   }).toString();
 
+  // The whole report is already in memory; the table shows it a page at a time.
+  // Downloading still gives every row, since the export builds its own query.
+  const pg = pageFrom(sp, PREVIEW_ROWS);
+  const total = result?.rows.length ?? 0;
+  const lastPage = Math.max(1, Math.ceil(total / PREVIEW_ROWS));
+  if (pg.page > lastPage) { pg.page = lastPage; pg.offset = (lastPage - 1) * PREVIEW_ROWS; }
+  const pageRows = result ? result.rows.slice(pg.offset, pg.offset + PREVIEW_ROWS) : [];
+  const win = result ? pageWindow(pg, pageRows.length, total) : null;
+
   return (
     <>
       <PageHeader
@@ -95,8 +106,9 @@ export default async function ReportsPage({
               <p className="text-[13px] text-[var(--muted)]">{result.subtitle}</p>
             </div>
             <span className="text-[13px] text-[var(--muted)]">
-              {result.rows.length} row{result.rows.length === 1 ? "" : "s"}
-              {result.rows.length > PREVIEW_ROWS && ` · showing the first ${PREVIEW_ROWS}`}
+              {result.rows.length.toLocaleString("en-IN")} row{result.rows.length === 1 ? "" : "s"}
+              {win && win.pages > 1 &&
+                ` · showing ${win.first.toLocaleString("en-IN")}–${win.last.toLocaleString("en-IN")}`}
             </span>
           </div>
 
@@ -114,7 +126,7 @@ export default async function ReportsPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {result.rows.slice(0, PREVIEW_ROWS).map((row, i) => (
+                  {pageRows.map((row, i) => (
                     <tr key={i}>
                       {result.columns.map((c) => (
                         <td key={c.key}
@@ -129,6 +141,10 @@ export default async function ReportsPage({
                 </tbody>
               </table>
             </div>
+          )}
+          {win && win.pages > 1 && (
+            <Pager page={pg.page} pages={win.pages} first={win.first} last={win.last}
+              total={win.total} unit="row" />
           )}
         </Card>
       )}

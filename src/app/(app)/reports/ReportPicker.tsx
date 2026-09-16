@@ -66,6 +66,8 @@ export default function ReportPicker({
     for (const [k, v] of Object.entries(patch)) {
       if (v) next.set(k, v); else next.delete(k);
     }
+    // a different report or filter is a different result; start it at page one
+    next.delete("page");
     start(() => router.replace(`/reports?${next.toString()}`));
   };
 
