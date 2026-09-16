@@ -5,6 +5,7 @@ import { tx } from "@/lib/db";
 import { SAME_DAY_ONLY } from "@/lib/attendance";
 import { today } from "@/lib/format";
 import { isGlobalRole } from "@/lib/roles";
+import { isReasonFor, needsReason } from "@/lib/attendance-meta";
 
 const VALID = new Set(["present", "absent", "late", "half_day", "leave", "holiday"]);
 
@@ -28,12 +29,17 @@ export async function saveAttendance(_prev: unknown, form: FormData) {
   if (!canTouchCenter(user, centerId))
     return { error: "You can only mark attendance for your own centre." };
 
-  const entries: { enrollmentId: number; status: string }[] = [];
+  const entries: { enrollmentId: number; status: string; reason: string | null }[] = [];
   for (const [key, value] of form.entries()) {
     if (!key.startsWith("st_")) continue;
     const enrollmentId = Number(key.slice(3));
     const status = String(value);
     if (!enrollmentId || !VALID.has(status)) continue;
+    const given = String(form.get(`rs_${enrollmentId}`) ?? "").trim() || null;
+    // a reason only belongs to absent and leave; anything else clears it
+    const reason = needsReason(status) ? given : null;
+    if (reason !== null && !isReasonFor(status, reason))
+      return { error: "One of the reasons does not fit the mark it was given with." };
     // Present / late / half-day are a same-day judgement; a day that went unmarked
     // is closed as leave and can only be corrected to absent or leave afterwards.
     if (isPast && SAME_DAY_ONLY.has(status))
@@ -41,7 +47,7 @@ export async function saveAttendance(_prev: unknown, form: FormData) {
         error: "Attendance for a past date cannot be marked present, late or half day. " +
                "Those days can only be recorded as leave or absent.",
       };
-    entries.push({ enrollmentId, status });
+    entries.push({ enrollmentId, status, reason });
   }
   if (entries.length === 0) return { error: "Nothing to save." };
 
@@ -56,19 +62,51 @@ export async function saveAttendance(_prev: unknown, form: FormData) {
       );
       const byId = new Map(rows.map((r) => [r.id, r]));
 
+      // What is already recorded for this day. A reason is required whenever a
+      // teacher marks someone absent or on leave — but not for a record left as
+      // it was: the register closes unmarked days as leave by itself, and the
+      // imported months carry no reasons, and re-saving the sheet must not
+      // demand a reason for every one of those.
+      const { rows: before } = await c.query<{ student_id: number; status: string; reason: string | null }>(
+        `SELECT student_id, status, reason FROM student_attendance
+          WHERE att_date = $1 AND student_id = ANY($2::bigint[])`,
+        [attDate, rows.map((r) => r.student_id)],
+      );
+      const was = new Map(before.map((b) => [b.student_id, b]));
+      let missing = 0;
+      for (const e of entries) {
+        const enr = byId.get(e.enrollmentId);
+        if (!enr || !needsReason(e.status) || e.reason) continue;
+        const prior = was.get(enr.student_id);
+        const unchanged = prior && prior.status === e.status && !prior.reason;
+        if (!unchanged) missing++;
+      }
+      if (missing > 0) {
+        throw new Error(
+          `Choose a reason for ${missing} student${missing === 1 ? "" : "s"} marked absent or on leave.`);
+      }
+
       for (const e of entries) {
         const enr = byId.get(e.enrollmentId);
         if (!enr || enr.center_id !== centerId) continue;  // ignore anything out of scope
         await c.query(
           `INSERT INTO student_attendance
              (student_id, enrollment_id, session_id, class_level_id, center_id,
-              att_date, status, marked_by, marked_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8, now())
+              att_date, status, reason, marked_by, marked_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, now())
            ON CONFLICT (student_id, att_date) DO UPDATE
-             SET status = EXCLUDED.status, marked_by = EXCLUDED.marked_by,
+             SET status = EXCLUDED.status,
+                 -- keep an existing reason when the mark is re-saved unchanged
+                 -- without one; otherwise take what was chosen
+                 reason = CASE
+                   WHEN EXCLUDED.reason IS NULL AND student_attendance.status = EXCLUDED.status
+                     THEN student_attendance.reason
+                   ELSE EXCLUDED.reason END,
+                 marked_by = EXCLUDED.marked_by,
                  marked_at = now(), enrollment_id = EXCLUDED.enrollment_id,
                  class_level_id = EXCLUDED.class_level_id`,
-          [enr.student_id, enr.id, sessionId, classLevelId, centerId, attDate, e.status, user.uid],
+          [enr.student_id, enr.id, sessionId, classLevelId, centerId, attDate, e.status,
+           e.reason, user.uid],
         );
         saved++;
       }

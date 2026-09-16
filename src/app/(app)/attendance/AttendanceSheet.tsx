@@ -4,11 +4,13 @@ import { useActionState, useState } from "react";
 import { saveAttendance } from "./actions";
 import { Avatar } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
+import { ABSENT_REASONS, LEAVE_REASONS, needsReason, reasonsFor } from "@/lib/attendance-meta";
 
 export type Row = {
   enrollment_id: number; student_id: number; enrollment_no: string;
   first_name: string; last_name: string | null; roll_no: number | null;
   status: string | null;
+  reason: string | null;
 };
 
 const OPTIONS = [
@@ -34,10 +36,34 @@ export default function AttendanceSheet({
     ),
   );
 
+  // what was saved, so a record left untouched is not asked for a reason again
+  const saved = Object.fromEntries(rows.map((r) => [r.enrollment_id, r]));
+  const [reasons, setReasons] = useState<Record<number, string>>(
+    () => Object.fromEntries(rows.map((r) => [r.enrollment_id, r.reason ?? ""])),
+  );
+
   const disabledFor = (value: string) => locked || (isPast && SAME_DAY_ONLY.has(value));
 
-  const setAll = (value: string) =>
-    setMarks(Object.fromEntries(rows.map((r) => [r.enrollment_id, value])));
+  /** Changing the mark to one with a different list of reasons clears the old choice. */
+  const mark = (id: number, value: string) => {
+    setMarks((m) => ({ ...m, [id]: value }));
+    setReasons((r) => (reasonsFor(value).includes(r[id]) ? r : { ...r, [id]: "" }));
+  };
+
+  /** A reason is owed when absent or leave was set now, not merely left as saved. */
+  const owes = (id: number) => {
+    const status = marks[id];
+    if (!needsReason(status) || reasons[id]) return false;
+    const was = saved[id];
+    return !(was && was.status === status && !was.reason);
+  };
+  const owing = rows.filter((r) => owes(r.enrollment_id)).length;
+  const absentIds = rows.filter((r) => marks[r.enrollment_id] === "absent").map((r) => r.enrollment_id);
+  const leaveIds = rows.filter((r) => marks[r.enrollment_id] === "leave").map((r) => r.enrollment_id);
+  const applyToAll = (ids: number[], reason: string) =>
+    setReasons((r) => ({ ...r, ...Object.fromEntries(ids.map((id) => [id, reason])) }));
+
+  const setAll = (value: string) => rows.forEach((r) => mark(r.enrollment_id, value));
 
   const counts = OPTIONS.map((o) => ({
     ...o, n: Object.values(marks).filter((v) => v === o.value).length,
@@ -62,6 +88,26 @@ export default function AttendanceSheet({
               </span>
             ))}
           </div>
+          {!locked && (absentIds.length > 1 || leaveIds.length > 1) && (
+            <div className="flex flex-wrap gap-2">
+              {absentIds.length > 1 && (
+                <select className="select w-auto py-1 text-[12.5px]" value=""
+                  aria-label="Reason for every absent student"
+                  onChange={(e) => e.target.value && applyToAll(absentIds, e.target.value)}>
+                  <option value="">Reason for all {absentIds.length} absent…</option>
+                  {ABSENT_REASONS.map((x) => <option key={x} value={x}>{x}</option>)}
+                </select>
+              )}
+              {leaveIds.length > 1 && (
+                <select className="select w-auto py-1 text-[12.5px]" value=""
+                  aria-label="Reason for every student on leave"
+                  onChange={(e) => e.target.value && applyToAll(leaveIds, e.target.value)}>
+                  <option value="">Reason for all {leaveIds.length} on leave…</option>
+                  {LEAVE_REASONS.map((x) => <option key={x} value={x}>{x}</option>)}
+                </select>
+              )}
+            </div>
+          )}
           {!locked && (
             <div className="flex gap-2">
               {!isPast && (
@@ -106,6 +152,7 @@ export default function AttendanceSheet({
                   </td>
                   <td>
                     <input type="hidden" name={`st_${r.enrollment_id}`} value={marks[r.enrollment_id]} />
+                    <input type="hidden" name={`rs_${r.enrollment_id}`} value={reasons[r.enrollment_id] ?? ""} />
                     <div className="flex justify-end gap-1">
                       {OPTIONS.map((o) => {
                         const on = marks[r.enrollment_id] === o.value;
@@ -115,7 +162,7 @@ export default function AttendanceSheet({
                             title={disabledFor(o.value) && !locked
                               ? `${o.title} can only be marked on the day itself`
                               : o.title}
-                            onClick={() => setMarks((m) => ({ ...m, [r.enrollment_id]: o.value }))}
+                            onClick={() => mark(r.enrollment_id, o.value)}
                             className="h-8 min-w-8 rounded-lg border px-2 text-[12px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-40"
                             style={on
                               ? { background: o.color, borderColor: o.color, color: "#fff" }
@@ -126,6 +173,23 @@ export default function AttendanceSheet({
                         );
                       })}
                     </div>
+                    {needsReason(marks[r.enrollment_id]) && (
+                      <div className="mt-1.5 flex justify-end">
+                        <select
+                          className="select w-auto py-1 text-[12.5px]"
+                          aria-label={`Reason for ${r.first_name}`}
+                          disabled={locked}
+                          value={reasons[r.enrollment_id] ?? ""}
+                          onChange={(e) => setReasons((x) => ({ ...x, [r.enrollment_id]: e.target.value }))}
+                          style={owes(r.enrollment_id) ? { borderColor: "var(--bad)" } : undefined}>
+                          <option value="">
+                            {marks[r.enrollment_id] === "leave" ? "Reason for leave…" : "Reason for absence…"}
+                          </option>
+                          {reasonsFor(marks[r.enrollment_id]).map((x) =>
+                            <option key={x} value={x}>{x}</option>)}
+                        </select>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -135,7 +199,12 @@ export default function AttendanceSheet({
       </div>
 
       {!locked && (
-        <div className="mt-4 flex items-center gap-3">
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          {owing > 0 && (
+            <span className="w-full text-[13px] font-medium text-[var(--bad)]">
+              Choose a reason for {owing} student{owing === 1 ? "" : "s"} marked absent or on leave.
+            </span>
+          )}
           <Submit>Save attendance</Submit>
           <span className="text-[13px] text-[var(--muted)]">
             {isPast

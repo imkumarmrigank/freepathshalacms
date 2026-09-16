@@ -36,7 +36,7 @@ export default async function AttendancePage({
   if (centerId && classId) {
     rows = await query<Row>(
       `SELECT e.id AS enrollment_id, s.id AS student_id, s.enrollment_no,
-              s.first_name, s.last_name, e.roll_no, a.status
+              s.first_name, s.last_name, e.roll_no, a.status, a.reason
          FROM enrollments e
          JOIN students s ON s.id = e.student_id
          LEFT JOIN student_attendance a
