@@ -26,6 +26,18 @@ export function reasonsFor(status: string): readonly string[] {
   return [];
 }
 
+/**
+ * The first day a reason is compulsory. Attendance before it was taken without
+ * reasons and stays as it was — correcting an old day does not demand one — so
+ * the records that do carry a reason are all ones a teacher actually gave, and
+ * a count of "No idea" means what it says.
+ */
+export const REASONS_REQUIRED_FROM = "2026-09-17";
+
+export function reasonRequiredOn(date: string) {
+  return date >= REASONS_REQUIRED_FROM;
+}
+
 export function needsReason(status: string) {
   return status === "absent" || status === "leave";
 }

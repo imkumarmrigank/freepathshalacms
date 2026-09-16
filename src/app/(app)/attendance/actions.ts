@@ -5,7 +5,7 @@ import { tx } from "@/lib/db";
 import { SAME_DAY_ONLY } from "@/lib/attendance";
 import { today } from "@/lib/format";
 import { isGlobalRole } from "@/lib/roles";
-import { isReasonFor, needsReason } from "@/lib/attendance-meta";
+import { isReasonFor, needsReason, reasonRequiredOn } from "@/lib/attendance-meta";
 
 const VALID = new Set(["present", "absent", "late", "half_day", "leave", "holiday"]);
 
@@ -74,7 +74,9 @@ export async function saveAttendance(_prev: unknown, form: FormData) {
       );
       const was = new Map(before.map((b) => [b.student_id, b]));
       let missing = 0;
-      for (const e of entries) {
+      // a reason may still be given for an earlier day, but is only demanded from
+      // the date the rule came in
+      for (const e of reasonRequiredOn(attDate) ? entries : []) {
         const enr = byId.get(e.enrollmentId);
         if (!enr || !needsReason(e.status) || e.reason) continue;
         const prior = was.get(enr.student_id);

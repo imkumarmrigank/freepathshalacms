@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import { saveAttendance } from "./actions";
 import { Avatar } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
-import { ABSENT_REASONS, LEAVE_REASONS, needsReason, reasonsFor } from "@/lib/attendance-meta";
+import { ABSENT_REASONS, LEAVE_REASONS, needsReason, reasonRequiredOn, reasonsFor } from "@/lib/attendance-meta";
 
 export type Row = {
   enrollment_id: number; student_id: number; enrollment_no: string;
@@ -51,7 +51,9 @@ export default function AttendanceSheet({
   };
 
   /** A reason is owed when absent or leave was set now, not merely left as saved. */
+  const required = reasonRequiredOn(attDate);
   const owes = (id: number) => {
+    if (!required) return false;
     const status = marks[id];
     if (!needsReason(status) || reasons[id]) return false;
     const was = saved[id];
@@ -183,7 +185,8 @@ export default function AttendanceSheet({
                           onChange={(e) => setReasons((x) => ({ ...x, [r.enrollment_id]: e.target.value }))}
                           style={owes(r.enrollment_id) ? { borderColor: "var(--bad)" } : undefined}>
                           <option value="">
-                            {marks[r.enrollment_id] === "leave" ? "Reason for leave…" : "Reason for absence…"}
+                            {marks[r.enrollment_id] === "leave" ? "Reason for leave" : "Reason for absence"}
+                            {required ? "…" : " (optional)"}
                           </option>
                           {reasonsFor(marks[r.enrollment_id]).map((x) =>
                             <option key={x} value={x}>{x}</option>)}
