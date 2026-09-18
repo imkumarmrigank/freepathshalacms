@@ -114,6 +114,14 @@ export function canAssignCoverage(role: Role) {
   return role === "super_admin" || role === "admin";
 }
 
+/**
+ * Granting or refusing leave. A centre manager runs the centre's day but does
+ * not decide who is paid to be away from it, so this stays with the office.
+ */
+export function canDecideLeave(role: Role) {
+  return role === "super_admin" || role === "admin";
+}
+
 /* ------------------------------------------------------------ feature gates */
 
 /**
@@ -129,6 +137,9 @@ export type Feature =
   // suggestions. "auditReports" is reading them. A centre reads its own report
   // and answers its own suggestions; it never scores itself.
   | "audits" | "auditReports"
+  // leave: asking for time off is the teacher's own; answering it is the
+  // administrator's. Two names, because almost nobody holds both.
+  | "leave" | "leaveApprovals"
   | "syllabus";
 
 /** One explicit list per role — no inference, so a gate is read, not deduced. */
@@ -137,13 +148,13 @@ const FEATURES: Record<Role, Feature[]> = {
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
     "calendar", "ptm", "followUps", "supplies", "statistics", "reports",
     "staff", "centres", "coverage", "counselling", "teacherRemarks", "messages",
-    "audits", "auditReports", "syllabus",
+    "audits", "auditReports", "leaveApprovals", "syllabus",
   ],
   admin: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
     "calendar", "ptm", "followUps", "supplies", "statistics", "reports",
     "staff", "centres", "coverage", "counselling", "teacherRemarks", "messages",
-    "audits", "auditReports", "syllabus",
+    "audits", "auditReports", "leaveApprovals", "syllabus",
   ],
   // the whole point of the mentor role is that this list is short
   mentor: [
@@ -153,17 +164,17 @@ const FEATURES: Record<Role, Feature[]> = {
   center_manager: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
     "calendar", "ptm", "followUps", "supplies", "statistics", "reports",
-    "staff", "ownCheckIn", "counselling", "messages", "auditReports", "syllabus",
+    "staff", "ownCheckIn", "leave", "counselling", "messages", "auditReports", "syllabus",
   ],
   teacher: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
-    "calendar", "ptm", "followUps", "reports", "ownCheckIn", "counselling", "messages",
-    "auditReports", "syllabus",
+    "calendar", "ptm", "followUps", "reports", "ownCheckIn", "leave", "counselling",
+    "messages", "auditReports", "syllabus",
   ],
   backup_teacher: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
-    "calendar", "ptm", "followUps", "reports", "ownCheckIn", "counselling", "messages",
-    "auditReports", "syllabus",
+    "calendar", "ptm", "followUps", "reports", "ownCheckIn", "leave", "counselling",
+    "messages", "auditReports", "syllabus",
   ],
   // Deliberately the shortest list in the file. An auditor judges centres; they
   // do not run one, and they see nothing of a child beyond the roll numbers on

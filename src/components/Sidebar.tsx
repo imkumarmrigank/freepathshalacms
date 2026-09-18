@@ -48,8 +48,10 @@ const MENU: Node[] = [
     label: "Attendance", icon: IconCheck, children: [
       { href: "/attendance", label: "Student register", feature: "attendance" },
       { href: "/my-attendance", label: "My check-in", feature: "ownCheckIn" },
+      { href: "/leave", label: "My leave", feature: "leave" },
       { href: "/manage/staff-attendance", label: "Staff attendance",
         roles: ["super_admin", "admin", "center_manager"] },
+      { href: "/manage/leave", label: "Leave requests", feature: "leaveApprovals" },
     ],
   },
 

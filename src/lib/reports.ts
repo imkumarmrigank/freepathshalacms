@@ -3,7 +3,7 @@ import { query } from "./db";
 import { groupByOf, reportByKey, type GroupBy } from "./report-meta";
 import { titleCase } from "./format";
 import type { SessionUser } from "./auth";
-import { isGlobalRole } from "./roles";
+import { isGlobalRole, ROLE_LABEL, type Role } from "./roles";
 
 export type ReportColumn = { key: string; label: string; width?: number; numeric?: boolean };
 export type ReportRow = Record<string, string | number | null>;
@@ -72,6 +72,7 @@ export async function runReport(
     case "student-attendance-trend":     return studentAttendanceTrend(scoped, period);
     case "staff-attendance-trend":       return staffAttendanceTrend(scoped, period);
     case "student-attendance-register":  return studentAttendanceRegister(scoped, period);
+    case "staff-attendance-register":    return staffAttendanceRegister(scoped, period);
     case "staff-attendance-summary":     return staffAttendanceSummary(scoped, period);
     case "staff-attendance-detail":      return staffAttendanceDetail(scoped, period);
     case "counselling-referrals":        return counsellingReferrals(scoped, period);
@@ -492,6 +493,76 @@ async function studentAttendanceRegister(p: ReportParams, period: string): Promi
       ...dates.map((d) => ({ key: d, label: d.slice(8) + "/" + d.slice(5, 7), width: 6 })),
     ],
     rows: [...byStudent.values()],
+  };
+}
+
+/**
+ * The staff equivalent of the student register, and deliberately not the same
+ * thing: a child is present or absent, but a teacher's day is a time. Each
+ * square holds when they arrived and when they left, so the question the office
+ * actually asks — who opened the centre late — is answered by reading across.
+ */
+async function staffAttendanceRegister(p: ReportParams, period: string): Promise<ReportResult> {
+  const dates = datesBetween(p.from, p.to);
+  const params: unknown[] = [dates[0], dates[dates.length - 1]];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND u.center_id = $${params.length}`; }
+  if (p.role) { params.push(p.role); where += ` AND u.role = $${params.length}`; }
+
+  const rows = await query<{
+    user_id: number; name: string; role: string; center_name: string | null;
+    att_date: string | null; status: string | null;
+    check_in: string | null; check_out: string | null; spells: number | null;
+  }>(
+    `SELECT u.id AS user_id, u.name, u.role, c.name AS center_name,
+            a.att_date, a.status,
+            to_char(a.check_in_at  AT TIME ZONE 'Asia/Kolkata', 'HH24:MI') AS check_in,
+            to_char(a.check_out_at AT TIME ZONE 'Asia/Kolkata', 'HH24:MI') AS check_out,
+            (SELECT count(*) FROM staff_punches sp WHERE sp.attendance_id = a.id) AS spells
+       FROM users u
+       LEFT JOIN centers c ON c.id = u.center_id
+       LEFT JOIN staff_attendance a
+              ON a.user_id = u.id AND a.att_date BETWEEN $1 AND $2
+      WHERE u.is_active AND u.role IN ('teacher','center_manager','backup_teacher') ${where}
+      ORDER BY c.code NULLS LAST, u.name, a.att_date`,
+    params,
+  );
+
+  // What a square says when nobody punched: the register still knows why.
+  const MARK: Record<string, string> = {
+    absent: "A", leave: "Lv", holiday: "—", present: "P", late: "L", half_day: "H",
+  };
+
+  const byStaff = new Map<number, ReportRow>();
+  for (const r of rows) {
+    let row = byStaff.get(r.user_id);
+    if (!row) {
+      row = { name: r.name, role_label: ROLE_LABEL[r.role as Role] ?? r.role,
+              center_name: r.center_name ?? "—" };
+      for (const d of dates) row[d] = "";
+      byStaff.set(r.user_id, row);
+    }
+    if (!r.att_date) continue;
+    const key = r.att_date.slice(0, 10);
+    if (r.check_in) {
+      const times = `${r.check_in}-${r.check_out ?? "…"}`;
+      row[key] = Number(r.spells ?? 1) > 1 ? `${times} (${r.spells})` : times;
+    } else {
+      row[key] = MARK[r.status ?? ""] ?? r.status ?? "";
+    }
+  }
+
+  return {
+    title: "Staff attendance register",
+    subtitle: `${period} · check-in and check-out time · A absent, Lv leave, `
+      + `(2) means they left and came back`,
+    columns: [
+      { key: "name", label: "Staff", width: 22 },
+      { key: "role_label", label: "Role", width: 14 },
+      { key: "center_name", label: "Centre", width: 16 },
+      ...dates.map((d) => ({ key: d, label: d.slice(8) + "/" + d.slice(5, 7), width: 12 })),
+    ],
+    rows: [...byStaff.values()],
   };
 }
 

@@ -10,6 +10,8 @@ import { EVENT_LABEL, EVENT_TONE } from "@/lib/calendar-meta";
 import { isGlobalRole, canAdmitStudents, can } from "@/lib/roles";
 import { counsellingLoad, strugglingStudents } from "@/lib/statistics";
 import { standings } from "@/lib/audits";
+import { awayToday, pendingLeaveCount, staffToday } from "@/lib/leave";
+import { LEAVE_LABEL } from "@/lib/leave-meta";
 import DailyByCentre, { type CentreDay } from "./DailyByCentre";
 import AuditStanding from "./AuditStanding";
 
@@ -157,6 +159,12 @@ export default async function Dashboard({
         [session.id, dailyDay])
     : [];
 
+  // Who is meant to be at a centre today and is not, and whether anybody was
+  // put in for them. Administrators only: a teacher sees their own leave page.
+  const [staff, away, leaveWaiting] = wantsDaily
+    ? await Promise.all([staffToday(centerId), awayToday(centerId), pendingLeaveCount(centerId)])
+    : [null, [], 0];
+
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const attPct = Number(attToday?.total ?? 0) > 0
@@ -258,6 +266,72 @@ export default async function Dashboard({
         <div className="mt-6">
           <DailyByCentre day={dailyDay} rows={daily} />
         </div>
+      )}
+
+
+      {wantsDaily && staff && (
+        <>
+          <div className="label-cap mb-2.5 mt-6">Staff today</div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard label="Teachers" value={staff.teachers}
+              hint={`${staff.managers} centre manager${staff.managers === 1 ? "" : "s"} · ${staff.backups} backup`} />
+            <StatCard label="Checked in today"
+              value={`${staff.checkedIn} of ${staff.teachers + staff.managers}`}
+              hint={staff.checkedIn === staff.teachers + staff.managers
+                ? "everybody is in" : `${away.length} still to arrive or away`}
+              tone={away.length > 0 ? "warn" : "default"} />
+            <StatCard label="Absent today" value={away.filter((a) => a.marked).length}
+              hint={`${away.filter((a) => a.marked === "leave").length} on approved leave`}
+              tone={away.some((a) => a.marked && !a.backup_name) ? "bad" : "default"} />
+            <StatCard label="Leave to answer" value={leaveWaiting}
+              hint={leaveWaiting ? "waiting on the office" : "nothing waiting"}
+              tone={leaveWaiting > 0 ? "warn" : "default"} />
+          </div>
+
+          <Card className="mt-4" pad={false}>
+            {away.length === 0 ? (
+              <Empty title="Every teacher has checked in"
+                hint="Nobody is marked absent or on leave today." />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="tbl">
+                  <thead>
+                    <tr><th>Not at the centre</th><th>Centre</th><th>Why</th><th>Backup teacher</th></tr>
+                  </thead>
+                  <tbody>
+                    {away.map((a) => (
+                      <tr key={a.user_id}>
+                        <td className="font-medium">{a.name}</td>
+                        <td className="text-[var(--muted)]">{a.center_name ?? "—"}</td>
+                        <td>
+                          {a.marked === "leave" ? (
+                            <Badge tone="mute">
+                              On leave{a.leave_type ? ` · ${LEAVE_LABEL[a.leave_type] ?? a.leave_type}` : ""}
+                            </Badge>
+                          ) : a.marked === "absent" ? (
+                            <Badge tone="bad">Marked absent</Badge>
+                          ) : (
+                            <Badge tone="warn">Not checked in yet</Badge>
+                          )}
+                        </td>
+                        <td>
+                          {a.backup_name
+                            ? <Badge tone="ok">Yes · {a.backup_name}</Badge>
+                            : (
+                              <span className="text-[13px] text-[var(--muted)]">
+                                No{" "}
+                                <Link href="/manage/coverage" className="underline">assign cover</Link>
+                              </span>
+                            )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </>
       )}
 
       {upcomingEvents.length > 0 && (

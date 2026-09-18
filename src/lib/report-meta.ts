@@ -95,6 +95,16 @@ export const REPORTS: ReportMeta[] = [
     roles: ["super_admin", "admin", "center_manager"],
   },
   {
+    key: "staff-attendance-register",
+    label: "Staff attendance register",
+    group: "Attendance",
+    description:
+      "The day-by-day register for staff — people down the side, dates across the top, and the "
+      + "check-in and check-out time in each square instead of a present mark.",
+    filters: ["dates", "center", "role"],
+    roles: ["super_admin", "admin", "center_manager"],
+  },
+  {
     key: "staff-attendance-detail",
     label: "Staff attendance — day by day",
     group: "Attendance",
