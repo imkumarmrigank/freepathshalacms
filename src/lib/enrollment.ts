@@ -24,10 +24,21 @@ export async function nextEnrollmentNo(
     "SELECT next_seq FROM enrollment_counters WHERE center_id = $1 FOR UPDATE",
     [centerId],
   );
-  const seq = rows[0].next_seq;
-  await client.query(
-    "UPDATE enrollment_counters SET next_seq = next_seq + 1 WHERE center_id = $1",
+
+  // The counter is the source of truth, but a row written straight into the
+  // table — a bulk import, a correction run — does not advance it, and the next
+  // admission then collides with an enrolment number already taken and fails
+  // with a unique-violation the centre reads as "duplicate entry". Take
+  // whichever is higher, so the counter repairs itself the first time it is used.
+  const { rows: used } = await client.query<{ highest: number | null }>(
+    `SELECT max(substring(enrollment_no from '[0-9]+$')::int) AS highest
+       FROM students WHERE center_id = $1`,
     [centerId],
+  );
+  const seq = Math.max(rows[0].next_seq, Number(used[0]?.highest ?? 0) + 1);
+  await client.query(
+    "UPDATE enrollment_counters SET next_seq = $2 WHERE center_id = $1",
+    [centerId, seq + 1],
   );
 
   const prefix = process.env.ENROLLMENT_PREFIX || "FP";

@@ -228,7 +228,14 @@ export async function submitAdmission(payload: AdmissionPayload, draftId: number
       return { id: studentId, enrollmentNo, admissionNo, registrationNo };
     });
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Could not save the admission." };
+    const msg = err instanceof Error ? err.message : "";
+    // Postgres says "duplicate key value violates unique constraint"; a centre
+    // reads that as "this child is already on the roll", which it is not.
+    if (msg.includes("students_enrollment_no_key"))
+      return { error: "Two admissions were given the same enrolment number. Try saving again — the number is reissued on the next attempt." };
+    if (msg.includes("uniq_students_center_admission_no"))
+      return { error: "That admission number is already used at this centre." };
+    return { error: msg || "Could not save the admission." };
   }
 
   revalidatePath("/students");
