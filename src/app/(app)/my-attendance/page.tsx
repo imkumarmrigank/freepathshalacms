@@ -18,13 +18,21 @@ export default async function MyAttendancePage() {
     name: string; latitude: number | null; longitude: number | null; geofence_radius_m: number;
   }>("SELECT name, latitude, longitude, geofence_radius_m FROM centers WHERE id = $1", [user.centerId]);
 
-  const [todayRow, history, summary] = await Promise.all([
+  const [todayRow, spells, history, summary] = await Promise.all([
     one<{
       check_in_at: string | null; check_out_at: string | null;
-      check_in_distance_m: number | null; status: string;
+      check_in_distance_m: number | null; worked_minutes: number | null; status: string;
     }>(
-      `SELECT check_in_at, check_out_at, check_in_distance_m, status
+      `SELECT check_in_at, check_out_at, check_in_distance_m, worked_minutes, status
          FROM staff_attendance WHERE user_id = $1 AND att_date = $2`,
+      [user.uid, today()],
+    ),
+    query<{
+      id: number; check_in_at: string; check_out_at: string | null; worked_minutes: number | null;
+    }>(
+      `SELECT id, check_in_at, check_out_at, worked_minutes
+         FROM staff_punches WHERE user_id = $1 AND att_date = $2
+        ORDER BY check_in_at`,
       [user.uid, today()],
     ),
     query<{
@@ -57,6 +65,7 @@ export default async function MyAttendancePage() {
 
       <PunchCard
         today={todayRow}
+        spells={spells}
         centerName={center?.name ?? "your centre"}
         radius={center?.geofence_radius_m ?? GEOFENCE_DEFAULT_M}
         hasCoords={center?.latitude != null && center?.longitude != null}

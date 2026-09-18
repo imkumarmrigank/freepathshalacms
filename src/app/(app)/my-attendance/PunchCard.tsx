@@ -6,12 +6,18 @@ import { Alert } from "@/components/ui";
 
 type Today = {
   check_in_at: string | null; check_out_at: string | null;
-  check_in_distance_m: number | null; status: string;
+  check_in_distance_m: number | null; worked_minutes: number | null; status: string;
 } | null;
 
+type Spell = {
+  id: number; check_in_at: string; check_out_at: string | null; worked_minutes: number | null;
+};
+
 export default function PunchCard({
-  today, centerName, radius, hasCoords,
-}: { today: Today; centerName: string; radius: number; hasCoords: boolean }) {
+  today, spells, centerName, radius, hasCoords,
+}: {
+  today: Today; spells: Spell[]; centerName: string; radius: number; hasCoords: boolean;
+}) {
   const [state, action] = useActionState(punch, null);
   const [coords, setCoords] = useState<{ lat: number; lng: number; acc: number } | null>(null);
   const [geoError, setGeoError] = useState<string | null>(null);
@@ -62,10 +68,15 @@ export default function PunchCard({
   const time = (v: string | null) =>
     v ? new Date(v).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : "—";
 
-  const checkedIn = Boolean(today?.check_in_at);
-  const checkedOut = Boolean(today?.check_out_at);
-  const kind = checkedIn ? "out" : "in";
-  const done = checkedIn && checkedOut;
+  // The day is never "finished": a teacher who leaves and comes back checks in
+  // again. Only an open spell decides whether the next punch is in or out.
+  const open = spells.find((s) => !s.check_out_at) ?? null;
+  const kind = open ? "out" : "in";
+  const hours = (m: number | null | undefined) => {
+    if (m == null) return "—";
+    const h = Math.floor(m / 60);
+    return h ? `${h}h ${m % 60}m` : `${m}m`;
+  };
 
   return (
     <div className="card card-pad">
@@ -97,8 +108,25 @@ export default function PunchCard({
           <div className="mt-1.5 text-[20px] font-semibold capitalize">
             {today?.status ?? "not marked"}
           </div>
+          <div className="text-[12px] text-[var(--muted)]">
+            {open ? "Currently checked in" : `${hours(today?.worked_minutes)} logged today`}
+          </div>
         </div>
       </div>
+
+      {spells.length > 1 && (
+        <div className="mt-4">
+          <div className="label-cap mb-1.5">Today’s spells</div>
+          <ul className="text-[13px] text-[var(--muted)]">
+            {spells.map((s, i) => (
+              <li key={s.id}>
+                {i + 1}. {time(s.check_in_at)} → {s.check_out_at ? time(s.check_out_at) : "still in"}
+                {s.worked_minutes != null && ` · ${hours(s.worked_minutes)}`}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <form action={action} className="mt-5 flex flex-wrap items-center gap-3">
         <input type="hidden" name="kind" value={kind} />
@@ -106,7 +134,7 @@ export default function PunchCard({
         <input type="hidden" name="lng" value={coords?.lng ?? ""} />
         <input type="hidden" name="accuracy" value={coords?.acc ?? ""} />
 
-        {!done && hasCoords && (
+        {hasCoords && (
           coords ? (
             <button type="submit" className="btn btn-primary">
               {kind === "in" ? "Confirm check-in" : "Confirm check-out"}
@@ -118,8 +146,6 @@ export default function PunchCard({
             </button>
           )
         )}
-        {done && <span className="text-[13px] text-[var(--muted)]">Today is complete. See you tomorrow.</span>}
-
         <span className="text-[13px] text-[var(--muted)]">
           {coords
             ? `Location ready (±${coords.acc} m). Checking ${kind === "in" ? "in" : "out"} is only ` +
