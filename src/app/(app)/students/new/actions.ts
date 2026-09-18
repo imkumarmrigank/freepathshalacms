@@ -6,6 +6,7 @@ import { canTouchCenter, requireUser } from "@/lib/auth";
 import { one, query, tx } from "@/lib/db";
 import { nextEnrollmentNo } from "@/lib/enrollment";
 import { currentSession } from "@/lib/queries";
+import { aadhaarMatches, linkSiblings } from "@/lib/siblings";
 import { isAadhaar, isEmail, isMobile } from "@/lib/admission-meta";
 import { canAdmitStudents } from "@/lib/roles";
 
@@ -84,7 +85,14 @@ export async function discardDraft(draftId: number) {
 
 /* -------------------------------------------------------------- submission */
 
-export async function submitAdmission(payload: AdmissionPayload, draftId: number | null) {
+export async function submitAdmission(
+  payload: AdmissionPayload,
+  draftId: number | null,
+  /** Sent back after the centre has confirmed who the matching children are. */
+  siblingsOf: number[] = [],
+  /** True when the centre has looked at the matches and says none is a sibling. */
+  notSiblings = false,
+) {
   const user = await requireUser();
   if (!canAdmitStudents(user.role))
     return { error: "Only the centre manager can admit a student." };
@@ -144,6 +152,21 @@ export async function submitAdmission(payload: AdmissionPayload, draftId: number
     return { error: "That centre is not one of yours.", step: 3 };
 
   const year = admissionDate.slice(0, 4);
+  // A child who shares an Aadhaar with somebody already on the roll is almost
+  // always a brother or sister — families give the same parent number for every
+  // child — so ask rather than refuse. The centre is shown who matched and
+  // decides; nothing is written until they have.
+  const confirmed = new Set(siblingsOf.map(Number).filter(Boolean));
+  if (confirmed.size === 0 && !notSiblings) {
+    const matches = await aadhaarMatches({
+      aadhaar,
+      fatherAadhaar: s(payload, "father_aadhaar_number"),
+      motherAadhaar: s(payload, "mother_aadhaar_number"),
+      guardianAadhaar: s(payload, "guardian_aadhaar_number"),
+    });
+    if (matches.length > 0) return { matches };
+  }
+
   let result: { id: number; enrollmentNo: string; admissionNo: string; registrationNo: string };
 
   try {
@@ -225,6 +248,8 @@ export async function submitAdmission(payload: AdmissionPayload, draftId: number
         await c.query("DELETE FROM admission_drafts WHERE id = $1 AND created_by = $2",
           [draftId, user.uid]);
       }
+      for (const other of confirmed) await linkSiblings(c, studentId, other, user.uid);
+
       return { id: studentId, enrollmentNo, admissionNo, registrationNo };
     });
   } catch (err) {

@@ -204,6 +204,10 @@ export default function AdmissionWizard({
   const [openCard, setOpenCard] = useState<string | null>("mother");
   const [message, setMessage] = useState<{ kind: "ok" | "bad"; text: string } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [matches, setMatches] = useState<
+    { id: number; enrollment_no: string; admission_no: string | null; name: string;
+      class_name: string | null; center_name: string; matched_on: string }[] | null>(null);
+  const [picked, setPicked] = useState<number[]>([]);
   const [pending, start] = useTransition();
 
   const v = (k: string) => (data[k] === undefined || data[k] === null ? "" : String(data[k]));
@@ -272,9 +276,16 @@ export default function AdmissionWizard({
       }
     });
 
-  const onSubmit = () =>
+  /**
+   * Admitting, with a pause when the Aadhaar matches somebody already on the
+   * roll. The centre is shown who matched and says whether it is a brother or
+   * sister; only then does the admission go through.
+   */
+  const send = (siblings: number[], notSiblings: boolean) =>
     start(async () => {
-      const res = await submitAdmission(data, draftId);
+      const res = await submitAdmission(data, draftId, siblings, notSiblings);
+      if (res?.matches) { setMatches(res.matches); setPicked([]); return; }
+      setMatches(null);
       if (res?.error) {
         setMessage({ kind: "bad", text: res.error });
         if (typeof res.step === "number") setStep(res.step);
@@ -282,9 +293,62 @@ export default function AdmissionWizard({
       router.refresh();
     });
 
+  const onSubmit = () => send([], false);
+
+
+  const siblingPanel = matches && (
+    <Card className="mb-5">
+      <h2 className="mb-1 text-[15px] font-semibold text-[var(--warn)]">
+        Somebody on the roll has the same Aadhaar
+      </h2>
+      <p className="mb-3 text-[13px] leading-relaxed text-[var(--muted)]">
+        This usually means a brother or sister — families give the same parent
+        Aadhaar for every child. Check the names below. Tick the ones who are
+        this child&rsquo;s siblings, or say none of them are.
+      </p>
+      <ul className="mb-4">
+        {matches.map((m) => (
+          <li key={m.id} className="border-t border-[#f1f1f6] py-2.5 first:border-0">
+            <label className="flex cursor-pointer items-start gap-3">
+              <input type="checkbox" className="mt-1 h-4 w-4 flex-none accent-[var(--brand)]"
+                checked={picked.includes(m.id)}
+                onChange={(e) => setPicked((p) =>
+                  e.target.checked ? [...p, m.id] : p.filter((x) => x !== m.id))} />
+              <span className="min-w-0">
+                <span className="block text-[14px] font-medium">{m.name}</span>
+                <span className="block text-[12.5px] text-[var(--muted)]">
+                  {m.enrollment_no}
+                  {m.admission_no ? ` · admission ${m.admission_no}` : ""}
+                  {m.class_name ? ` · ${m.class_name}` : ""} · {m.center_name}
+                </span>
+                <span className="block text-[12px] text-[var(--faint)]">
+                  Matched on {m.matched_on}
+                </span>
+              </span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className="btn btn-primary" disabled={pending || picked.length === 0}
+          onClick={() => send(picked, false)}>
+          {pending ? "Saving…" : `Yes — admit as a sibling of ${picked.length} child${picked.length === 1 ? "" : "ren"}`}
+        </button>
+        <button type="button" className="btn btn-ghost" disabled={pending}
+          onClick={() => send([], true)}>
+          None of these — admit anyway
+        </button>
+        <button type="button" className="btn btn-ghost" disabled={pending}
+          onClick={() => setMatches(null)}>
+          Go back and check
+        </button>
+      </div>
+    </Card>
+  );
 
   return (
     <>
+      {siblingPanel}
       {/* -------------------------------------------------------- progress */}
       <Card className="mb-5">
         <ol className="flex flex-wrap items-center gap-x-2 gap-y-3">
