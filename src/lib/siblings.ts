@@ -45,7 +45,7 @@ export async function aadhaarMatches(p: {
        JOIN centers ce ON ce.id = s.center_id
        LEFT JOIN enrollments e ON e.student_id = s.id
        LEFT JOIN class_levels cl ON cl.id = e.class_level_id
-      WHERE ($4::bigint IS NULL OR s.id <> $4)
+      WHERE ($3::bigint IS NULL OR s.id <> $3)
         AND (
           ($1::text IS NOT NULL AND s.aadhaar_number = $1)
           OR (array_length($2::text[], 1) > 0 AND (
@@ -54,7 +54,7 @@ export async function aadhaarMatches(p: {
              OR s.guardian_aadhaar_number = ANY($2)))
         )
       ORDER BY s.id DESC`,
-    [own, parents, null, p.excludeId ?? null],
+    [own, parents, p.excludeId ?? null],
   );
 }
 
