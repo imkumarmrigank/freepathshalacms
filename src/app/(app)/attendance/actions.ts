@@ -40,13 +40,6 @@ export async function saveAttendance(_prev: unknown, form: FormData) {
     const reason = needsReason(status) ? given : null;
     if (reason !== null && !isReasonFor(status, reason))
       return { error: "One of the reasons does not fit the mark it was given with." };
-    // Present / late / half-day are a same-day judgement; a day that went unmarked
-    // is closed as leave and can only be corrected to absent or leave afterwards.
-    if (isPast && SAME_DAY_ONLY.has(status))
-      return {
-        error: "Attendance for a past date cannot be marked present, late or half day. " +
-               "Those days can only be recorded as leave or absent.",
-      };
     entries.push({ enrollmentId, status, reason });
   }
   if (entries.length === 0) return { error: "Nothing to save." };
@@ -73,6 +66,23 @@ export async function saveAttendance(_prev: unknown, form: FormData) {
         [attDate, rows.map((r) => r.student_id)],
       );
       const was = new Map(before.map((b) => [b.student_id, b]));
+
+      // Being present is a same-day judgement: a day that went unmarked is
+      // closed as absent and cannot be turned into attendance afterwards. A
+      // mark the register already holds is not a new judgement, so re-saving a
+      // sheet that carries older marks is allowed to go through untouched.
+      if (isPast) {
+        for (const e of entries) {
+          if (!SAME_DAY_ONLY.has(e.status)) continue;
+          const enr = byId.get(e.enrollmentId);
+          const prior = enr ? was.get(enr.student_id) : null;
+          if (prior?.status === e.status) continue;
+          throw new Error(
+            "Attendance for a past date cannot be marked present. " +
+            "A closed day can only be corrected to absent.");
+        }
+      }
+
       let missing = 0;
       // a reason may still be given for an earlier day, but is only demanded from
       // the date the rule came in

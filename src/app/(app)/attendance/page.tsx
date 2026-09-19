@@ -82,9 +82,9 @@ export default async function AttendancePage({
       {isPast && !future && !holiday && (
         <div className="mb-4">
           <Alert kind="warn">
-            {fmtDate(attDate)} is closed. Present, late and half day can only be given on the
-            day itself — anyone left unmarked that day has already been recorded as absent.
-            A closed day can still be corrected to leave or absent.
+            {fmtDate(attDate)} is closed. Present can only be given on the day itself —
+            anyone left unmarked that day has already been recorded as absent. A closed day
+            can still be corrected to absent, with the reason.
           </Alert>
         </div>
       )}

@@ -4,7 +4,10 @@ import { useActionState, useState } from "react";
 import { saveAttendance } from "./actions";
 import { Avatar } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
-import { ABSENT_REASONS, LEAVE_REASONS, needsReason, reasonRequiredOn, reasonsFor } from "@/lib/attendance-meta";
+import {
+  ABSENT_REASONS, LEAVE_REASONS, LEGACY_STATUS_LABEL, MARKABLE, MARK_OPTIONS,
+  needsReason, reasonRequiredOn, reasonsFor,
+} from "@/lib/attendance-meta";
 
 export type Row = {
   enrollment_id: number; student_id: number; enrollment_no: string;
@@ -13,13 +16,7 @@ export type Row = {
   reason: string | null;
 };
 
-const OPTIONS = [
-  { value: "present", label: "P", title: "Present", color: "var(--ok)" },
-  { value: "absent", label: "A", title: "Absent", color: "var(--bad)" },
-  { value: "late", label: "L", title: "Late", color: "#eab308" },
-  { value: "half_day", label: "H", title: "Half day", color: "#0891b2" },
-  { value: "leave", label: "Lv", title: "Leave", color: "var(--muted)" },
-];
+const OPTIONS = MARK_OPTIONS;
 
 const SAME_DAY_ONLY = new Set(["present", "late", "half_day"]);
 
@@ -42,7 +39,10 @@ export default function AttendanceSheet({
     () => Object.fromEntries(rows.map((r) => [r.enrollment_id, r.reason ?? ""])),
   );
 
-  const disabledFor = (value: string) => locked || (isPast && SAME_DAY_ONLY.has(value));
+  // A mark the register already holds stays settable, even on a closed day:
+  // pressing it changes nothing, and disabling it would strand the row.
+  const disabledFor = (id: number, value: string) =>
+    locked || (isPast && SAME_DAY_ONLY.has(value) && saved[id]?.status !== value);
 
   /** Changing the mark to one with a different list of reasons clears the old choice. */
   const mark = (id: number, value: string) => {
@@ -70,6 +70,9 @@ export default function AttendanceSheet({
   const counts = OPTIONS.map((o) => ({
     ...o, n: Object.values(marks).filter((v) => v === o.value).length,
   }));
+  // Anything the register holds from before the two-button register — shown so
+  // the totals across the top still add up to the class.
+  const older = Object.values(marks).filter((v) => !MARKABLE.has(v)).length;
 
   return (
     <form action={action}>
@@ -89,6 +92,13 @@ export default function AttendanceSheet({
                 <strong className="tabular-nums">{c.n}</strong>
               </span>
             ))}
+            {older > 0 && (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-[var(--faint)]" />
+                <span className="text-[var(--muted)]">Older marks</span>
+                <strong className="tabular-nums">{older}</strong>
+              </span>
+            )}
           </div>
           {!locked && (absentIds.length > 1 || leaveIds.length > 1) && (
             <div className="flex flex-wrap gap-2">
@@ -155,13 +165,20 @@ export default function AttendanceSheet({
                   <td>
                     <input type="hidden" name={`st_${r.enrollment_id}`} value={marks[r.enrollment_id]} />
                     <input type="hidden" name={`rs_${r.enrollment_id}`} value={reasons[r.enrollment_id] ?? ""} />
-                    <div className="flex justify-end gap-1">
+                    <div className="flex items-center justify-end gap-1">
+                      {!MARKABLE.has(marks[r.enrollment_id]) && (
+                        <span className="mr-1 rounded-md border border-[var(--border)] px-1.5 py-0.5 text-[11px] text-[var(--muted)]"
+                          title="Recorded before the register was simplified — press P or A to change it">
+                          {LEGACY_STATUS_LABEL[marks[r.enrollment_id]] ?? marks[r.enrollment_id]}
+                        </span>
+                      )}
                       {OPTIONS.map((o) => {
                         const on = marks[r.enrollment_id] === o.value;
                         return (
                           <button
-                            key={o.value} type="button" disabled={disabledFor(o.value)}
-                            title={disabledFor(o.value) && !locked
+                            key={o.value} type="button"
+                            disabled={disabledFor(r.enrollment_id, o.value)}
+                            title={disabledFor(r.enrollment_id, o.value) && !locked
                               ? `${o.title} can only be marked on the day itself`
                               : o.title}
                             onClick={() => mark(r.enrollment_id, o.value)}
@@ -211,7 +228,7 @@ export default function AttendanceSheet({
           <Submit>Save attendance</Submit>
           <span className="text-[13px] text-[var(--muted)]">
             {isPast
-              ? "This day is closed — only leave or absent can be recorded now."
+              ? "This day is closed — present can only be given on the day itself."
               : "Saving again for the same date overwrites the earlier entry."}
           </span>
         </div>
