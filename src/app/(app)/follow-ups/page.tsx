@@ -5,6 +5,7 @@ import { centersForUser, currentSession, resolveCenterId } from "@/lib/queries";
 import { Avatar, Badge, Card, Empty, PageHeader, StatCard } from "@/components/ui";
 import Filters from "@/components/Filters";
 import AssignFollowUp from "./AssignFollowUp";
+import QuickClose from "./QuickClose";
 import { fmtDate, fullName, titleCase, today } from "@/lib/format";
 import { isGlobalRole } from "@/lib/roles";
 import Pager from "@/components/Pager";
@@ -83,12 +84,19 @@ export default async function FollowUpsPage({
       <PageHeader title="Follow-ups"
         subtitle="Commitments made to parents during a PTM" />
 
+      {/* The three numbers describe whichever list is on screen, so the
+          Completed tab does not report its rows as "still pending". */}
       <div className="mb-5 grid gap-4 sm:grid-cols-3">
-        <StatCard label="Overdue" value={overdue} hint="past the promised date"
-          tone={overdue ? "bad" : "default"} />
-        <StatCard label="Due this week" value={dueSoon} hint="next 7 days"
-          tone={dueSoon ? "warn" : "default"} />
-        <StatCard label="Open in total" value={total} hint="still pending" />
+        <StatCard label={status === "pending" ? "Overdue" : "Past the promised date"}
+          value={overdue} hint="promised date has gone by"
+          tone={status === "pending" && overdue ? "bad" : "default"} />
+        <StatCard label="Dated this week" value={dueSoon} hint="next 7 days"
+          tone={status === "pending" && dueSoon ? "warn" : "default"} />
+        <StatCard
+          label={status === "pending" ? "Open in total"
+            : status === "done" ? "Completed" : "Cancelled"}
+          value={total}
+          hint={status === "pending" ? "still pending" : "in this period"} />
       </div>
 
       <Filters
@@ -112,7 +120,7 @@ export default async function FollowUpsPage({
               <thead>
                 <tr>
                   <th>Due</th><th>Student</th><th>Class</th><th>How</th>
-                  <th>Assigned to</th><th>From PTM</th>
+                  <th>Assigned to</th><th>From PTM</th><th></th>
                 </tr>
               </thead>
               <tbody>
@@ -150,6 +158,7 @@ export default async function FollowUpsPage({
                         )}
                       </td>
                       <td className="text-[var(--muted)]">{fmtDate(r.interaction_date)}</td>
+                      <td><QuickClose id={r.id} status={r.follow_up_status} /></td>
                     </tr>
                   );
                 })}

@@ -38,14 +38,18 @@ export async function recordInteraction(_prev: unknown, form: FormData) {
   // the form's required questions, checked here and not only in the browser
   const parentPresent = String(form.get("parent_present") ?? "");
   const engagement = String(form.get("engagement") ?? "");
-  const priority = String(form.get("follow_up_priority") ?? "");
-  const followUpDate = str(form, "follow_up_date");
+  // Not every conversation leaves something owing. When the mentor says no
+  // follow-up is needed, the priority and the date go with it rather than
+  // being filled in with something meaningless.
+  const followUpRequired = String(form.get("follow_up_required") ?? "yes") !== "no";
+  const priority = followUpRequired ? String(form.get("follow_up_priority") ?? "") : "";
+  const followUpDate = followUpRequired ? str(form, "follow_up_date") : null;
   const confidence = form.get("confidence") ? Number(form.get("confidence")) : null;
 
   if (!parentPresent) return { error: "Say who attended." };
   if (!engagement) return { error: "Record the parent's engagement level." };
-  if (!priority) return { error: "Set the follow-up priority." };
-  if (!followUpDate) return { error: "Set the next follow-up date." };
+  if (followUpRequired && !priority) return { error: "Set the follow-up priority." };
+  if (followUpRequired && !followUpDate) return { error: "Set the next follow-up date." };
   if (confidence === null || confidence < 1 || confidence > 5)
     return { error: "Rate your confidence in this family's progress from 1 to 5." };
 
@@ -62,7 +66,9 @@ export async function recordInteraction(_prev: unknown, form: FormData) {
   // whoever is named as the mentor, defaulting to the person filling this in
   const mentorId = form.get("mentor_id") ? Number(form.get("mentor_id")) : user.uid;
   const assigneeRaw = form.get("follow_up_assignee_id");
-  const assigneeId = assigneeRaw && String(assigneeRaw) !== "" ? Number(assigneeRaw) : mentorId;
+  const assigneeId = !followUpRequired
+    ? null
+    : assigneeRaw && String(assigneeRaw) !== "" ? Number(assigneeRaw) : mentorId;
 
   // attendance is already known, so it is taken from the record rather than typed
   const att = await one<{ present: string; marked: string }>(
@@ -81,9 +87,9 @@ export async function recordInteraction(_prev: unknown, form: FormData) {
         interaction_date, mode, parent_present, engagement, attendance_pct,
         discussion, concerns, action_items, concern_tags, commitment_tags,
         follow_up_required, follow_up_date, follow_up_priority, follow_up_owner,
-        follow_up_assignee_id, confidence, support_needed)
+        follow_up_assignee_id, follow_up_status, confidence, support_needed)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
-             TRUE,$17,$18,$19,$20,$21,$22)
+             $17,$18,$19,$20,$21,$22,$23,$24)
      RETURNING id`,
     [num(form, "meeting_id"), studentId, session.id, student.class_level_id,
      student.center_id, mentorId,
@@ -91,8 +97,10 @@ export async function recordInteraction(_prev: unknown, form: FormData) {
      parentPresent, engagement, attendancePct,
      str(form, "discussion"), str(form, "concerns"), str(form, "action_items"),
      concernTags, commitmentTags,
-     followUpDate, priority, str(form, "follow_up_owner"),
-     assigneeId, confidence, str(form, "support_needed")],
+     followUpRequired, followUpDate, priority || null,
+     followUpRequired ? str(form, "follow_up_owner") : null,
+     assigneeId, followUpRequired ? "pending" : "done",
+     confidence, str(form, "support_needed")],
   );
 
   revalidatePath("/ptm");
@@ -100,10 +108,17 @@ export async function recordInteraction(_prev: unknown, form: FormData) {
   redirect(`/ptm/${row!.id}?created=1`);
 }
 
+/**
+ * Close a follow-up, cancel it, or put it back on the list. Anyone who can
+ * touch the centre may do it, at any time — a promise kept early is closed
+ * early, and a follow-up closed by mistake should not need a new PTM record.
+ */
 export async function closeFollowUp(_prev: unknown, form: FormData) {
   const user = await requireUser();
   const id = Number(form.get("id"));
   const status = String(form.get("follow_up_status") ?? "done");
+  if (!["done", "cancelled", "pending"].includes(status))
+    return { error: "Say whether it is done, cancelled or still open." };
 
   const row = await one<{ center_id: number }>(
     "SELECT center_id FROM ptm_interactions WHERE id = $1", [id],
@@ -113,12 +128,21 @@ export async function closeFollowUp(_prev: unknown, form: FormData) {
     return { error: "This record belongs to another centre." };
 
   await query(
-    "UPDATE ptm_interactions SET follow_up_status = $2, follow_up_notes = $3 WHERE id = $1",
+    `UPDATE ptm_interactions
+        SET follow_up_status = $2,
+            -- a note is added when one is given; reopening keeps what was written
+            follow_up_notes = COALESCE($3, follow_up_notes)
+      WHERE id = $1`,
     [id, status, str(form, "follow_up_notes")],
   );
   revalidatePath("/follow-ups");
+  revalidatePath("/dashboard");
   revalidatePath(`/ptm/${id}`);
-  return { ok: status === "done" ? "Follow-up closed." : "Follow-up cancelled." };
+  return {
+    ok: status === "done" ? "Follow-up closed."
+      : status === "cancelled" ? "Follow-up cancelled."
+      : "Follow-up reopened.",
+  };
 }
 
 /** Hand an open follow-up to a teacher, or take it back. */

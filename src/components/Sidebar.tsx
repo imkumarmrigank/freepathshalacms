@@ -70,6 +70,8 @@ const MENU: Node[] = [
       { href: "/ptm", label: "PTM interactions", feature: "ptm" },
       { href: "/follow-ups", label: "Follow-ups", feature: "followUps" },
       { href: "/counselling", label: "Counselling", feature: "counselling" },
+      { href: "/centre-feedback", label: "Centre feedback",
+        roles: ["mentor", "admin", "super_admin", "center_manager"] },
     ],
   },
 

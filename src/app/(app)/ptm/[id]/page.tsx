@@ -107,23 +107,27 @@ export default async function InteractionPage({
             )}
           </Card>
 
-          {row.follow_up_required && (
-            <Card>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-[15px] font-semibold">Follow-up</h2>
-                {row.follow_up_status === "pending"
+          <Card>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-[15px] font-semibold">Follow-up</h2>
+              {!row.follow_up_required
+                ? <Badge tone="mute">Not required</Badge>
+                : row.follow_up_status === "pending"
                   ? <Badge tone="warn">Pending</Badge>
                   : <Badge tone={row.follow_up_status === "done" ? "ok" : "mute"}>{titleCase(row.follow_up_status)}</Badge>}
-              </div>
-              <p className="mt-2 text-[14px] text-[var(--muted)]">
-                {titleCase(row.follow_up_mode ?? "follow-up")} on {fmtDate(row.follow_up_date)}
-              </p>
-              {row.follow_up_notes && (
-                <p className="mt-3 whitespace-pre-wrap text-[14px] text-[var(--muted)]">{row.follow_up_notes}</p>
-              )}
-              {row.follow_up_status === "pending" && <CloseFollowUp id={row.id} />}
-            </Card>
-          )}
+            </div>
+            <p className="mt-2 text-[14px] text-[var(--muted)]">
+              {row.follow_up_required
+                ? `${titleCase(row.follow_up_mode ?? "follow-up")} on ${fmtDate(row.follow_up_date)}`
+                : "The mentor recorded that nothing was left outstanding after this conversation."}
+            </p>
+            {row.follow_up_notes && (
+              <p className="mt-3 whitespace-pre-wrap text-[14px] text-[var(--muted)]">{row.follow_up_notes}</p>
+            )}
+            {row.follow_up_required && (
+              <CloseFollowUp id={row.id} status={row.follow_up_status} />
+            )}
+          </Card>
         </div>
 
         <Card>

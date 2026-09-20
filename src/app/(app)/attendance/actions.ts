@@ -4,7 +4,7 @@ import { requireUser, canTouchCenter } from "@/lib/auth";
 import { tx } from "@/lib/db";
 import { SAME_DAY_ONLY } from "@/lib/attendance";
 import { today } from "@/lib/format";
-import { isGlobalRole } from "@/lib/roles";
+import { canMarkAttendance } from "@/lib/roles";
 import { isReasonFor, needsReason, reasonRequiredOn } from "@/lib/attendance-meta";
 
 const VALID = new Set(["present", "absent", "late", "half_day", "leave", "holiday"]);
@@ -26,6 +26,8 @@ export async function saveAttendance(_prev: unknown, form: FormData) {
   const isPast = attDate < today();
   if (attDate > today())
     return { error: "You cannot mark attendance for a future date." };
+  if (!canMarkAttendance(user.role))
+    return { error: "You can read the register but not mark it." };
   if (!canTouchCenter(user, centerId))
     return { error: "You can only mark attendance for your own centre." };
 

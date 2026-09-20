@@ -57,6 +57,9 @@ export default function InteractionForm({
     () => students.find((s) => s.id === defaultStudentId)?.centerId ?? (centers.length === 1 ? centers[0].id : ""),
   );
   const [studentId, setStudentId] = useState<number | "">(defaultStudentId ?? "");
+  // Most PTMs leave something owing, so a follow-up is the starting point — but
+  // a conversation that settled everything should not have to invent a date.
+  const [followUp, setFollowUp] = useState(true);
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -218,9 +221,30 @@ export default function InteractionForm({
             <textarea className="textarea" name="action_items" rows={2} />
           </Field>
 
-          <div className="grid gap-x-4 sm:grid-cols-2">
+          <Field label="14. Is a follow-up needed? *">
+            <div className="flex flex-wrap gap-4 text-[13px]">
+              <label className="flex items-center gap-2">
+                <input type="radio" name="follow_up_required" value="yes" className="h-4 w-4"
+                  checked={followUp} onChange={() => setFollowUp(true)} />
+                <span>Yes — something was promised</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="radio" name="follow_up_required" value="no" className="h-4 w-4"
+                  checked={!followUp} onChange={() => setFollowUp(false)} />
+                <span>No follow-up required</span>
+              </label>
+            </div>
+          </Field>
+
+          {!followUp && (
+            <p className="mb-4 text-[13px] text-[var(--muted)]">
+              The interaction is recorded on its own — nothing will appear on the follow-ups list.
+            </p>
+          )}
+
+          <div className={`grid gap-x-4 sm:grid-cols-2 ${followUp ? "" : "hidden"}`}>
             <Field label="15. Follow-up Priority *">
-              <select className="select" name="follow_up_priority" required defaultValue="">
+              <select className="select" name="follow_up_priority" required={followUp} defaultValue="">
                 <option value="">Select</option>
                 {FOLLOW_UP_PRIORITY.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
@@ -228,7 +252,7 @@ export default function InteractionForm({
               </select>
             </Field>
             <Field label="16. Next Follow-up Date *">
-              <input className="input" type="date" name="follow_up_date" required />
+              <input className="input" type="date" name="follow_up_date" required={followUp} />
             </Field>
             <Field label="17. Follow-up Owner">
               <select className="select" name="follow_up_owner" defaultValue="Same Mentor">

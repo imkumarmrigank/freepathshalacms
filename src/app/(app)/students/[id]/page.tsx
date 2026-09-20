@@ -286,7 +286,7 @@ export default async function StudentPage({
 
           {can(user.role, "counselling") && (
             <FlagForCounselling studentId={student.id} flag={flag}
-              canRaise={user.role !== "mentor"} startOpen={openFlag === "1"} />
+              canRaise={user.role !== "auditor"} startOpen={openFlag === "1"} />
           )}
 
           {canMarkDropout(user.role) && (

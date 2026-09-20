@@ -558,6 +558,10 @@ export default function AdmissionWizard({
                 value={v("aadhaar_number")} placeholder="Enter Aadhaar number"
                 error={errors.aadhaar_number} onChange={(x) => set("aadhaar_number", x)} />
             </div>
+            <DocUpload label="Student's Aadhaar Card"
+              hint="A photo or scan of the child's own Aadhaar, if the family has it"
+              value={(data.aadhaar_media_id as number) ?? null}
+              onChange={(id) => set("aadhaar_media_id", id)} />
           </Card>
         </>
       )}

@@ -11,9 +11,14 @@ const str = (f: FormData, k: string) => {
   return v === "" ? null : v;
 };
 
-/** Anyone who teaches the child, or runs the centre, may raise the referral. */
+/**
+ * Anyone who works with the child may raise a referral — including the mentor.
+ * A mentor who hears something at a PTM that needs picking up properly should
+ * be able to put it on the list rather than keep it in their head; the record
+ * says who raised it, so a mentor's own referral reads as exactly that.
+ */
 function canRaise(role: string) {
-  return role !== "mentor";
+  return role !== "auditor";
 }
 
 /** Only the mentor — and the admins above them — work a referral. */
@@ -24,7 +29,7 @@ function canWork(role: string) {
 export async function raiseFlag(_prev: unknown, form: FormData) {
   const user = await requireUser();
   if (!canRaise(user.role))
-    return { error: "Mentors receive referrals rather than raise them." };
+    return { error: "An auditor does not raise counselling referrals." };
 
   const studentId = Number(form.get("student_id"));
   const reasons = form.getAll("reason").map((v) => String(v))

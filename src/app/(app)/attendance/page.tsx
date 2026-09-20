@@ -8,7 +8,7 @@ import { fmtDate, today } from "@/lib/format";
 import { closeRegisterUpToYesterday } from "@/lib/attendance";
 import { holidayOn } from "@/lib/calendar";
 import { EVENT_LABEL } from "@/lib/calendar-meta";
-import { isGlobalRole } from "@/lib/roles";
+import { canMarkAttendance, isGlobalRole } from "@/lib/roles";
 
 export default async function AttendancePage({
   searchParams,
@@ -49,6 +49,7 @@ export default async function AttendancePage({
   }
 
   const holiday = centerId ? await holidayOn(attDate, centerId) : null;
+  const readOnly = !canMarkAttendance(user.role);
   const markedCount = rows.filter((r) => r.status).length;
 
   return (
@@ -66,6 +67,15 @@ export default async function AttendancePage({
           defaults={{ center: String(centerId ?? ""), class: String(classId ?? ""), date: attDate }}
         />
       </Card>
+
+      {readOnly && (
+        <div className="mb-4">
+          <Alert kind="info">
+            You are reading the register, not marking it — pick a centre, class and date to see
+            who was in that day.
+          </Alert>
+        </div>
+      )}
 
       {future && <div className="mb-4"><Alert kind="warn">Attendance cannot be marked for a future date.</Alert></div>}
 
@@ -102,7 +112,8 @@ export default async function AttendancePage({
       ) : (
         <AttendanceSheet
           rows={rows} attDate={attDate} sessionId={session.id}
-          classLevelId={classId} centerId={centerId} locked={future || Boolean(holiday)}
+          classLevelId={classId} centerId={centerId}
+          locked={future || Boolean(holiday) || readOnly}
           isPast={isPast}
         />
       )}

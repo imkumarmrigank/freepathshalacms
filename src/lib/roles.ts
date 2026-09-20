@@ -140,6 +140,9 @@ export type Feature =
   // leave: asking for time off is the teacher's own; answering it is the
   // administrator's. Two names, because almost nobody holds both.
   | "leave" | "leaveApprovals"
+  // centreFeedback: the mentor's own account of a centre they work with.
+  // Reading it back is an administrator's business, so it is a second name.
+  | "centreFeedback" | "centreFeedbackReports"
   | "syllabus";
 
 /** One explicit list per role — no inference, so a gate is read, not deduced. */
@@ -148,18 +151,18 @@ const FEATURES: Record<Role, Feature[]> = {
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
     "calendar", "ptm", "followUps", "supplies", "statistics", "reports",
     "staff", "centres", "coverage", "counselling", "teacherRemarks", "messages",
-    "audits", "auditReports", "leaveApprovals", "syllabus",
+    "audits", "auditReports", "leaveApprovals", "centreFeedbackReports", "syllabus",
   ],
   admin: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
     "calendar", "ptm", "followUps", "supplies", "statistics", "reports",
     "staff", "centres", "coverage", "counselling", "teacherRemarks", "messages",
-    "audits", "auditReports", "leaveApprovals", "syllabus",
+    "audits", "auditReports", "leaveApprovals", "centreFeedbackReports", "syllabus",
   ],
   // the whole point of the mentor role is that this list is short
   mentor: [
     "ptm", "followUps", "progressReports", "students", "calendar", "statistics",
-    "counselling", "teacherRemarks", "messages",
+    "counselling", "teacherRemarks", "messages", "attendance", "centreFeedback",
   ],
   center_manager: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
@@ -184,6 +187,15 @@ const FEATURES: Record<Role, Feature[]> = {
 
 export function can(role: Role, feature: Feature): boolean {
   return FEATURES[role].includes(feature);
+}
+
+/**
+ * Marking the register is the centre's own work. A mentor reads it — they need
+ * to know whether the child they are about to ring has been coming in — but a
+ * visitor does not record who was in the room.
+ */
+export function canMarkAttendance(role: Role) {
+  return role !== "mentor" && role !== "auditor";
 }
 
 /** A mentor may read a student but never change one. */
