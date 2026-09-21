@@ -16,14 +16,15 @@ const str = (f: FormData, k: string) => {
 /**
  * Move a child to another centre, and optionally another class.
  *
- * What always goes with them: the child, this year's enrolment, and anything
- * still open — a follow-up owed to the family, a referral with the mentor —
- * because that work now belongs to the new centre.
+ * What always goes with them: the child, this year's enrolment, and any
+ * referral still open with the mentor, because that work now belongs to the
+ * new centre.
  *
- * What goes if the office says so (the default): this year's attendance, PTM
- * records and closed referrals, so the new centre sees the year whole.
+ * What goes if the office says so (the default): this year's attendance and
+ * closed referrals, so the new centre sees the year whole.
  *
- * What never moves: marks, which belong to the tests the old centre set (the
+ * What never moves: PTM records, which stay with the centre that held the
+ * meeting so its record of the family's progress stays whole; marks, which belong to the tests the old centre set (the
  * report card follows the child to them anyway); supplies handed out, which
  * are part of the old centre's stock count; earlier years' enrolments, which
  * record where the child studied that year; and the enrolment number, which is
@@ -91,30 +92,18 @@ export async function transferStudent(_prev: unknown, form: FormData): Promise<R
         [student.enrollment_id, toCenterId, toClass]);
     }
 
-    // Open work follows the child. A follow-up assigned to a teacher at the
-    // old centre is handed back to the office — that teacher cannot visit now.
-    const openPtm = await c.query(
-      `UPDATE ptm_interactions i
-          SET center_id = $2,
-              follow_up_assignee_id = CASE
-                WHEN (SELECT u.center_id FROM users u WHERE u.id = i.follow_up_assignee_id) = $3
-                  THEN NULL ELSE i.follow_up_assignee_id END
-        WHERE i.student_id = $1 AND i.follow_up_required AND i.follow_up_status = 'pending'
-          AND i.center_id <> $2`,
-      [student.id, toCenterId, from]);
+    // PTM records stay where the meeting happened: they are that centre's
+    // account of the family, and the child's page shows them wherever the
+    // child is now. Open referrals are live work, so they follow the child.
     const openFlags = await c.query(
       `UPDATE counselling_flags SET center_id = $2
         WHERE student_id = $1 AND status <> 'closed' AND center_id <> $2`,
       [student.id, toCenterId]);
 
-    let attendance = 0, ptm = openPtm.rowCount ?? 0, referrals = openFlags.rowCount ?? 0;
+    let attendance = 0, referrals = openFlags.rowCount ?? 0;
     if (moveHistory) {
       attendance = (await c.query(
         `UPDATE student_attendance SET center_id = $2
-          WHERE student_id = $1 AND session_id = $3 AND center_id <> $2`,
-        [student.id, toCenterId, session.id])).rowCount ?? 0;
-      ptm += (await c.query(
-        `UPDATE ptm_interactions SET center_id = $2
           WHERE student_id = $1 AND session_id = $3 AND center_id <> $2`,
         [student.id, toCenterId, session.id])).rowCount ?? 0;
       referrals += (await c.query(
@@ -136,11 +125,11 @@ export async function transferStudent(_prev: unknown, form: FormData): Promise<R
          (student_id, session_id, from_center_id, to_center_id, from_class_id, to_class_id,
           transferred_on, reason, moved_history, moved_attendance, moved_ptm,
           moved_referrals, left_sports, transferred_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,0,$11,$12,$13)`,
       [student.id, session.id, from, toCenterId, student.class_level_id, toClass, on,
-       str(form, "reason"), moveHistory, attendance, ptm, referrals, sports, actor.uid]);
+       str(form, "reason"), moveHistory, attendance, referrals, sports, actor.uid]);
 
-    return { attendance, ptm, referrals, sports };
+    return { attendance, referrals, sports };
   });
 
   revalidatePath("/manage/transfers");
@@ -150,7 +139,6 @@ export async function transferStudent(_prev: unknown, form: FormData): Promise<R
   const n = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;
   const bits = [
     moved.attendance && n(moved.attendance, "attendance day", "attendance days"),
-    moved.ptm && n(moved.ptm, "PTM record", "PTM records"),
     moved.referrals && n(moved.referrals, "referral", "referrals"),
   ].filter(Boolean);
   return {

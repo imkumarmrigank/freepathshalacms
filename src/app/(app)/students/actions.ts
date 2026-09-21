@@ -86,6 +86,13 @@ export async function updateStudent(_prev: unknown, form: FormData) {
     return { error: "Only an administrator can mark a student as dropped out." };
   if (existing.status === "dropped" && status !== "dropped" && !canMarkDropout(user.role))
     return { error: "Only an administrator can bring a dropped-out student back." };
+  // Suspending is the office's call; bringing a suspended child back goes through
+  // Students → Suspended, which also sets the centre and class they return to.
+  if (status === "suspended" && existing.status !== "suspended" && !canMarkDropout(user.role))
+    return { error: "Only an administrator can suspend a student." };
+  if (existing.status === "suspended" && status !== "suspended")
+    return { error: "Bring a suspended student back from Students → Suspended students, "
+      + "so their centre and class are set at the same time." };
 
   // Everything the admission record shows, except the admission number and the
   // Admission & scheme block — those have their own controls and their own audit.
@@ -153,6 +160,13 @@ export async function updateStudent(_prev: unknown, form: FormData) {
     `UPDATE students SET ${sets.join(", ")}, updated_at=now() WHERE id=$1`,
     values,
   );
+  // a child newly suspended is dated from today, with who did it
+  if (status === "suspended" && existing.status !== "suspended") {
+    await query(
+      `UPDATE students SET left_on = $2, status_changed_by = $3, status_changed_at = now()
+        WHERE id = $1`,
+      [id, today(), user.uid]);
+  }
   revalidatePath(`/students/${id}`);
   return { ok: "Saved." };
 }

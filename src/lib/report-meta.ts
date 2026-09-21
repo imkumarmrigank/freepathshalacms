@@ -51,6 +51,34 @@ export const REPORTS: ReportMeta[] = [
     roles: ["super_admin", "admin"],
   },
   {
+    key: "suspended-students",
+    label: "Suspended students",
+    group: "Students",
+    description:
+      "Every child currently suspended: their last centre and class, since when, and why.",
+    filters: ["center"],
+    roles: ["super_admin", "admin"],
+  },
+  {
+    key: "passed-out-students",
+    label: "Passed out students",
+    group: "Students",
+    description:
+      "Children who have moved on from the centre to a formal school, with where they went.",
+    filters: ["center"],
+    roles: ["super_admin", "admin"],
+  },
+  {
+    key: "student-reactivations",
+    label: "Students brought back",
+    group: "Students",
+    description:
+      "Suspended or passed-out children returned to the roll in the period: from where and "
+      + "what class, to where and what class, why they had left, and who brought them back.",
+    filters: ["dates", "center"],
+    roles: ["super_admin", "admin"],
+  },
+  {
     key: "student-transfers",
     label: "Transfers between centres",
     group: "Students",

@@ -69,6 +69,9 @@ export async function runReport(
     case "dropouts":                     return dropouts(scoped, period);
     case "dropout-reasons":              return dropoutReasons(scoped, period);
     case "student-transfers":            return studentTransfers(scoped, period);
+    case "suspended-students":           return offRoll(scoped, "suspended");
+    case "passed-out-students":          return offRoll(scoped, "graduated");
+    case "student-reactivations":        return reactivations(scoped, period);
     case "student-attendance-summary":   return studentAttendanceSummary(scoped, period);
     case "student-attendance-trend":     return studentAttendanceTrend(scoped, period);
     case "staff-attendance-trend":       return staffAttendanceTrend(scoped, period);
@@ -1885,8 +1888,112 @@ async function studentTransfers(p: ReportParams, period: string): Promise<Report
       enrollment_no: r.enrollment_no, from_centre: r.from_centre, to_centre: r.to_centre,
       from_class: r.from_class ?? "—", to_class: r.to_class ?? "—", reason: r.reason ?? "",
       moved: r.moved_history
-        ? `${r.moved_attendance} attendance days, ${r.moved_ptm} PTMs, ${r.moved_referrals} referrals`
+        ? `${r.moved_attendance} attendance days, ${r.moved_referrals} referrals`
         : `Open items only (${r.moved_referrals} referrals)`,
+      by_name: r.by_name ?? "",
+    })),
+  };
+}
+
+/* ------------------------------------------------ suspended and passed out */
+
+async function offRoll(p: ReportParams, status: "suspended" | "graduated"): Promise<ReportResult> {
+  const params: unknown[] = [status];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND s.center_id = $${params.length}`; }
+  const rows = await query<{
+    student: string; enrollment_no: string; admission_no: string | null; gender: string | null;
+    father_name: string | null; primary_phone: string | null; center_name: string;
+    class_name: string | null; left_on: string | null; left_reason: string | null;
+  }>(
+    `SELECT trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
+            s.enrollment_no, s.admission_no, s.gender, s.father_name, s.primary_phone,
+            c.name AS center_name, cl.name AS class_name, s.left_on, s.left_reason
+       FROM students s
+       JOIN centers c ON c.id = s.center_id
+       LEFT JOIN LATERAL (
+         SELECT e.class_level_id FROM enrollments e
+          WHERE e.student_id = s.id ORDER BY e.session_id DESC LIMIT 1
+       ) last ON TRUE
+       LEFT JOIN class_levels cl ON cl.id = last.class_level_id
+      WHERE s.status = $1 ${where}
+      ORDER BY c.code, cl.sequence NULLS LAST, student`,
+    params,
+  );
+  const passed = status === "graduated";
+  return {
+    title: passed ? "Passed out students" : "Suspended students",
+    subtitle: `${rows.length} child${rows.length === 1 ? "" : "ren"}`,
+    columns: [
+      { key: "center_name", label: "Last centre", width: 16 },
+      { key: "student", label: "Student", width: 24 },
+      { key: "enrollment_no", label: "Enrolment No", width: 14 },
+      { key: "admission_no", label: "Admission No", width: 12 },
+      { key: "class_name", label: "Last class", width: 11 },
+      { key: "gender", label: "Gender", width: 9 },
+      { key: "father_name", label: "Father", width: 20 },
+      { key: "primary_phone", label: "Phone", width: 13 },
+      { key: "left_on", label: "Since", width: 12 },
+      { key: "left_reason", label: passed ? "Went to" : "Reason", width: 44 },
+    ],
+    rows: rows.map((r) => ({
+      center_name: r.center_name, student: r.student, enrollment_no: r.enrollment_no,
+      admission_no: r.admission_no ?? "", class_name: r.class_name ?? "—",
+      gender: r.gender ? titleCase(r.gender) : "—", father_name: r.father_name ?? "",
+      primary_phone: r.primary_phone ?? "", left_on: r.left_on ? String(r.left_on).slice(0, 10) : "",
+      left_reason: r.left_reason ?? "",
+    })),
+  };
+}
+
+async function reactivations(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.from, p.to];
+  let where = "";
+  if (p.centerId) {
+    params.push(p.centerId);
+    where = ` AND (r.from_center_id = $${params.length} OR r.to_center_id = $${params.length})`;
+  }
+  const rows = await query<{
+    reactivated_on: string; student: string; enrollment_no: string; from_status: string;
+    from_centre: string | null; to_centre: string; from_class: string | null; to_class: string;
+    left_reason: string | null; note: string | null; by_name: string | null;
+  }>(
+    `SELECT r.reactivated_on, trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
+            s.enrollment_no, r.from_status, fc.name AS from_centre, tc.name AS to_centre,
+            fcl.name AS from_class, tcl.name AS to_class, r.left_reason, r.note,
+            u.name AS by_name
+       FROM student_reactivations r
+       JOIN students s ON s.id = r.student_id
+       LEFT JOIN centers fc ON fc.id = r.from_center_id
+       JOIN centers tc ON tc.id = r.to_center_id
+       LEFT JOIN class_levels fcl ON fcl.id = r.from_class_id
+       JOIN class_levels tcl ON tcl.id = r.to_class_id
+       LEFT JOIN users u ON u.id = r.reactivated_by
+      WHERE r.reactivated_on BETWEEN $1 AND $2 ${where}
+      ORDER BY r.reactivated_on DESC, r.id DESC`,
+    params,
+  );
+  return {
+    title: "Students brought back",
+    subtitle: `${period} · ${rows.length} student${rows.length === 1 ? "" : "s"}`,
+    columns: [
+      { key: "reactivated_on", label: "Date", width: 12 },
+      { key: "student", label: "Student", width: 24 },
+      { key: "enrollment_no", label: "Enrolment No", width: 14 },
+      { key: "was", label: "Was", width: 11 },
+      { key: "from_centre", label: "From centre", width: 16 },
+      { key: "to_centre", label: "To centre", width: 16 },
+      { key: "from_class", label: "Class before", width: 12 },
+      { key: "to_class", label: "Class now", width: 12 },
+      { key: "left_reason", label: "Why they had left", width: 36 },
+      { key: "note", label: "Note", width: 30 },
+      { key: "by_name", label: "Brought back by", width: 18 },
+    ],
+    rows: rows.map((r) => ({
+      reactivated_on: String(r.reactivated_on).slice(0, 10), student: r.student,
+      enrollment_no: r.enrollment_no, was: r.from_status === "graduated" ? "Passed out" : "Suspended",
+      from_centre: r.from_centre ?? "", to_centre: r.to_centre, from_class: r.from_class ?? "—",
+      to_class: r.to_class, left_reason: r.left_reason ?? "", note: r.note ?? "",
       by_name: r.by_name ?? "",
     })),
   };

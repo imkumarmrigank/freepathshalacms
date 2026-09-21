@@ -41,6 +41,7 @@ const MENU: Node[] = [
       { href: "/students", label: "All students", feature: "students" },
       { href: "/students/new", label: "New admission", when: canAdmitStudents },
       { href: "/manage/transfers", label: "Transfer students", roles: ["super_admin", "admin"] },
+      { href: "/manage/suspended", label: "Suspended students", roles: ["super_admin", "admin"] },
       { href: "/progress-reports", label: "Progress reports", feature: "progressReports" },
       { href: "/manage/promotions", label: "Promotions", roles: ["super_admin"] },
     ],

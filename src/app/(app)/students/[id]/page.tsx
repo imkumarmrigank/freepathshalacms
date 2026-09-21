@@ -17,7 +17,7 @@ import EnrollmentControls from "./EnrollmentControls";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
 
 const STATUS_TONE: Record<string, string> = {
-  active: "ok", inactive: "mute", graduated: "info", transferred: "mute", dropped: "bad",
+  active: "ok", inactive: "mute", graduated: "info", transferred: "mute", dropped: "bad", suspended: "warn",
 };
 const ENGAGEMENT_TONE: Record<string, string> = { attentive: "ok", neutral: "warn", resistant: "bad" };
 const SOURCE_LABEL: Record<string, string> = {

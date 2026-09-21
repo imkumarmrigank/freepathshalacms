@@ -122,7 +122,7 @@ export default function EditStudent({ s, readOnly, canDrop }:
           </Field>
           <Field label="Status">
             <select className="select" name="status" defaultValue={s.status}>
-              {["active", "inactive", "graduated", "transferred", "dropped"]
+              {["active", "inactive", "suspended", "graduated", "transferred", "dropped"]
                 // dropping out has its own control, with a reason attached
                 .filter((v) => v !== "dropped" || canDrop || s.status === "dropped")
                 .map((v) => <option key={v} value={v}>{v[0].toUpperCase() + v.slice(1)}</option>)}

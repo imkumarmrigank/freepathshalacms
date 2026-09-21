@@ -10,7 +10,7 @@ import Pager from "@/components/Pager";
 import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
 
 const STATUS_TONE: Record<string, string> = {
-  active: "ok", inactive: "mute", graduated: "info", transferred: "mute", dropped: "bad",
+  active: "ok", inactive: "mute", graduated: "info", transferred: "mute", dropped: "bad", suspended: "warn",
 };
 
 type Row = {
@@ -88,7 +88,7 @@ export default async function StudentsPage({
         current={{ ...sp, session: String(sessionId ?? "") }}
         searchPlaceholder="Search by name, enrolment no. or phone"
         extra={[{ name: "status", label: "All statuses",
-          options: ["active", "inactive", "graduated", "transferred", "dropped"]
+          options: ["active", "inactive", "suspended", "graduated", "transferred", "dropped"]
             .map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) })) }]}
       />
 

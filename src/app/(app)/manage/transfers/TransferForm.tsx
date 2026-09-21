@@ -122,13 +122,13 @@ export default function TransferForm({
             <label className="mb-1 flex items-start gap-2 text-[13px]">
               <input type="checkbox" name="move_history" defaultChecked className="mt-0.5 h-4 w-4" />
               <span>
-                Move this year&rsquo;s attendance, PTM records and counselling referrals with the child
+                Move this year&rsquo;s attendance and counselling referrals with the child
               </span>
             </label>
             <p className="mb-4 pl-6 text-[12px] text-[var(--muted)]">
-              Open follow-ups and open referrals always move. Test marks stay with the tests the old
-              centre held but still appear on the child&rsquo;s report card. Supplies handed out stay
-              in the old centre&rsquo;s stock count.
+              Open referrals always move. PTM records stay with the centre that held them, and test
+              marks with the tests the old centre set — both still show on the child&rsquo;s page and
+              report card. Supplies handed out stay in the old centre&rsquo;s stock count.
             </p>
 
             <button className="btn btn-primary" type="submit" disabled={!to || pending}>
