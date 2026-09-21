@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { centersForUser, resolveCenterId } from "@/lib/queries";
 import { Alert, Avatar, Badge, Card, Empty, PageHeader } from "@/components/ui";
@@ -14,7 +14,7 @@ const TONE: Record<string, string> = {
 export default async function StaffAttendancePage({
   searchParams,
 }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const user = await requireUser();
+  const user = await requireRole("super_admin", "admin", "center_manager");
   if (isTeaching(user.role))
     return <Alert kind="bad">You don’t have access to the staff register.</Alert>;
 
@@ -41,7 +41,7 @@ export default async function StaffAttendancePage({
        LEFT JOIN centers c ON c.id = u.center_id
        LEFT JOIN staff_attendance a ON a.user_id = u.id AND a.att_date = $1
        LEFT JOIN users o ON o.id = a.override_by
-      WHERE u.is_active AND u.role IN ('center_manager','teacher') ${scope}
+      WHERE u.is_active AND u.role IN ('center_manager','teacher','rider') ${scope}
       ORDER BY c.code, u.role, u.name`,
     params,
   );

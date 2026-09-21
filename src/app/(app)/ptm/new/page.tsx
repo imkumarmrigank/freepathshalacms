@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth";
+import { requireFeature } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { centersForUser, currentSession, resolveCenterId } from "@/lib/queries";
 import { Alert, PageHeader } from "@/components/ui";
@@ -8,7 +8,7 @@ import InteractionForm from "./InteractionForm";
 export default async function NewInteractionPage({
   searchParams,
 }: { searchParams: Promise<{ student?: string }> }) {
-  const user = await requireUser();
+  const user = await requireFeature("ptm");
   const { student } = await searchParams;
   const session = await currentSession();
   if (!session) return <Alert kind="warn">No academic session is open.</Alert>;

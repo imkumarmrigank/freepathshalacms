@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { canTouchCenter, requireUser } from "@/lib/auth";
+import { canTouchCenter, requireFeature } from "@/lib/auth";
 import { one } from "@/lib/db";
 import { Alert, Card, PageHeader } from "@/components/ui";
 import { fullName } from "@/lib/format";
@@ -10,7 +10,7 @@ export const metadata = { title: "Admission successful · Pehchaan" };
 export default async function AdmissionSuccessPage({
   searchParams,
 }: { searchParams: Promise<{ student?: string }> }) {
-  const user = await requireUser();
+  const user = await requireFeature("students");
   const { student: studentParam } = await searchParams;
   if (!studentParam) notFound();
 

@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 import {
   IconGrid, IconUsers, IconChat, IconCal, IconChart, IconClock, IconAward,
   IconBuilding, IconLayers, IconCheck, IconBook, IconBox, IconChevron, IconReport, IconClipboard, IconFlag,
+  IconBall,
 } from "./icons";
 import { can, canAdmitStudents, type Feature, type Role } from "@/lib/roles";
 
@@ -85,6 +86,8 @@ const MENU: Node[] = [
         roles: ["super_admin"] },
     ],
   },
+
+  { href: "/sports", label: "Sports", icon: IconBall, feature: "sports" },
 
   { href: "/calendar", label: "Calendar", icon: IconCal, feature: "calendar" },
   { href: "/supplies", label: "Supplies", icon: IconBox, feature: "supplies" },
@@ -173,6 +176,15 @@ const DOCK: Record<Role, { href: string; label: string; icon: Icon }[]> = {
     { href: "/students", label: "Students", icon: IconUsers },
     { href: "/reports", label: "Reports", icon: IconReport },
     { href: "/statistics", label: "Insights", icon: IconChart },
+  ],
+  // a sports teacher's day starts at whichever centre they are standing in
+  sports_teacher: [
+    { href: "/sports", label: "Sports", icon: IconBall },
+    { href: "/calendar", label: "Calendar", icon: IconCal },
+    { href: "/messages", label: "Messages", icon: IconChat },
+  ],
+  rider: [
+    { href: "/my-attendance", label: "Check in", icon: IconClock },
   ],
 };
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { today, toISODate } from "@/lib/format";
 import ExcelJS from "exceljs";
 import { getSession } from "@/lib/auth";
+import { can } from "@/lib/roles";
 import { runReport, type ReportParams } from "@/lib/reports";
 import { currentSession } from "@/lib/queries";
 import { reportByKey } from "@/lib/report-meta";
@@ -16,6 +17,8 @@ function csvEscape(v: unknown) {
 export async function GET(req: Request) {
   const user = await getSession();
   if (!user) return new NextResponse("Unauthorized", { status: 401 });
+  // the same gate as the reports page: a download is not a way round it
+  if (!can(user.role, "reports")) return new NextResponse("Forbidden", { status: 403 });
 
   const url = new URL(req.url);
   const key = url.searchParams.get("report") ?? "";

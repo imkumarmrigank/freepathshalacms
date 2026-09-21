@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireUser, canTouchCenter } from "@/lib/auth";
+import { canTouchCenter, requireFeature } from "@/lib/auth";
 import { one } from "@/lib/db";
 import { Alert, Badge, Card, PageHeader } from "@/components/ui";
 import { fmtDate, fmtDateTime, pct, titleCase } from "@/lib/format";
@@ -15,7 +15,7 @@ const TONE: Record<string, string> = { attentive: "ok", neutral: "warn", resista
 export default async function InteractionPage({
   params, searchParams,
 }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string }> }) {
-  const user = await requireUser();
+  const user = await requireFeature("ptm");
   const { id } = await params;
   const { created } = await searchParams;
 

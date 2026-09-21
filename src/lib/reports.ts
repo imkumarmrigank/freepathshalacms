@@ -91,6 +91,12 @@ export async function runReport(
     case "ptm-summary":                  return ptmSummary(scoped, period);
     case "teaching-plan-progress":       return teachingPlanProgress(scoped);
     case "timetable":                    return timetableReport(scoped);
+    case "sports-visits":                return sportsVisits(scoped, period);
+    case "sports-teacher-days":          return sportsTeacherDays(scoped, period);
+    case "sports-players":               return sportsPlayers(scoped);
+    case "sports-attendance":            return sportsAttendance(scoped, period);
+    case "sports-marks":                 return sportsMarks(scoped, period);
+    case "sports-talent":                return sportsTalent(scoped);
     default: throw new Error("Unknown report.");
   }
 }
@@ -523,7 +529,7 @@ async function staffAttendanceRegister(p: ReportParams, period: string): Promise
        LEFT JOIN centers c ON c.id = u.center_id
        LEFT JOIN staff_attendance a
               ON a.user_id = u.id AND a.att_date BETWEEN $1 AND $2
-      WHERE u.is_active AND u.role IN ('teacher','center_manager','backup_teacher') ${where}
+      WHERE u.is_active AND u.role IN ('teacher','center_manager','backup_teacher','rider') ${where}
       ORDER BY c.code NULLS LAST, u.name, a.att_date`,
     params,
   );
@@ -589,7 +595,7 @@ async function staffAttendanceSummary(p: ReportParams, period: string): Promise<
        LEFT JOIN centers c ON c.id = u.center_id
        LEFT JOIN staff_attendance a
          ON a.user_id = u.id AND a.att_date BETWEEN $1 AND $2
-      WHERE u.is_active AND u.role IN ('teacher','center_manager') ${where}
+      WHERE u.is_active AND u.role IN ('teacher','center_manager','rider') ${where}
       GROUP BY u.name, u.role, c.name, c.code
       ORDER BY c.code, u.role, u.name`,
     params,
@@ -1490,5 +1496,339 @@ async function dropoutReasons(p: ReportParams, period: string): Promise<ReportRe
       { key: "children", label: "Children", width: 10, numeric: true },
     ],
     rows,
+  };
+}
+
+/* ------------------------------------------------------------------ sports */
+
+const SPORT_LEVEL: Record<string, string> = {
+  centre: "Stands out at the centre", district: "District level",
+  state: "State level", national: "National level",
+};
+
+/** Turnout across every session a child has been marked for, per sport. */
+const TURNOUT = `
+  LEFT JOIN LATERAL (
+    SELECT count(*) FILTER (WHERE a.status = 'present') AS present, count(*) AS marked
+      FROM sport_attendance a
+     WHERE a.sport_id = ss.sport_id AND a.student_id = ss.student_id
+  ) t ON TRUE`;
+
+async function sportsPlayers(p: ReportParams): Promise<ReportResult> {
+  const params: unknown[] = [p.sessionId];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND sp.center_id = $${params.length}`; }
+
+  const rows = await query<{
+    center_name: string; sport: string; student: string; enrollment_no: string;
+    class_name: string | null; gender: string | null; joined_on: string;
+    present: string; marked: string; is_special: boolean; speciality: string | null;
+    special_level: string | null;
+  }>(
+    `SELECT c.name AS center_name, sp.name AS sport,
+            trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
+            s.enrollment_no, cl.name AS class_name, s.gender, ss.joined_on,
+            t.present, t.marked, ss.is_special, ss.speciality, ss.special_level
+       FROM sport_students ss
+       JOIN sports sp ON sp.id = ss.sport_id
+       JOIN centers c ON c.id = sp.center_id
+       JOIN students s ON s.id = ss.student_id
+       LEFT JOIN enrollments e ON e.student_id = s.id AND e.session_id = $1
+       LEFT JOIN class_levels cl ON cl.id = e.class_level_id
+       ${TURNOUT}
+      WHERE ss.left_on IS NULL AND s.status = 'active' ${where}
+      ORDER BY c.code, sp.name, cl.sequence NULLS LAST, student`,
+    params,
+  );
+
+  return {
+    title: "Children in sports",
+    subtitle: `${rows.length} place${rows.length === 1 ? "" : "s"} across the sports — a child in two sports is listed twice`,
+    columns: [
+      { key: "center_name", label: "Centre", width: 16 },
+      { key: "sport", label: "Sport", width: 14 },
+      { key: "student", label: "Student", width: 24 },
+      { key: "enrollment_no", label: "Enrolment No", width: 14 },
+      { key: "class_name", label: "Class", width: 10 },
+      { key: "gender", label: "Gender", width: 9 },
+      { key: "joined_on", label: "Joined", width: 12 },
+      { key: "sessions", label: "Sessions marked", numeric: true, width: 10 },
+      { key: "turnout", label: "Turnout %", numeric: true, width: 10 },
+      { key: "talent", label: "Talent", width: 28 },
+      { key: "level", label: "Could go to", width: 20 },
+    ],
+    rows: rows.map((r) => ({
+      center_name: r.center_name, sport: r.sport, student: r.student,
+      enrollment_no: r.enrollment_no, class_name: r.class_name ?? "—",
+      gender: r.gender ? titleCase(r.gender) : "—",
+      joined_on: String(r.joined_on).slice(0, 10),
+      sessions: Number(r.marked),
+      turnout: Number(r.marked) ? pct(Number(r.present), Number(r.marked)) : null,
+      talent: r.is_special ? r.speciality : "",
+      level: r.is_special && r.special_level ? SPORT_LEVEL[r.special_level] : "",
+    })),
+  };
+}
+
+async function sportsAttendance(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND sp.center_id = $${params.length}`; }
+
+  const rows = await query<{
+    center_name: string; sport: string; student: string; enrollment_no: string;
+    present: string; absent: string;
+  }>(
+    `SELECT c.name AS center_name, sp.name AS sport,
+            trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
+            s.enrollment_no,
+            count(*) FILTER (WHERE a.status = 'present') AS present,
+            count(*) FILTER (WHERE a.status = 'absent')  AS absent
+       FROM sport_attendance a
+       JOIN sports sp ON sp.id = a.sport_id
+       JOIN centers c ON c.id = sp.center_id
+       JOIN students s ON s.id = a.student_id
+      WHERE a.att_date BETWEEN $1 AND $2 ${where}
+      GROUP BY c.code, c.name, sp.name, s.id
+      ORDER BY c.code, sp.name, student`,
+    params,
+  );
+
+  return {
+    title: "Sports attendance",
+    subtitle: `${period} · one row per child per sport`,
+    columns: [
+      { key: "center_name", label: "Centre", width: 16 },
+      { key: "sport", label: "Sport", width: 14 },
+      { key: "student", label: "Student", width: 24 },
+      { key: "enrollment_no", label: "Enrolment No", width: 14 },
+      { key: "present", label: "Present", numeric: true },
+      { key: "absent", label: "Absent", numeric: true },
+      { key: "sessions", label: "Sessions", numeric: true },
+      { key: "turnout", label: "Turnout %", numeric: true, width: 10 },
+    ],
+    rows: rows.map((r) => {
+      const present = Number(r.present), absent = Number(r.absent);
+      return {
+        center_name: r.center_name, sport: r.sport, student: r.student,
+        enrollment_no: r.enrollment_no, present, absent, sessions: present + absent,
+        turnout: pct(present, present + absent),
+      };
+    }),
+  };
+}
+
+async function sportsMarks(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND sp.center_id = $${params.length}`; }
+
+  const rows = await query<{
+    test_date: string; center_name: string; sport: string; test: string; student: string;
+    enrollment_no: string; marks: string | null; max_marks: string; is_absent: boolean;
+    remarks: string | null;
+  }>(
+    `SELECT t.test_date, c.name AS center_name, sp.name AS sport, t.title AS test,
+            trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
+            s.enrollment_no, m.marks, t.max_marks, m.is_absent, m.remarks
+       FROM sport_marks m
+       JOIN sport_tests t ON t.id = m.test_id
+       JOIN sports sp ON sp.id = t.sport_id
+       JOIN centers c ON c.id = sp.center_id
+       JOIN students s ON s.id = m.student_id
+      WHERE t.test_date BETWEEN $1 AND $2 ${where}
+      ORDER BY t.test_date DESC, c.code, sp.name, t.title, student`,
+    params,
+  );
+
+  return {
+    title: "Sports tests and marks",
+    subtitle: `${period} · ${rows.length} result${rows.length === 1 ? "" : "s"}`,
+    columns: [
+      { key: "test_date", label: "Date", width: 12 },
+      { key: "center_name", label: "Centre", width: 16 },
+      { key: "sport", label: "Sport", width: 14 },
+      { key: "test", label: "Test", width: 20 },
+      { key: "student", label: "Student", width: 24 },
+      { key: "enrollment_no", label: "Enrolment No", width: 14 },
+      { key: "marks", label: "Marks", numeric: true },
+      { key: "max_marks", label: "Out of", numeric: true },
+      { key: "percent", label: "%", numeric: true },
+      { key: "remarks", label: "Remarks", width: 40 },
+    ],
+    rows: rows.map((r) => ({
+      test_date: String(r.test_date).slice(0, 10), center_name: r.center_name,
+      sport: r.sport, test: r.test, student: r.student, enrollment_no: r.enrollment_no,
+      marks: r.is_absent ? "Absent" : r.marks == null ? null : Number(r.marks),
+      max_marks: Number(r.max_marks),
+      percent: r.is_absent || r.marks == null ? null : pct(Number(r.marks), Number(r.max_marks)),
+      remarks: r.remarks ?? "",
+    })),
+  };
+}
+
+async function sportsTalent(p: ReportParams): Promise<ReportResult> {
+  const params: unknown[] = [p.sessionId];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND sp.center_id = $${params.length}`; }
+
+  const rows = await query<{
+    center_name: string; sport: string; student: string; enrollment_no: string;
+    class_name: string | null; speciality: string | null; special_level: string | null;
+    marked_by: string | null; marked_at: string | null; present: string; marked: string;
+    best: string | null;
+  }>(
+    `SELECT c.name AS center_name, sp.name AS sport,
+            trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
+            s.enrollment_no, cl.name AS class_name, ss.speciality, ss.special_level,
+            u.name AS marked_by,
+            to_char(ss.special_marked_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') AS marked_at,
+            t.present, t.marked,
+            (SELECT max(round(100.0 * m.marks / st.max_marks, 1))
+               FROM sport_marks m JOIN sport_tests st ON st.id = m.test_id
+              WHERE st.sport_id = ss.sport_id AND m.student_id = ss.student_id
+                AND m.marks IS NOT NULL) AS best
+       FROM sport_students ss
+       JOIN sports sp ON sp.id = ss.sport_id
+       JOIN centers c ON c.id = sp.center_id
+       JOIN students s ON s.id = ss.student_id
+       LEFT JOIN enrollments e ON e.student_id = s.id AND e.session_id = $1
+       LEFT JOIN class_levels cl ON cl.id = e.class_level_id
+       LEFT JOIN users u ON u.id = ss.special_marked_by
+       ${TURNOUT}
+      WHERE ss.is_special AND ss.left_on IS NULL ${where}
+      ORDER BY array_position(ARRAY['national','state','district','centre'], ss.special_level),
+               c.code, sp.name, student`,
+    params,
+  );
+
+  return {
+    title: "Sporting talent",
+    subtitle: `${rows.length} child${rows.length === 1 ? "" : "ren"} marked as specially gifted, the strongest first`,
+    columns: [
+      { key: "center_name", label: "Centre", width: 16 },
+      { key: "sport", label: "Sport", width: 14 },
+      { key: "student", label: "Student", width: 24 },
+      { key: "enrollment_no", label: "Enrolment No", width: 14 },
+      { key: "class_name", label: "Class", width: 10 },
+      { key: "speciality", label: "Talent", width: 30 },
+      { key: "level", label: "Could go to", width: 20 },
+      { key: "turnout", label: "Turnout %", numeric: true, width: 10 },
+      { key: "best", label: "Best test %", numeric: true, width: 11 },
+      { key: "marked_by", label: "Marked by", width: 18 },
+      { key: "marked_on", label: "Marked on", width: 12 },
+    ],
+    rows: rows.map((r) => ({
+      center_name: r.center_name, sport: r.sport, student: r.student,
+      enrollment_no: r.enrollment_no, class_name: r.class_name ?? "—",
+      speciality: r.speciality ?? "",
+      level: r.special_level ? SPORT_LEVEL[r.special_level] : "",
+      turnout: Number(r.marked) ? pct(Number(r.present), Number(r.marked)) : null,
+      best: r.best == null ? null : Number(r.best),
+      marked_by: r.marked_by ?? "", marked_on: r.marked_at ?? "",
+    })),
+  };
+}
+
+const IST_TIME = (col: string) => `to_char(${col} AT TIME ZONE 'Asia/Kolkata', 'HH12:MI AM')`;
+
+async function sportsVisits(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND v.center_id = $${params.length}`; }
+
+  const rows = await query<{
+    visit_date: string; teacher: string; center_name: string; check_in: string;
+    check_out: string | null; worked_minutes: number | null; check_in_distance_m: number | null;
+    sports_covered: string[]; children_count: number | null; activities: string | null;
+    highlights: string | null; issues: string | null; submitted: boolean; closed_late: boolean;
+  }>(
+    `SELECT v.visit_date, u.name AS teacher, c.name AS center_name,
+            ${IST_TIME("v.check_in_at")} AS check_in, ${IST_TIME("v.check_out_at")} AS check_out,
+            v.worked_minutes, v.check_in_distance_m, v.sports_covered, v.children_count,
+            v.activities, v.highlights, v.issues,
+            (v.report_submitted_at IS NOT NULL) AS submitted, v.closed_late
+       FROM sports_visits v
+       JOIN users u ON u.id = v.user_id
+       JOIN centers c ON c.id = v.center_id
+      WHERE v.visit_date BETWEEN $1 AND $2 ${where}
+      ORDER BY v.visit_date DESC, u.name, v.check_in_at`,
+    params,
+  );
+
+  return {
+    title: "Sports teacher visits",
+    subtitle: `${period} · ${rows.length} visit${rows.length === 1 ? "" : "s"}`,
+    columns: [
+      { key: "visit_date", label: "Date", width: 12 },
+      { key: "teacher", label: "Sports teacher", width: 18 },
+      { key: "center_name", label: "Centre", width: 16 },
+      { key: "check_in", label: "In", width: 10 },
+      { key: "check_out", label: "Out", width: 10 },
+      { key: "hours", label: "Time at centre", width: 12 },
+      { key: "distance", label: "Distance (m)", numeric: true, width: 11 },
+      { key: "sports", label: "Sports played", width: 22 },
+      { key: "children", label: "Children", numeric: true },
+      { key: "activities", label: "What was done", width: 44 },
+      { key: "highlights", label: "Highlights", width: 30 },
+      { key: "issues", label: "Problems", width: 30 },
+      { key: "report", label: "Report", width: 14 },
+    ],
+    rows: rows.map((r) => ({
+      visit_date: String(r.visit_date).slice(0, 10), teacher: r.teacher,
+      center_name: r.center_name, check_in: r.check_in,
+      check_out: r.check_out ?? (r.closed_late ? "not recorded" : "still there"),
+      hours: r.worked_minutes == null ? "" : `${Math.floor(r.worked_minutes / 60)}h ${r.worked_minutes % 60}m`,
+      distance: r.check_in_distance_m, sports: r.sports_covered.join(", "),
+      children: r.children_count, activities: r.activities ?? "",
+      highlights: r.highlights ?? "", issues: r.issues ?? "",
+      report: !r.submitted ? "Not submitted" : r.closed_late ? "Submitted late" : "Submitted",
+    })),
+  };
+}
+
+async function sportsTeacherDays(p: ReportParams, period: string): Promise<ReportResult> {
+  const rows = await query<{
+    visit_date: string; teacher: string; centres: number; route: string;
+    first_in: string; last_out: string | null; minutes: number | null; pending: number;
+    children: number | null;
+  }>(
+    `SELECT v.visit_date, u.name AS teacher,
+            count(*)::int AS centres,
+            string_agg(c.name, ' → ' ORDER BY v.check_in_at) AS route,
+            ${IST_TIME("min(v.check_in_at)")} AS first_in,
+            ${IST_TIME("max(v.check_out_at)")} AS last_out,
+            sum(v.worked_minutes)::int AS minutes,
+            count(*) FILTER (WHERE v.report_submitted_at IS NULL)::int AS pending,
+            sum(v.children_count)::int AS children
+       FROM sports_visits v
+       JOIN users u ON u.id = v.user_id
+       JOIN centers c ON c.id = v.center_id
+      WHERE v.visit_date BETWEEN $1 AND $2
+      GROUP BY v.visit_date, u.id, u.name
+      ORDER BY v.visit_date DESC, u.name`,
+    [p.from, p.to],
+  );
+
+  return {
+    title: "Sports teacher — day by day",
+    subtitle: period,
+    columns: [
+      { key: "visit_date", label: "Date", width: 12 },
+      { key: "teacher", label: "Sports teacher", width: 18 },
+      { key: "centres", label: "Centres", numeric: true },
+      { key: "route", label: "Where, in order", width: 40 },
+      { key: "first_in", label: "First in", width: 10 },
+      { key: "last_out", label: "Last out", width: 10 },
+      { key: "hours", label: "Hours at centres", width: 13 },
+      { key: "children", label: "Children", numeric: true },
+      { key: "pending", label: "Reports missing", numeric: true, width: 12 },
+    ],
+    rows: rows.map((r) => ({
+      visit_date: String(r.visit_date).slice(0, 10), teacher: r.teacher, centres: r.centres,
+      route: r.route, first_in: r.first_in, last_out: r.last_out ?? "",
+      hours: r.minutes == null ? "" : `${Math.floor(r.minutes / 60)}h ${r.minutes % 60}m`,
+      children: r.children, pending: r.pending,
+    })),
   };
 }

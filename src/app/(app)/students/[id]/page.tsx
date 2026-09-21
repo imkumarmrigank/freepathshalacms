@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireUser, canTouchCenter } from "@/lib/auth";
+import { canTouchCenter, requireFeature } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { listClasses } from "@/lib/queries";
 import { Alert, Avatar, Badge, Card, Empty, Meter, PageHeader } from "@/components/ui";
@@ -31,7 +31,7 @@ export default async function StudentPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ created?: string; flag?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await requireFeature("students");
   const { id } = await params;
   const { created, flag: openFlag } = await searchParams;
   const sid = Number(id);

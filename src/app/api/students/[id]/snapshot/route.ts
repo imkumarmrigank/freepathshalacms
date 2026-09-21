@@ -3,6 +3,7 @@ import { canTouchCenter, getSession } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
 import { percentage } from "@/lib/exam-meta";
+import { can } from "@/lib/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,8 @@ export async function GET(
 ) {
   const user = await getSession();
   if (!user) return new NextResponse("Unauthorized", { status: 401 });
+  // the PTM form's read of a child — only for people who hold PTMs
+  if (!can(user.role, "ptm")) return new NextResponse("Forbidden", { status: 403 });
 
   const { id } = await params;
   const studentId = Number(id);

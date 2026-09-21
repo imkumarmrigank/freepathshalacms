@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requireFeature } from "@/lib/auth";
 import { centersForUser, resolveCenterId } from "@/lib/queries";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { eventsBetween } from "@/lib/calendar";
@@ -29,7 +29,7 @@ function monthBounds(month: string) {
 export default async function CalendarPage({
   searchParams,
 }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const user = await requireUser();
+  const user = await requireFeature("calendar");
   const sp = await searchParams;
   const centers = await centersForUser(user);
   const centerId = resolveCenterId(user, sp.center);

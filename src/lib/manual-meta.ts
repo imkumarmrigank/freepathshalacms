@@ -93,6 +93,8 @@ const OF_ROLE: Record<Role, ManualKey> = {
   admin: "admin",
   super_admin: "admin",
   auditor: "auditor",
+  sports_teacher: "teacher",
+  rider: "teacher",
 };
 
 export function manualKeyFor(role: Role): ManualKey {

@@ -244,6 +244,66 @@ export const REPORTS: ReportMeta[] = [
     description: "The full weekly grid as a list — class, day, period, subject and teacher.",
     filters: ["center", "class", "session"],
   },
+  {
+    key: "sports-visits",
+    label: "Sports teacher visits",
+    group: "Sports",
+    description:
+      "Every centre the sports teacher checked in at: arrival and departure, time spent, "
+      + "and the report they submitted — sports played, how many children, what was done, "
+      + "highlights and problems.",
+    filters: ["dates", "center"],
+    roles: ["super_admin", "admin"],
+  },
+  {
+    key: "sports-teacher-days",
+    label: "Sports teacher — day by day",
+    group: "Sports",
+    description:
+      "One line per sports teacher per day: how many centres, which ones, first arrival, "
+      + "last departure, hours at centres, and any visit still without a report.",
+    filters: ["dates"],
+    roles: ["super_admin", "admin"],
+  },
+  {
+    key: "sports-players",
+    label: "Children in sports",
+    group: "Sports",
+    description:
+      "Every child on a sport's list: centre, sport, class, when they joined, how often they "
+      + "turn up, and any talent the sports teacher has marked.",
+    filters: ["center"],
+    roles: ["super_admin", "admin"],
+  },
+  {
+    key: "sports-attendance",
+    label: "Sports attendance",
+    group: "Sports",
+    description:
+      "For each child and sport, how many sessions in the period they were present and absent, "
+      + "and their turnout.",
+    filters: ["dates", "center"],
+    roles: ["super_admin", "admin"],
+  },
+  {
+    key: "sports-marks",
+    label: "Sports tests and marks",
+    group: "Sports",
+    description:
+      "Every sports test in the period with each child's marks, percentage and the teacher's remark.",
+    filters: ["dates", "center"],
+    roles: ["super_admin", "admin"],
+  },
+  {
+    key: "sports-talent",
+    label: "Sporting talent",
+    group: "Sports",
+    description:
+      "The children marked as specially gifted: what their talent is, how far it could go, "
+      + "their turnout and their best test result.",
+    filters: ["center"],
+    roles: ["super_admin", "admin"],
+  },
 ];
 
 export const REPORT_GROUPS = [...new Set(REPORTS.map((r) => r.group))];

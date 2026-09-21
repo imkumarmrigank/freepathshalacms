@@ -182,9 +182,10 @@ export default function ReportPicker({
               <span className="mb-1.5 block text-[13px] font-medium text-[var(--muted)]">Staff</span>
               <select className="select w-auto" value={current.role ?? ""}
                 onChange={(e) => push({ role: e.target.value })}>
-                <option value="">Teachers and managers</option>
+                <option value="">All centre staff</option>
                 <option value="teacher">Teachers only</option>
                 <option value="center_manager">Centre managers only</option>
+                <option value="rider">Riders only</option>
               </select>
             </label>
           )}

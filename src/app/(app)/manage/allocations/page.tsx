@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { currentSession, listClasses, resolveCenterId } from "@/lib/queries";
 import { Alert, Card, Empty, PageHeader } from "@/components/ui";
@@ -6,7 +6,7 @@ import AllocationRow from "./AllocationRow";
 import { isTeaching } from "@/lib/roles";
 
 export default async function AllocationsPage() {
-  const user = await requireUser();
+  const user = await requireRole("super_admin", "admin", "center_manager");
   if (isTeaching(user.role))
     return <Alert kind="bad">You don’t have access to class allocation.</Alert>;
 

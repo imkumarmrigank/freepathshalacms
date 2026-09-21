@@ -17,6 +17,8 @@ export const IconCheck = s("M20 6 9 17l-5-5");
 export const IconBuilding = s("M3 21h18M5 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M15 9h2a2 2 0 0 1 2 2v10M9 7h2M9 11h2M9 15h2");
 export const IconLayers = s("m12 2 9 5-9 5-9-5zM3 12l9 5 9-5M3 17l9 5 9-5");
 export const IconArrowUp = s("M12 19V5M5 12l7-7 7 7");
+// a ball, for the sports pages: a circle with the seams of a football
+export const IconBall = s("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20M12 7l4 3-1.5 4.5h-5L8 10zM12 2v5M16 10l5-1.5M14.5 14.5l3 4.5M9.5 14.5l-3 4.5M8 10 3 8.5");
 export const IconClock = s("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20M12 6v6l4 2");
 /** The design draws the plus a little heavier than the nav icons. */
 export const IconPlus = (p: P) => (

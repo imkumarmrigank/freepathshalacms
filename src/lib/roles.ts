@@ -5,7 +5,9 @@ export type Role =
   | "center_manager"
   | "teacher"
   | "backup_teacher"
-  | "auditor";
+  | "auditor"
+  | "sports_teacher"
+  | "rider";
 
 export const ROLE_LABEL: Record<Role, string> = {
   super_admin: "Super Admin",
@@ -15,6 +17,8 @@ export const ROLE_LABEL: Record<Role, string> = {
   teacher: "Teacher",
   backup_teacher: "Backup Teacher",
   auditor: "Auditor",
+  sports_teacher: "Sports Teacher",
+  rider: "Rider",
 };
 
 export const ROLE_BLURB: Record<Role, string> = {
@@ -25,12 +29,14 @@ export const ROLE_BLURB: Record<Role, string> = {
   teacher: "One centre: marks the register, records PTMs, writes teaching plans.",
   backup_teacher: "Stands in for an absent teacher at whichever centre is assigned.",
   auditor: "Visits centres, rates them, and leaves suggestions to act on.",
+  sports_teacher: "Goes to any centre: runs its games, the sports register, tests and talent.",
+  rider: "One centre: checks in and out there, and nothing else.",
 };
 
 /** Roles that work across every centre rather than being pinned to one. */
 export function isGlobalRole(role: Role) {
   return role === "super_admin" || role === "admin" || role === "mentor"
-    || role === "auditor";
+    || role === "auditor" || role === "sports_teacher";
 }
 
 /** Structural settings — sessions, classes, promotion, centres, admins. */
@@ -51,13 +57,16 @@ export function isTeaching(role: Role) {
  */
 export const CREATABLE_ROLES: Record<Role, Role[]> = {
   super_admin: ["super_admin", "admin", "mentor", "center_manager", "teacher",
-    "backup_teacher", "auditor"],
-  admin: ["mentor", "center_manager", "teacher", "backup_teacher", "auditor"],
+    "backup_teacher", "auditor", "sports_teacher", "rider"],
+  admin: ["mentor", "center_manager", "teacher", "backup_teacher", "auditor",
+    "sports_teacher", "rider"],
   mentor: [],
   center_manager: ["teacher"],
   teacher: [],
   backup_teacher: [],
   auditor: [],
+  sports_teacher: [],
+  rider: [],
 };
 
 export function canCreateRole(actor: Role, target: Role) {
@@ -72,7 +81,7 @@ export function canManageStaff(role: Role) {
  * a backup teacher goes wherever they are assigned — none of them has a home centre.
  */
 export function needsCentre(role: Role) {
-  return role === "center_manager" || role === "teacher";
+  return role === "center_manager" || role === "teacher" || role === "rider";
 }
 
 /** Only the super admin opens a new centre; an admin maintains existing ones. */
@@ -143,6 +152,8 @@ export type Feature =
   // centreFeedback: the mentor's own account of a centre they work with.
   // Reading it back is an administrator's business, so it is a second name.
   | "centreFeedback" | "centreFeedbackReports"
+  // sports: running a centre's games — the register, tests, and talent.
+  | "sports"
   | "syllabus";
 
 /** One explicit list per role — no inference, so a gate is read, not deduced. */
@@ -152,12 +163,14 @@ const FEATURES: Record<Role, Feature[]> = {
     "calendar", "ptm", "followUps", "supplies", "statistics", "reports",
     "staff", "centres", "coverage", "counselling", "teacherRemarks", "messages",
     "audits", "auditReports", "leaveApprovals", "centreFeedbackReports", "syllabus",
+    "sports",
   ],
   admin: [
     "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
     "calendar", "ptm", "followUps", "supplies", "statistics", "reports",
     "staff", "centres", "coverage", "counselling", "teacherRemarks", "messages",
     "audits", "auditReports", "leaveApprovals", "centreFeedbackReports", "syllabus",
+    "sports",
   ],
   // the whole point of the mentor role is that this list is short
   mentor: [
@@ -183,6 +196,11 @@ const FEATURES: Record<Role, Feature[]> = {
   // do not run one, and they see nothing of a child beyond the roll numbers on
   // the day of a visit.
   auditor: ["audits", "auditReports", "calendar", "messages"],
+  // A sports teacher sees a child only as a player: the sports pages carry the
+  // names they need, and nothing of the classroom record comes with them.
+  sports_teacher: ["sports", "calendar", "messages"],
+  // The shortest list there is: a rider proves they were at the centre.
+  rider: ["ownCheckIn"],
 };
 
 export function can(role: Role, feature: Feature): boolean {

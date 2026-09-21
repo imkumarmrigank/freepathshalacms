@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requireFeature } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { centersForUser, currentSession, resolveCenterId } from "@/lib/queries";
 import { Avatar, Badge, Card, Empty, PageHeader, StatCard } from "@/components/ui";
@@ -15,7 +15,7 @@ import { one } from "@/lib/db";
 export default async function FollowUpsPage({
   searchParams,
 }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const user = await requireUser();
+  const user = await requireFeature("followUps");
   const sp = await searchParams;
   const [centers, session] = await Promise.all([centersForUser(user), currentSession()]);
   const centerId = resolveCenterId(user, sp.center);

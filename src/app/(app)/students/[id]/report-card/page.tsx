@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireUser, canTouchCenter } from "@/lib/auth";
+import { canTouchCenter, requireFeature } from "@/lib/auth";
 import { currentSession, listSessions } from "@/lib/queries";
 import { loadReportCard } from "@/lib/report-card";
 import ReportCard from "@/components/ReportCard";
@@ -17,7 +17,7 @@ export default async function ReportCardPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ session?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await requireFeature("students");
   const { id } = await params;
   const { session: sessionParam } = await searchParams;
 

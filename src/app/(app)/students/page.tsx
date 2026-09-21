@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requireFeature } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { centersForUser, currentSession, listClasses, listSessions, resolveCenterId } from "@/lib/queries";
 import { Avatar, Badge, Card, Empty, Meter, PageHeader } from "@/components/ui";
@@ -23,7 +23,7 @@ type Row = {
 export default async function StudentsPage({
   searchParams,
 }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const user = await requireUser();
+  const user = await requireFeature("students");
   const sp = await searchParams;
   const [centers, classes, sessions, cur] = await Promise.all([
     centersForUser(user), listClasses(), listSessions(), currentSession(),

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { query, one } from "@/lib/db";
 import { currentSession, resolveCenterId } from "@/lib/queries";
@@ -24,6 +25,10 @@ export default async function Dashboard({
 }: { searchParams: Promise<{ denied?: string }> }) {
   const user = await requireUser();
   const { denied } = await searchParams;
+  // Nothing on this page is a sports teacher's — their day starts at the games.
+  if (user.role === "sports_teacher") redirect(denied ? "/sports?denied=1" : "/sports");
+  // A rider's one screen is their check-in.
+  if (user.role === "rider") redirect("/my-attendance");
   const session = await currentSession();
   const centerId = resolveCenterId(user, null);
   const scope = centerId ? " AND center_id = $2" : "";

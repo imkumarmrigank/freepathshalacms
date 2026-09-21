@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth";
+import { requireFeature } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { centersForUser, currentSession, listClasses, resolveCenterId } from "@/lib/queries";
 import { Alert, Badge, Card, Empty, PageHeader } from "@/components/ui";
@@ -7,7 +7,7 @@ import ScheduleForm from "./ScheduleForm";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
 
 export default async function MeetingsPage() {
-  const user = await requireUser();
+  const user = await requireFeature("ptm");
   const [centers, classes, session] = await Promise.all([
     centersForUser(user), listClasses(), currentSession(),
   ]);

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requireFeature } from "@/lib/auth";
 import { centersForUser } from "@/lib/queries";
 import { Card, Empty, PageHeader } from "@/components/ui";
 import {
@@ -13,7 +13,7 @@ export const metadata = { title: "Messages · Pehchaan" };
 export default async function MessagesPage({
   searchParams,
 }: { searchParams: Promise<{ c?: string }> }) {
-  const user = await requireUser();
+  const user = await requireFeature("messages");
   const sp = await searchParams;
 
   const [conversations, people, centres] = await Promise.all([

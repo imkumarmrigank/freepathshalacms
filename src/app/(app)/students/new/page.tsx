@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requireFeature } from "@/lib/auth";
 import { canAdmitStudents } from "@/lib/roles";
 import { one, query } from "@/lib/db";
 import { centersForUser, currentSession, listClasses } from "@/lib/queries";
@@ -13,7 +13,7 @@ export const metadata = { title: "New admission · Pehchaan" };
 export default async function NewStudentPage({
   searchParams,
 }: { searchParams: Promise<{ draft?: string }> }) {
-  const user = await requireUser();
+  const user = await requireFeature("students");
   const { draft: draftParam } = await searchParams;
 
   const [centers, classes, session] = await Promise.all([

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requireFeature } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { centersForUser, currentSession, listClasses, resolveCenterId } from "@/lib/queries";
 import { Avatar, Badge, Card, Empty, PageHeader } from "@/components/ui";
@@ -15,7 +15,7 @@ const TONE: Record<string, string> = { attentive: "ok", neutral: "warn", resista
 export default async function PtmPage({
   searchParams,
 }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const user = await requireUser();
+  const user = await requireFeature("ptm");
   const sp = await searchParams;
   const [centers, classes, session] = await Promise.all([
     centersForUser(user), listClasses(), currentSession(),
