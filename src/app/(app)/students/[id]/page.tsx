@@ -7,7 +7,7 @@ import { Alert, Avatar, Badge, Card, Empty, Meter, PageHeader } from "@/componen
 import { IconPlus } from "@/components/icons";
 import { fmtDate, fullName, titleCase } from "@/lib/format";
 import { EXAM_TYPE_LABEL, grade, percentage } from "@/lib/exam-meta";
-import { canEditStudents, canMarkDropout, can } from "@/lib/roles";
+import { canEditStudents, canMarkDropout, canTransferStudents, can } from "@/lib/roles";
 import type { Student } from "@/lib/types";
 import EditStudent from "./EditStudent";
 import AdmissionRecord from "./AdmissionRecord";
@@ -146,6 +146,11 @@ export default async function StudentPage({
             <Link href={`/students/${student.id}/report-card`} className="btn btn-ghost btn-sm">
               Progress report
             </Link>
+            {canTransferStudents(user.role) && student.status === "active" && (
+              <Link href={`/manage/transfers?student=${student.id}`} className="btn btn-ghost btn-sm">
+                Transfer centre
+              </Link>
+            )}
             <Link href={`/ptm/new?student=${student.id}`} className="btn btn-primary btn-sm">
               <IconPlus className="h-3.5 w-3.5" /> Record Parent Interaction
             </Link>

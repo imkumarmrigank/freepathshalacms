@@ -85,9 +85,22 @@ export async function loadReportCard(
             m.marks_obtained, COALESCE(m.is_absent, FALSE) AS is_absent
        FROM exams x
        LEFT JOIN exam_marks m ON m.exam_id = x.id AND m.student_id = $1
-      WHERE x.session_id = $2 AND x.center_id = $3
-        AND x.class_level_id = (SELECT class_level_id FROM enrollments
-                                 WHERE student_id = $1 AND session_id = $2)
+      WHERE x.session_id = $2
+        -- The tests this child sat, at whichever centre; and the tests of the
+        -- class they are in now, at the centre they are in now — from the day
+        -- they arrived, if they were transferred in, so a test held there
+        -- before they came does not show as one they missed.
+        AND (
+          m.id IS NOT NULL
+          OR (x.center_id = $3
+              AND x.class_level_id = (SELECT class_level_id FROM enrollments
+                                       WHERE student_id = $1 AND session_id = $2)
+              AND x.exam_date >= COALESCE(
+                    (SELECT max(t.transferred_on) FROM student_transfers t
+                      WHERE t.student_id = $1 AND t.to_center_id = $3
+                        AND t.session_id = $2),
+                    '-infinity'::date))
+        )
         -- a session runs April to March; an exam dated outside it belongs to
         -- another year's report, whatever session row it happens to carry
         AND x.exam_date BETWEEN (SELECT start_date FROM academic_sessions WHERE id = $2)

@@ -51,6 +51,16 @@ export const REPORTS: ReportMeta[] = [
     roles: ["super_admin", "admin"],
   },
   {
+    key: "student-transfers",
+    label: "Transfers between centres",
+    group: "Students",
+    description:
+      "Every child moved from one centre to another in the period: from where, to where, any "
+      + "change of class, the reason, who made the move and what records went with the child.",
+    filters: ["dates", "center"],
+    roles: ["super_admin", "admin"],
+  },
+  {
     key: "student-attendance-summary",
     label: "Student attendance summary",
     group: "Attendance",

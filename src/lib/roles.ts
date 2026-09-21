@@ -229,6 +229,11 @@ export function canAdmitStudents(role: Role) {
   return role === "super_admin" || role === "admin" || role === "center_manager";
 }
 
+/** Moving a child between centres: the office decides, neither centre does. */
+export function canTransferStudents(role: Role) {
+  return role === "super_admin" || role === "admin";
+}
+
 /** Taking a child off the roll is an administrator's decision, never a centre's. */
 export function canMarkDropout(role: Role) {
   return role === "super_admin" || role === "admin";

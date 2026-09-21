@@ -30,10 +30,17 @@ export async function nextEnrollmentNo(
   // admission then collides with an enrolment number already taken and fails
   // with a unique-violation the centre reads as "duplicate entry". Take
   // whichever is higher, so the counter repairs itself the first time it is used.
+  //
+  // Counted by this centre's own number series, wherever the child now is: a
+  // child transferred out keeps FP-8-0105, so 0105 must never be issued again,
+  // and a child transferred in with FP-3-0240 must not push this centre's
+  // series forward to 0241.
+  const prefix = process.env.ENROLLMENT_PREFIX || "FP";
+  const series = `${prefix}-${center.rows[0].code}-`;
   const { rows: used } = await client.query<{ highest: number | null }>(
     `SELECT max(substring(enrollment_no from '[0-9]+$')::int) AS highest
-       FROM students WHERE center_id = $1`,
-    [centerId],
+       FROM students WHERE left(enrollment_no, length($1)) = $1`,
+    [series],
   );
   const seq = Math.max(rows[0].next_seq, Number(used[0]?.highest ?? 0) + 1);
   await client.query(
@@ -41,6 +48,5 @@ export async function nextEnrollmentNo(
     [centerId, seq + 1],
   );
 
-  const prefix = process.env.ENROLLMENT_PREFIX || "FP";
-  return `${prefix}-${center.rows[0].code}-${String(seq).padStart(4, "0")}`;
+  return `${series}${String(seq).padStart(4, "0")}`;
 }

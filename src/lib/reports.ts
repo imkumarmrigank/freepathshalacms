@@ -68,6 +68,7 @@ export async function runReport(
   switch (key) {
     case "dropouts":                     return dropouts(scoped, period);
     case "dropout-reasons":              return dropoutReasons(scoped, period);
+    case "student-transfers":            return studentTransfers(scoped, period);
     case "student-attendance-summary":   return studentAttendanceSummary(scoped, period);
     case "student-attendance-trend":     return studentAttendanceTrend(scoped, period);
     case "staff-attendance-trend":       return staffAttendanceTrend(scoped, period);
@@ -1829,6 +1830,64 @@ async function sportsTeacherDays(p: ReportParams, period: string): Promise<Repor
       route: r.route, first_in: r.first_in, last_out: r.last_out ?? "",
       hours: r.minutes == null ? "" : `${Math.floor(r.minutes / 60)}h ${r.minutes % 60}m`,
       children: r.children, pending: r.pending,
+    })),
+  };
+}
+
+/* --------------------------------------------------------------- transfers */
+
+/** A centre filter matches a transfer at either end — the children who left it and who arrived. */
+async function studentTransfers(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.from, p.to];
+  let where = "";
+  if (p.centerId) {
+    params.push(p.centerId);
+    where = ` AND (t.from_center_id = $${params.length} OR t.to_center_id = $${params.length})`;
+  }
+  const rows = await query<{
+    transferred_on: string; student: string; enrollment_no: string; from_centre: string;
+    to_centre: string; from_class: string | null; to_class: string | null; reason: string | null;
+    moved_history: boolean; moved_attendance: number; moved_ptm: number; moved_referrals: number;
+    left_sports: number; by_name: string | null;
+  }>(
+    `SELECT t.transferred_on, trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
+            s.enrollment_no, fc.name AS from_centre, tc.name AS to_centre,
+            fcl.name AS from_class, tcl.name AS to_class, t.reason, t.moved_history,
+            t.moved_attendance, t.moved_ptm, t.moved_referrals, t.left_sports, u.name AS by_name
+       FROM student_transfers t
+       JOIN students s ON s.id = t.student_id
+       JOIN centers fc ON fc.id = t.from_center_id
+       JOIN centers tc ON tc.id = t.to_center_id
+       LEFT JOIN class_levels fcl ON fcl.id = t.from_class_id
+       LEFT JOIN class_levels tcl ON tcl.id = t.to_class_id
+       LEFT JOIN users u ON u.id = t.transferred_by
+      WHERE t.transferred_on BETWEEN $1 AND $2 ${where}
+      ORDER BY t.transferred_on DESC, t.id DESC`,
+    params,
+  );
+  return {
+    title: "Transfers between centres",
+    subtitle: `${period} · ${rows.length} transfer${rows.length === 1 ? "" : "s"}`,
+    columns: [
+      { key: "transferred_on", label: "Date", width: 12 },
+      { key: "student", label: "Student", width: 24 },
+      { key: "enrollment_no", label: "Enrolment No", width: 14 },
+      { key: "from_centre", label: "From centre", width: 16 },
+      { key: "to_centre", label: "To centre", width: 16 },
+      { key: "from_class", label: "Class before", width: 12 },
+      { key: "to_class", label: "Class after", width: 12 },
+      { key: "reason", label: "Reason", width: 30 },
+      { key: "moved", label: "Records moved", width: 34 },
+      { key: "by_name", label: "Transferred by", width: 18 },
+    ],
+    rows: rows.map((r) => ({
+      transferred_on: String(r.transferred_on).slice(0, 10), student: r.student,
+      enrollment_no: r.enrollment_no, from_centre: r.from_centre, to_centre: r.to_centre,
+      from_class: r.from_class ?? "—", to_class: r.to_class ?? "—", reason: r.reason ?? "",
+      moved: r.moved_history
+        ? `${r.moved_attendance} attendance days, ${r.moved_ptm} PTMs, ${r.moved_referrals} referrals`
+        : `Open items only (${r.moved_referrals} referrals)`,
+      by_name: r.by_name ?? "",
     })),
   };
 }
