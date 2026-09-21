@@ -20,10 +20,26 @@ export type ClassLevel = {
   id: number; name: string; sequence: number; is_terminal: boolean; is_active: boolean;
 };
 
+/**
+ * Asked on nearly every page, and it changes about once a year — so the answer
+ * is kept for half a minute rather than fetched from a database on another
+ * continent each time. Switching the current session takes effect within that.
+ */
+let sessionMemo: { at: number; value: AcademicSession | null } | null = null;
+const SESSION_TTL_MS = 30_000;
+
 export async function currentSession() {
-  return one<AcademicSession>(
+  if (sessionMemo && Date.now() - sessionMemo.at < SESSION_TTL_MS) return sessionMemo.value;
+  const value = await one<AcademicSession>(
     "SELECT * FROM academic_sessions WHERE is_current ORDER BY sequence DESC LIMIT 1",
   );
+  sessionMemo = { at: Date.now(), value };
+  return value;
+}
+
+/** Called when the current session is changed, so the change shows at once. */
+export async function forgetCurrentSession() {
+  sessionMemo = null;
 }
 
 export async function listSessions() {

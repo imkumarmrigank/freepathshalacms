@@ -1,4 +1,5 @@
 "use server";
+import { forgetCurrentSession } from "@/lib/queries";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { tx } from "@/lib/db";
@@ -145,6 +146,7 @@ export async function runPromotion(_prev: unknown, form: FormData): Promise<Prom
       return { promoted, retained, graduated, skipped, onResult, from: from.name, to: to.name };
     });
 
+    await forgetCurrentSession();
     revalidatePath("/manage/promotions");
     revalidatePath("/students");
     revalidatePath("/dashboard");

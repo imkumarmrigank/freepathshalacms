@@ -1,4 +1,5 @@
 "use server";
+import { forgetCurrentSession } from "@/lib/queries";
 import { isCentreType } from "@/lib/centre-meta";
 import { revalidatePath } from "next/cache";
 import { requireRole, requireUser, hashPassword, canTouchCenter } from "@/lib/auth";
@@ -195,6 +196,7 @@ export async function setCurrentSession(_prev: unknown, form: FormData) {
   const id = Number(form.get("id"));
   await query("UPDATE academic_sessions SET is_current = FALSE WHERE is_current");
   await query("UPDATE academic_sessions SET is_current = TRUE, is_locked = FALSE WHERE id = $1", [id]);
+  await forgetCurrentSession();
   revalidatePath("/manage/sessions");
   revalidatePath("/dashboard");
   return { ok: "Current session changed." };

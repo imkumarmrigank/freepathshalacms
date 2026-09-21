@@ -49,31 +49,38 @@ export default async function Dashboard({
   // Administrators watch the same numbers, so they load for them too.
   const watchesSupport = user.role === "mentor" || isGlobalRole(user.role)
     || user.role === "center_manager";
-  const [behind, counselling] = watchesSupport
+  // Every query below is started at once and awaited together. The database
+  // is a long way from the server, so a dozen questions asked one after
+  // another cost a dozen round trips; asked together they cost about one.
+  type Support = [
+    Awaited<ReturnType<typeof strugglingStudents>>,
+    Awaited<ReturnType<typeof counsellingLoad>> | null,
+  ];
+  const supportP = (async (): Promise<Support> => watchesSupport
     ? await Promise.all([
         strugglingStudents(session.id, centerId, 8),
         counsellingLoad(centerId),
       ])
-    : [[], null];
+    : [[], null])();
 
   // Where the auditor left this centre, and what it still owes. Shown to
   // everyone who can act on it — the manager and teachers who do the work, and
   // the administrators watching every centre.
-  const audit = can(user.role, "auditReports")
+  const auditP = (async () => can(user.role, "auditReports")
     ? await standings(isGlobalRole(user.role) ? null : user.centerId)
-    : [];
+    : [])();
 
-  const [students] = await query<{ n: string }>(
+  const studentsP = query<{ n: string }>(
     `SELECT count(*) AS n FROM enrollments WHERE session_id = $1 AND status = 'active'${scope}`,
     p([session.id]),
   );
-  const [ptms] = await query<{ n: string }>(
+  const ptmsP = query<{ n: string }>(
     `SELECT count(*) AS n FROM ptm_interactions
       WHERE date_trunc('month', interaction_date) = date_trunc('month', CURRENT_DATE)
         AND session_id = $1${scope}`,
     p([session.id]),
   );
-  const [followUps] = await query<{
+  const followUpsP = query<{
     overdue: string; due_today: string; this_week: string; pending: string;
   }>(
     `SELECT count(*) FILTER (WHERE follow_up_date < CURRENT_DATE)  AS overdue,
@@ -85,15 +92,22 @@ export default async function Dashboard({
       WHERE follow_up_required AND follow_up_status = 'pending' AND session_id = $1${scope}`,
     p([session.id]),
   );
-  const attToday = await one<{ present: string; total: string }>(
-    `SELECT count(*) FILTER (WHERE status IN ('present','late','half_day')) AS present,
+  // Only children still on the roll are counted, the same population as the
+  // roll itself — a child marked present in the morning and taken off the roll
+  // in the afternoon keeps their record, but no longer adds to today's figure.
+  const attTodayP = one<{ present: string; total: string }>(
+    `SELECT count(*) FILTER (WHERE a.status IN ('present','late','half_day')) AS present,
             count(*) AS total
-       FROM student_attendance WHERE att_date = $1 AND session_id = $2
-       ${centerId ? "AND center_id = $3" : ""}`,
+       FROM student_attendance a
+       JOIN students s ON s.id = a.student_id AND s.status = 'active'
+       JOIN enrollments e ON e.student_id = a.student_id AND e.session_id = a.session_id
+                         AND e.status = 'active'
+      WHERE a.att_date = $1 AND a.session_id = $2
+       ${centerId ? "AND a.center_id = $3" : ""}`,
     centerId ? [today(), session.id, centerId] : [today(), session.id],
   );
 
-  const recent = await query<{
+  const recentP = query<{
     id: number; first_name: string; last_name: string | null; enrollment_no: string;
     interaction_date: string; parent_present: string; engagement: string; mentor: string | null;
   }>(
@@ -107,7 +121,7 @@ export default async function Dashboard({
     p([session.id]),
   );
 
-  const upcoming = await query<{
+  const upcomingP = query<{
     id: number; first_name: string; last_name: string | null;
     follow_up_date: string; follow_up_mode: string | null;
   }>(
@@ -119,21 +133,21 @@ export default async function Dashboard({
     p([session.id]),
   );
 
-  const upcomingEvents = (await eventsBetween(
-    today(), `${Number(today().slice(0, 4)) + 1}-12-31`, centerId)).slice(0, 5);
+  const upcomingEventsP = eventsBetween(
+    today(), `${Number(today().slice(0, 4)) + 1}-12-31`, centerId).then((e) => e.slice(0, 5));
 
   // The administrator's first question each morning is which centres have not
   // marked their register, so answer it before anything else on the page. The
   // day shown is the last one with any register at all, so a quiet early
   // morning does not read as though every centre had failed to mark.
   const wantsDaily = user.role === "super_admin" || user.role === "admin";
-  const dailyDay = wantsDaily
+  const dailyDayP = (async () => wantsDaily
     ? (await one<{ d: string }>(
         `SELECT max(att_date) AS d FROM student_attendance WHERE session_id = $1`,
         [session.id]))?.d ?? today()
-    : today();
+    : today())();
 
-  const daily: CentreDay[] = wantsDaily
+  const dailyP: Promise<CentreDay[]> = (async () => wantsDaily
     ? await query<CentreDay>(
         `SELECT ce.id AS center_id, ce.name AS center_name, ce.code AS center_code,
                 (SELECT count(*) FROM enrollments e
@@ -158,17 +172,29 @@ export default async function Dashboard({
            FROM centers ce
            LEFT JOIN student_attendance a
                   ON a.center_id = ce.id AND a.session_id = $1 AND a.att_date = $2::date
+                 -- counted against the roll, so only children still on it
+                 AND EXISTS (SELECT 1 FROM enrollments e JOIN students s ON s.id = e.student_id
+                              WHERE e.student_id = a.student_id AND e.session_id = $1
+                                AND e.status = 'active' AND s.status = 'active')
           WHERE ce.is_active
           GROUP BY ce.id, ce.name, ce.code
           ORDER BY ce.code`,
-        [session.id, dailyDay])
-    : [];
+        [session.id, await dailyDayP])
+    : [])();
 
   // Who is meant to be at a centre today and is not, and whether anybody was
   // put in for them. Administrators only: a teacher sees their own leave page.
-  const [staff, away, leaveWaiting] = wantsDaily
+  const staffP = (async () => wantsDaily
     ? await Promise.all([staffToday(centerId), awayToday(centerId), pendingLeaveCount(centerId)])
-    : [null, [], 0];
+    : [null, [], 0] as const)();
+
+  const [
+    [behind, counselling], audit, [students], [ptms], [followUps], attToday, recent,
+    upcoming, upcomingEvents, dailyDay, daily, [staff, away, leaveWaiting],
+  ] = await Promise.all([
+    supportP, auditP, studentsP, ptmsP, followUpsP, attTodayP, recentP,
+    upcomingP, upcomingEventsP, dailyDayP, dailyP, staffP,
+  ]);
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
