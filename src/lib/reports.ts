@@ -1527,9 +1527,9 @@ async function sportsPlayers(p: ReportParams): Promise<ReportResult> {
     center_name: string; sport: string; student: string; enrollment_no: string;
     class_name: string | null; gender: string | null; joined_on: string;
     present: string; marked: string; is_special: boolean; speciality: string | null;
-    special_level: string | null;
+    special_level: string | null; remarks: string | null;
   }>(
-    `SELECT c.name AS center_name, sp.name AS sport,
+    `SELECT c.name AS center_name, sp.name AS sport, ss.remarks,
             trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
             s.enrollment_no, cl.name AS class_name, s.gender, ss.joined_on,
             t.present, t.marked, ss.is_special, ss.speciality, ss.special_level
@@ -1560,6 +1560,7 @@ async function sportsPlayers(p: ReportParams): Promise<ReportResult> {
       { key: "turnout", label: "Turnout %", numeric: true, width: 10 },
       { key: "talent", label: "Talent", width: 28 },
       { key: "level", label: "Could go to", width: 20 },
+      { key: "remarks", label: "Sports teacher's remark", width: 36 },
     ],
     rows: rows.map((r) => ({
       center_name: r.center_name, sport: r.sport, student: r.student,
@@ -1570,6 +1571,7 @@ async function sportsPlayers(p: ReportParams): Promise<ReportResult> {
       turnout: Number(r.marked) ? pct(Number(r.present), Number(r.marked)) : null,
       talent: r.is_special ? r.speciality : "",
       level: r.is_special && r.special_level ? SPORT_LEVEL[r.special_level] : "",
+      remarks: r.remarks ?? "",
     })),
   };
 }

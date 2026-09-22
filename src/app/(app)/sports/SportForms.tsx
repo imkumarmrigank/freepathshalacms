@@ -2,7 +2,7 @@
 import { useActionState, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  addPlayers, addSport, createSportTest, markSpeciality, removePlayer,
+  addPlayers, addSport, createSportTest, markSpeciality, removePlayer, saveRemark,
   saveSportAttendance, saveSportMarks, setSportActive,
 } from "./actions";
 import { Avatar, Card, Field } from "@/components/ui";
@@ -179,6 +179,7 @@ export function SportAttendance({
                     <div className="min-w-0">
                       <div className="truncate font-medium">{nameOf(p)}</div>
                       <div className="text-[11px] text-[var(--faint)]">{p.class_name ?? "—"} · {p.enrollment_no}</div>
+                      {p.remarks && <div className="text-[11.5px] italic text-[var(--muted)]">“{p.remarks}”</div>}
                     </div>
                   </div>
                 </td>
@@ -273,6 +274,7 @@ export function SportMarksSheet({
                     <input type="hidden" name="pid" value={p.student_id} />
                     <div className="font-medium">{nameOf(p)}</div>
                     <div className="text-[11px] text-[var(--faint)]">{p.class_name ?? "—"} · {p.enrollment_no}</div>
+                      {p.remarks && <div className="text-[11.5px] italic text-[var(--muted)]">“{p.remarks}”</div>}
                   </td>
                   <td>
                     <input className="input py-1" type="number" name={`m_${p.student_id}`}
@@ -327,6 +329,28 @@ export function TalentRow({ sportId, player }: { sportId: number; player: Player
         {state?.ok && <span className="text-[12px] text-[var(--ok)]">Saved</span>}
         {state?.error && <span className="text-[12px] text-[var(--bad)]">{state.error}</span>}
       </div>
+    </form>
+  );
+}
+
+/* ---------------------------------------------------------------- remarks */
+
+/** A note on one child in this sport, saved on its own. */
+export function RemarkField({
+  sportId, studentId, remarks,
+}: { sportId: number; studentId: number; remarks: string | null }) {
+  const [state, action, pending] = useActionState(saveRemark, null);
+  return (
+    <form action={action} className="flex min-w-[220px] items-center gap-1.5">
+      <input type="hidden" name="sport_id" value={sportId} />
+      <input type="hidden" name="student_id" value={studentId} />
+      <input className="input py-1 text-[12.5px]" name="remarks" defaultValue={remarks ?? ""}
+        maxLength={500} placeholder="Add a remark (optional)" aria-label="Remark" />
+      <button className="btn btn-ghost btn-sm" type="submit" disabled={pending}>
+        {pending ? "…" : "Save"}
+      </button>
+      {state?.ok && !pending && <span className="text-[11.5px] text-[var(--ok)]">✓</span>}
+      {state?.error && <span className="text-[11.5px] text-[var(--bad)]">{state.error}</span>}
     </form>
   );
 }

@@ -49,4 +49,6 @@ export type Player = {
   is_special: boolean;
   speciality: string | null;
   special_level: string | null;
+  remarks: string | null;
+  remarks_on: string | null;
 };

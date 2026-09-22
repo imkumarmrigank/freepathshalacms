@@ -46,7 +46,8 @@ export function playersOf(sportId: number, sessionId: number) {
   return query<Player>(
     `SELECT s.id AS student_id, s.first_name, s.last_name, s.enrollment_no, s.gender,
             cl.name AS class_name, ss.joined_on, ss.is_special, ss.speciality,
-            ss.special_level
+            ss.special_level, ss.remarks,
+            to_char(ss.remarks_updated_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') AS remarks_on
        FROM sport_students ss
        JOIN students s ON s.id = ss.student_id
        LEFT JOIN enrollments e ON e.student_id = s.id AND e.session_id = $2
@@ -156,4 +157,29 @@ export function openVisit(userId: number) {
 export function visitsOn(userId: number, date: string) {
   return query<Visit>(`${VISIT} WHERE v.user_id = $1 AND v.visit_date = $2 ORDER BY v.check_in_at`,
     [userId, date]);
+}
+
+/**
+ * Every child on a centre's roll, with the sports they already play there —
+ * so the sports teacher sees the children before any sport has been set up.
+ */
+export function childrenAt(centerId: number, sessionId: number) {
+  return query<{
+    student_id: number; first_name: string; last_name: string | null; enrollment_no: string;
+    class_name: string | null; section: string | null; sports: string[];
+  }>(
+    `SELECT s.id AS student_id, s.first_name, s.last_name, s.enrollment_no,
+            cl.name AS class_name, e.section,
+            COALESCE((SELECT array_agg(sp.name ORDER BY sp.name)
+                        FROM sport_students ss JOIN sports sp ON sp.id = ss.sport_id
+                       WHERE ss.student_id = s.id AND ss.left_on IS NULL
+                         AND sp.center_id = $1 AND sp.is_active), '{}') AS sports
+       FROM enrollments e
+       JOIN students s ON s.id = e.student_id
+       JOIN class_levels cl ON cl.id = e.class_level_id
+      WHERE e.center_id = $1 AND e.session_id = $2
+        AND e.status = 'active' AND s.status = 'active'
+      ORDER BY cl.sequence, e.section, s.first_name, s.last_name`,
+    [centerId, sessionId],
+  );
 }

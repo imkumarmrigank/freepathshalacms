@@ -3,7 +3,8 @@ import { requireFeature } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { Alert, Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { fmtDate, today } from "@/lib/format";
-import { openVisit, sportsAt, visitsOn } from "@/lib/sports";
+import { childrenAt, openVisit, sportsAt, visitsOn } from "@/lib/sports";
+import { currentSession } from "@/lib/queries";
 import { AddSportForm } from "./SportForms";
 import VisitCard from "./VisitCard";
 
@@ -39,7 +40,13 @@ export default async function SportsPage({
     : [null, []];
   const centerId = Number(sp.center) || open?.center_id || null;
   const centre = centres.find((c) => c.id === centerId) ?? null;
-  const sports = centre ? await sportsAt(centre.id) : [];
+  const session = await currentSession();
+  const [sports, children] = centre
+    ? await Promise.all([
+        sportsAt(centre.id),
+        session ? childrenAt(centre.id, session.id) : Promise.resolve([]),
+      ])
+    : [[], []];
 
   return (
     <>
@@ -72,9 +79,14 @@ export default async function SportsPage({
         <div className="grid gap-5 lg:grid-cols-5">
           <div className="lg:col-span-3">
             {sports.length === 0 ? (
-              <Card pad={false}>
-                <Empty title="No sports at this centre yet"
-                  hint="Add the first one — it will show here every time this centre is chosen." />
+              <Card>
+                <h2 className="mb-2 text-[15px] font-semibold">No sports at this centre yet</h2>
+                <ol className="list-decimal space-y-1 pl-5 text-[13.5px] text-[var(--muted)]">
+                  <li>Add a sport with the form on the right (below, on a phone).</li>
+                  <li>Open the sport by tapping its card here.</li>
+                  <li>On its Players tab, tick the children who are joining and add them.</li>
+                  <li>Then take their attendance, tests and remarks.</li>
+                </ol>
               </Card>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
@@ -100,6 +112,44 @@ export default async function SportsPage({
                 ))}
               </div>
             )}
+
+            <details className="card mt-5" open={children.length > 0 && sports.every((x) => x.players === 0)}>
+              <summary className="cursor-pointer px-5 py-3 text-[14px] font-semibold">
+                Children at this centre ({children.length})
+                <span className="ml-2 text-[12.5px] font-normal text-[var(--muted)]">
+                  {children.filter((c) => c.sports.length > 0).length} already in a sport
+                </span>
+              </summary>
+              {children.length === 0 ? (
+                <p className="px-5 pb-4 text-[13px] text-[var(--muted)]">Nobody is on this centre&rsquo;s roll.</p>
+              ) : (
+                <div className="max-h-[420px] overflow-y-auto border-t border-[var(--border)]">
+                  <table className="tbl">
+                    <tbody>
+                      {children.map((c) => (
+                        <tr key={c.student_id}>
+                          <td>
+                            <div className="font-medium">{c.first_name} {c.last_name ?? ""}</div>
+                            <div className="font-mono text-[11px] text-[var(--faint)]">{c.enrollment_no}</div>
+                          </td>
+                          <td className="text-[var(--muted)]">{c.class_name ?? "—"}{c.section ? ` · ${c.section}` : ""}</td>
+                          <td className="text-[12.5px]">
+                            {c.sports.length
+                              ? c.sports.join(", ")
+                              : <span className="text-[var(--faint)]">not in a sport yet</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {sports.length > 0 && (
+                <p className="border-t border-[var(--border)] px-5 py-3 text-[12.5px] text-[var(--muted)]">
+                  To add a child to a sport, open the sport above and use its Players tab.
+                </p>
+              )}
+            </details>
           </div>
           <div className="lg:col-span-2">
             <AddSportForm centerId={centre.id} centreName={centre.name} />

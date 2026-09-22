@@ -240,3 +240,24 @@ export async function markSpeciality(_prev: unknown, form: FormData): Promise<Re
   touched(got.sport.id);
   return { ok: special ? "Talent recorded." : "Talent mark removed." };
 }
+
+/* ----------------------------------------------------------------- remarks */
+
+/** A note on a child in a sport. Blank clears it. */
+export async function saveRemark(_prev: unknown, form: FormData): Promise<Result> {
+  const user = await requireUser();
+  const got = await reach(user, Number(form.get("sport_id")));
+  if ("error" in got) return { error: got.error };
+  const remarks = str(form, "remarks");
+  if (remarks && remarks.length > 500) return { error: "Keep the remark under 500 letters." };
+
+  const row = await one<{ id: number }>(
+    `UPDATE sport_students
+        SET remarks = $3, remarks_updated_at = now(), remarks_by = $4
+      WHERE sport_id = $1 AND student_id = $2 AND left_on IS NULL
+      RETURNING id`,
+    [got.sport.id, Number(form.get("student_id")), remarks, user.uid]);
+  if (!row) return { error: "That child is not on this sport's list." };
+  touched(got.sport.id);
+  return { ok: remarks ? "Remark saved." : "Remark cleared." };
+}

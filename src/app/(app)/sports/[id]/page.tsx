@@ -11,7 +11,7 @@ import {
   SPECIAL_LEVEL_LABEL, SPECIAL_LEVEL_TONE, SPORT_TABS, tabOf,
 } from "@/lib/sports-meta";
 import {
-  AddPlayers, NewSportTest, PauseSport, RemovePlayer, SportAttendance, TalentRow,
+  AddPlayers, NewSportTest, PauseSport, RemarkField, RemovePlayer, SportAttendance, TalentRow,
 } from "../SportForms";
 
 export default async function SportPage({
@@ -72,7 +72,17 @@ export default async function SportPage({
         <PauseSport sportId={sport.id} active={sport.is_active} />
       </div>
 
-      {tab === "players" && (
+      {tab === "players" && players.length === 0 && (
+        <div className="grid gap-4">
+          <p className="text-[13.5px] text-[var(--muted)]">
+            Nobody is playing {sport.name} yet. Tick the children below who are joining, then press
+            <strong> Add to the sport</strong>. You can then take their attendance and tests.
+          </p>
+          <AddPlayers sportId={sport.id} candidates={candidates} />
+        </div>
+      )}
+
+      {tab === "players" && players.length > 0 && (
         <div className="grid gap-5 lg:grid-cols-5">
           <div className="lg:col-span-3">
             <Card pad={false}>
@@ -82,7 +92,7 @@ export default async function SportPage({
                 <div className="overflow-x-auto">
                   <table className="tbl">
                     <thead>
-                      <tr><th>Child</th><th>Class</th><th>Joined</th><th>Turnout</th><th>Talent</th><th></th></tr>
+                      <tr><th>Child</th><th>Class</th><th>Turnout</th><th>Talent</th><th>Remark</th><th></th></tr>
                     </thead>
                     <tbody>
                       {players.map((p) => (
@@ -96,13 +106,21 @@ export default async function SportPage({
                               </div>
                             </div>
                           </td>
-                          <td className="text-[var(--muted)]">{p.class_name ?? "—"}</td>
-                          <td className="text-[var(--muted)]">{fmtDate(p.joined_on)}</td>
+                          <td className="text-[var(--muted)]">
+                            {p.class_name ?? "—"}
+                            <div className="text-[11px] text-[var(--faint)]">joined {fmtDate(p.joined_on)}</div>
+                          </td>
                           <td>{rate(p.student_id)}</td>
                           <td>
                             {p.is_special
                               ? <Badge tone={SPECIAL_LEVEL_TONE[p.special_level ?? "centre"]}>{p.speciality}</Badge>
                               : <span className="text-[var(--faint)]">—</span>}
+                          </td>
+                          <td>
+                            <RemarkField sportId={sport.id} studentId={p.student_id} remarks={p.remarks} />
+                            {p.remarks_on && (
+                              <div className="mt-0.5 text-[11px] text-[var(--faint)]">updated {fmtDate(p.remarks_on)}</div>
+                            )}
                           </td>
                           <td><RemovePlayer sportId={sport.id} studentId={p.student_id} /></td>
                         </tr>
