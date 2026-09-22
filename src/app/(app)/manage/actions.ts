@@ -37,6 +37,9 @@ export async function saveCenter(_prev: unknown, form: FormData) {
   if (!id && centreType === null)
     return { error: "Choose whether the centre is in a park or inside a school." };
 
+  // the section a child starts in here — E for an evening-only centre
+  const defaultSection = String(form.get("default_section") ?? "M") === "E" ? "E" : "M";
+
   const lat = numOrNull(form, "latitude");
   const lng = numOrNull(form, "longitude");
   if ((lat === null) !== (lng === null))
@@ -56,19 +59,19 @@ export async function saveCenter(_prev: unknown, form: FormData) {
       await query(
         `UPDATE centers SET code=$2, name=$3, area=$4, address=$5, city=$6, state=$7,
             pincode=$8, phone=$9, latitude=$10, longitude=$11, geofence_radius_m=$12,
-            is_active=$13, center_type=$14 WHERE id=$1`,
+            is_active=$13, center_type=$14, default_section=$15 WHERE id=$1`,
         [id, code, name, str(form, "area"), str(form, "address"), str(form, "city"),
          str(form, "state"), str(form, "pincode"), str(form, "phone"), lat, lng, radius,
-         form.get("is_active") === "on", centreType],
+         form.get("is_active") === "on", centreType, defaultSection],
       );
     } else {
       await query(
         `INSERT INTO centers (code, name, area, address, city, state, pincode, phone,
-            latitude, longitude, geofence_radius_m, center_type)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+            latitude, longitude, geofence_radius_m, center_type, default_section)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
         [code, name, str(form, "area"), str(form, "address"), str(form, "city"),
          str(form, "state"), str(form, "pincode"), str(form, "phone"), lat, lng, radius,
-         centreType],
+         centreType, defaultSection],
       );
     }
   } catch (err) {

@@ -11,7 +11,7 @@ import {
   OCCUPATIONS, QUALIFICATIONS, RELIGIONS, STATES, STEPS, maskAadhaar,
 } from "@/lib/admission-meta";
 
-type Ref = { id: number; name: string; code?: string };
+type Ref = { id: number; name: string; code?: string; defaultSection?: string };
 
 /* ------------------------------------------------------------ small pieces */
 
@@ -200,6 +200,8 @@ export default function AdmissionWizard({
     country: "India", nationality: "Indian",
     admission_date: today(),
     center_id: centers.length === 1 ? String(centers[0].id) : "",
+    // one centre to choose from: start in the section it runs
+    section: centers.length === 1 ? (centers[0].defaultSection ?? "M") : "M",
     ...(draft ?? {}),
   }));
   const [draftId, setDraftId] = useState<number | null>(initialDraftId);
@@ -537,7 +539,12 @@ export default function AdmissionWizard({
               <Select label="Centre" name="center_id" required value={v("center_id")}
                 options={centers} placeholder="Select Centre"
                 hint="Centres you add appear here automatically"
-                onChange={(x) => set("center_id", x)} />
+                onChange={(x) => {
+                  set("center_id", x);
+                  // a child joins the section the centre runs — E at an evening-only centre
+                  const c = centers.find((cc) => String(cc.id) === x);
+                  set("section", c?.defaultSection ?? "M");
+                }} />
               <Select label="Section" name="section" value={v("section") || "M"} noBlank
                 options={["M", "E"]} hint="Every child starts in M; the office can move them to E"
                 onChange={(x) => set("section", x)} />

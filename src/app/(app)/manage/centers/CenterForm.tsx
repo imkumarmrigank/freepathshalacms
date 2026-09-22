@@ -53,6 +53,14 @@ export default function CenterForm({ center }: { center?: Center | null }) {
               ))}
             </div>
           </Field>
+          <Field label="Children start in section"
+            hint="E for a centre that runs as the evening batch; M everywhere else">
+            <select className="select" name="default_section"
+              defaultValue={center?.default_section ?? "M"}>
+              <option value="M">M</option>
+              <option value="E">E</option>
+            </select>
+          </Field>
           <Field label="Area / locality">
             <input className="input" name="area" defaultValue={center?.area ?? ""} />
           </Field>

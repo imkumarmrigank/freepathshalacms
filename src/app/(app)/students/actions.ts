@@ -8,7 +8,7 @@ import { nextEnrollmentNo } from "@/lib/enrollment";
 import { currentSession } from "@/lib/queries";
 import { isGlobalRole, isTeaching, canMarkDropout, canChangeSection } from "@/lib/roles";
 import { isDropoutReason } from "@/lib/dropout-meta";
-import { isSection, sectionOr } from "@/lib/sections";
+import { isSection } from "@/lib/sections";
 import { RECOMMENDERS, PTM_RECOMMENDER } from "@/lib/promotion-meta";
 
 const str = (f: FormData, k: string) => {
@@ -57,7 +57,8 @@ export async function createStudent(_prev: unknown, form: FormData) {
         `INSERT INTO enrollments (student_id, session_id, class_level_id, center_id,
             section, roll_no, enrolled_on, source)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [s.id, session.id, classLevelId, centerId, sectionOr(form.get("section")),
+        // blank → the centre's own section (E at an evening-only centre)
+        [s.id, session.id, classLevelId, centerId, isSection(form.get("section")) ? form.get("section") : null,
          form.get("roll_no") ? Number(form.get("roll_no")) : null, enrolledOn, source],
       );
       return { studentId: s.id, enrollmentNo: no };

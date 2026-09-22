@@ -83,11 +83,12 @@ export async function transferStudent(_prev: unknown, form: FormData): Promise<R
       [student.id, toCenterId]);
 
     if (student.enrollment_id) {
-      // a new room: the old roll number means nothing there; the section (M or
-      // E) is kept, and the office can change it at the new centre
+      // a new room: the old roll number means nothing there, and the child
+      // starts in the new centre's section (E at an evening-only centre)
       await c.query(
         `UPDATE enrollments
             SET center_id = $2, class_level_id = $3, roll_no = NULL,
+                section = (SELECT default_section FROM centers WHERE id = $2),
                 source = 'transfer'
           WHERE id = $1`,
         [student.enrollment_id, toCenterId, toClass]);

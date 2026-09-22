@@ -86,7 +86,9 @@ export default async function NewStudentPage({
       )}
 
       <AdmissionWizard
-        centers={centers.map((c) => ({ id: c.id, name: c.name, code: c.code }))}
+        centers={centers.map((c) => ({
+          id: c.id, name: c.name, code: c.code, defaultSection: c.default_section,
+        }))}
         classes={classes.map((c) => ({ id: c.id, name: c.name }))}
         sessionName={session.name}
         draft={draftRow?.payload ?? null}

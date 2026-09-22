@@ -1,5 +1,5 @@
 "use server";
-import { sectionOr } from "@/lib/sections";
+import { isSection } from "@/lib/sections";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { PoolClient } from "pg";
@@ -243,7 +243,8 @@ export async function submitAdmission(
             section, roll_no, enrolled_on, source)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
         [studentId, session.id, classLevelId, centerId,
-         sectionOr(s(payload, "section")), n(payload, "roll_no"), admissionDate, source]);
+         isSection(s(payload, "section")) ? s(payload, "section") : null,
+         n(payload, "roll_no"), admissionDate, source]);
 
       if (draftId) {
         await c.query("DELETE FROM admission_drafts WHERE id = $1 AND created_by = $2",
