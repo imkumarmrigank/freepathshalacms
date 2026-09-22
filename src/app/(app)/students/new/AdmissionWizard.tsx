@@ -40,19 +40,21 @@ function Text({
 }
 
 function Select({
-  label, name, value, onChange, options, required, placeholder = "Select", hint,
+  label, name, value, onChange, options, required, placeholder = "Select", hint, noBlank = false,
 }: {
   label: string; name: string; value: string;
   onChange: (v: string) => void;
   options: readonly string[] | Ref[];
   required?: boolean; placeholder?: string; hint?: string;
+  /** Always one of the options — no empty "Select" line to fall back to. */
+  noBlank?: boolean;
 }) {
   return (
     <label className="field">
       <span>{label}{required && " *"}</span>
       <select className="select" name={name} value={value}
         onChange={(e) => onChange(e.target.value)}>
-        <option value="">{placeholder}</option>
+        {!noBlank && <option value="">{placeholder}</option>}
         {options.map((o) =>
           typeof o === "string"
             ? <option key={o} value={o}>{o}</option>
@@ -536,7 +538,7 @@ export default function AdmissionWizard({
                 options={centers} placeholder="Select Centre"
                 hint="Centres you add appear here automatically"
                 onChange={(x) => set("center_id", x)} />
-              <Select label="Section" name="section" value={v("section") || "M"}
+              <Select label="Section" name="section" value={v("section") || "M"} noBlank
                 options={["M", "E"]} hint="Every child starts in M; the office can move them to E"
                 onChange={(x) => set("section", x)} />
             </div>

@@ -9,6 +9,7 @@ import { closeRegisterUpToYesterday } from "@/lib/attendance";
 import { holidayOn } from "@/lib/calendar";
 import { EVENT_LABEL } from "@/lib/calendar-meta";
 import { canMarkAttendance, isGlobalRole } from "@/lib/roles";
+import { isSection } from "@/lib/sections";
 
 export default async function AttendancePage({
   searchParams,
@@ -28,6 +29,8 @@ export default async function AttendancePage({
 
   const centerId = resolveCenterId(user, sp.center) ?? (centers.length === 1 ? centers[0].id : null);
   const classId = Number(sp.class) || null;
+  // M or E marks one section's register; left open, the whole class is listed
+  const section = isSection(sp.section) ? sp.section : null;
   const attDate = sp.date || today();
   const future = attDate > today();
   const isPast = attDate < today();
@@ -36,15 +39,16 @@ export default async function AttendancePage({
   if (centerId && classId) {
     rows = await query<Row>(
       `SELECT e.id AS enrollment_id, s.id AS student_id, s.enrollment_no,
-              s.first_name, s.last_name, e.roll_no, a.status, a.reason
+              s.first_name, s.last_name, e.roll_no, e.section, a.status, a.reason
          FROM enrollments e
          JOIN students s ON s.id = e.student_id
          LEFT JOIN student_attendance a
            ON a.student_id = s.id AND a.att_date = $4
         WHERE e.session_id = $1 AND e.class_level_id = $2 AND e.center_id = $3
           AND e.status = 'active' AND s.status = 'active'
-        ORDER BY e.roll_no NULLS LAST, s.first_name`,
-      [session.id, classId, centerId, attDate],
+          AND ($5::text IS NULL OR e.section = $5)
+        ORDER BY e.section, e.roll_no NULLS LAST, s.first_name`,
+      [session.id, classId, centerId, attDate, section],
     );
   }
 
@@ -64,7 +68,8 @@ export default async function AttendancePage({
         <AttendancePicker
           centers={isGlobalRole(user.role) ? centers : []}
           classes={classes}
-          defaults={{ center: String(centerId ?? ""), class: String(classId ?? ""), date: attDate }}
+          defaults={{ center: String(centerId ?? ""), class: String(classId ?? ""), date: attDate,
+            section: section ?? "" }}
         />
       </Card>
 
@@ -115,6 +120,7 @@ export default async function AttendancePage({
           classLevelId={classId} centerId={centerId}
           locked={future || Boolean(holiday) || readOnly}
           isPast={isPast}
+          showSection={!section}
         />
       )}
     </>

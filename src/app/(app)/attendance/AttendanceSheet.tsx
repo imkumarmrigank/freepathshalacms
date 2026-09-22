@@ -12,6 +12,7 @@ import {
 export type Row = {
   enrollment_id: number; student_id: number; enrollment_no: string;
   first_name: string; last_name: string | null; roll_no: number | null;
+  section: string | null;
   status: string | null;
   reason: string | null;
 };
@@ -21,10 +22,12 @@ const OPTIONS = MARK_OPTIONS;
 const SAME_DAY_ONLY = new Set(["present", "late", "half_day"]);
 
 export default function AttendanceSheet({
-  rows, attDate, sessionId, classLevelId, centerId, locked, isPast,
+  rows, attDate, sessionId, classLevelId, centerId, locked, isPast, showSection = false,
 }: {
   rows: Row[]; attDate: string; sessionId: number;
   classLevelId: number; centerId: number; locked: boolean; isPast: boolean;
+  /** Both sections on one sheet: say which each child is in. */
+  showSection?: boolean;
 }) {
   const [state, action] = useActionState(saveAttendance, null);
   const [marks, setMarks] = useState<Record<number, string>>(
@@ -151,7 +154,14 @@ export default function AttendanceSheet({
                           className="block truncate font-medium hover:text-[var(--brand)]">
                           {r.first_name} {r.last_name ?? ""}
                         </Link>
-                        <div className="font-mono text-[11px] text-[var(--faint)]">{r.enrollment_no}</div>
+                        <div className="font-mono text-[11px] text-[var(--faint)]">
+                          {r.enrollment_no}
+                          {showSection && r.section && (
+                            <span className="ml-1.5 rounded border border-[var(--border)] px-1 font-sans font-semibold text-[var(--muted)]">
+                              {r.section}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       {/* the moment a teacher notices something is while they are
                           looking at the class, so the referral starts here */}
