@@ -70,8 +70,15 @@ export default async function Dashboard({
     ? await standings(isGlobalRole(user.role) ? null : user.centerId)
     : [])();
 
-  const studentsP = query<{ n: string }>(
-    `SELECT count(*) AS n FROM enrollments WHERE session_id = $1 AND status = 'active'${scope}`,
+  // Children on the roll: an active enrolment AND an active child. Counting the
+  // enrolment alone took in children marked inactive or dropped whose
+  // enrolment had never been closed, and the total ran well above the roll.
+  const studentsP = query<{ n: string; m: string; e: string }>(
+    `SELECT count(*) AS n,
+            count(*) FILTER (WHERE e.section = 'M') AS m,
+            count(*) FILTER (WHERE e.section = 'E') AS e
+       FROM enrollments e JOIN students s ON s.id = e.student_id AND s.status = 'active'
+      WHERE e.session_id = $1 AND e.status = 'active'${centerId ? " AND e.center_id = $2" : ""}`,
     p([session.id]),
   );
   const ptmsP = query<{ n: string }>(
@@ -155,6 +162,16 @@ export default async function Dashboard({
                   WHERE e.center_id = ce.id AND e.session_id = $1
                     AND e.status = 'active' AND s.status = 'active'
                     AND e.enrolled_on <= $2::date)                        AS roll,
+                (SELECT count(*) FROM enrollments e
+                   JOIN students s ON s.id = e.student_id
+                  WHERE e.center_id = ce.id AND e.session_id = $1
+                    AND e.status = 'active' AND s.status = 'active'
+                    AND e.enrolled_on <= $2::date AND e.section = 'M')    AS roll_m,
+                (SELECT count(*) FROM enrollments e
+                   JOIN students s ON s.id = e.student_id
+                  WHERE e.center_id = ce.id AND e.session_id = $1
+                    AND e.status = 'active' AND s.status = 'active'
+                    AND e.enrolled_on <= $2::date AND e.section = 'E')    AS roll_e,
                 count(a.*) FILTER (WHERE a.att_date = $2::date)           AS marked,
                 count(a.*) FILTER (WHERE a.att_date = $2::date
                                      AND a.status IN ('present','late','half_day')) AS present,
@@ -238,7 +255,10 @@ export default async function Dashboard({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Students" value={students.n} hint="enrolled this session" />
+        <StatCard label="Students" value={students.n}
+          hint={wantsDaily
+            ? `Section M ${students.m} · Section E ${students.e}`
+            : "enrolled this session"} />
         <StatCard label="Attendance today" value={attPct === null ? "—" : `${attPct}%`}
           hint={attToday && Number(attToday.total) > 0
             ? `${attToday.present} of ${attToday.total} marked` : "not marked yet"}

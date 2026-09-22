@@ -7,6 +7,8 @@ export type CentreDay = {
   center_name: string;
   center_code: string;
   roll: number;          // children on the roll today
+  roll_m: number;        // of whom in section M
+  roll_e: number;        // and in section E
   marked: number;        // register rows for today
   present: number;       // present, late or half day
   absent: number;
@@ -24,7 +26,8 @@ export default function DailyByCentre({ day, rows }:
   const total = rows.reduce((a, r) => ({
     roll: a.roll + r.roll, marked: a.marked + r.marked, present: a.present + r.present,
     staff: a.staff + r.staff, staff_in: a.staff_in + r.staff_in,
-  }), { roll: 0, marked: 0, present: 0, staff: 0, staff_in: 0 });
+    roll_m: a.roll_m + Number(r.roll_m), roll_e: a.roll_e + Number(r.roll_e),
+  }), { roll: 0, marked: 0, present: 0, staff: 0, staff_in: 0, roll_m: 0, roll_e: 0 });
 
   const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
 
@@ -57,7 +60,7 @@ export default function DailyByCentre({ day, rows }:
           <table className="tbl">
             <thead>
               <tr>
-                <th>Centre</th><th>On roll</th><th>Register</th>
+                <th>Centre</th><th>On roll</th><th>M</th><th>E</th><th>Register</th>
                 <th>Present</th><th>Absent</th><th>Attendance</th><th>Staff in</th>
               </tr>
             </thead>
@@ -68,6 +71,8 @@ export default function DailyByCentre({ day, rows }:
                   <tr key={r.center_id}>
                     <td className="font-medium">{r.center_name}</td>
                     <td className="tabular-nums text-[var(--muted)]">{r.roll}</td>
+                    <td className="tabular-nums text-[var(--muted)]">{r.roll_m}</td>
+                    <td className="tabular-nums text-[var(--muted)]">{r.roll_e}</td>
                     <td>
                       {r.roll === 0
                         ? <span className="text-[var(--faint)]">—</span>
