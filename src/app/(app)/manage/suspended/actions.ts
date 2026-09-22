@@ -75,7 +75,7 @@ export async function reactivateStudent(_prev: unknown, form: FormData): Promise
        ON CONFLICT (student_id, session_id) DO UPDATE
          SET class_level_id = EXCLUDED.class_level_id, center_id = EXCLUDED.center_id,
              enrolled_on = EXCLUDED.enrolled_on, source = 'mid_session', status = 'active',
-             section = NULL, roll_no = NULL`,
+             section = 'M', roll_no = NULL`,
       [studentId, session.id, classId, centerId, on]);
   });
 

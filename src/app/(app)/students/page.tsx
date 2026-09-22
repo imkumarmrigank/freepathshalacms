@@ -5,7 +5,9 @@ import { centersForUser, currentSession, listClasses, listSessions, resolveCente
 import { Avatar, Badge, Card, Empty, Meter, PageHeader } from "@/components/ui";
 import Filters from "@/components/Filters";
 import { fmtDate, fullName } from "@/lib/format";
-import { isGlobalRole, canAdmitStudents } from "@/lib/roles";
+import { isGlobalRole, canAdmitStudents, canChangeSection } from "@/lib/roles";
+import { SECTIONS, isSection } from "@/lib/sections";
+import SectionPicker from "./SectionPicker";
 import Pager from "@/components/Pager";
 import SortHeader, { sortFrom } from "@/components/SortHeader";
 import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
@@ -17,6 +19,7 @@ const STATUS_TONE: Record<string, string> = {
 type Row = {
   id: number; enrollment_no: string; first_name: string; last_name: string | null;
   status: string; class_name: string | null; center_name: string; section: string | null;
+  enrollment_id: number | null;
   admission_date: string; attendance_pct: string | null; enrolled_here: boolean;
   status_changed_on: string | null;
   total_rows: string;
@@ -59,6 +62,7 @@ export default async function StudentsPage({
                     OR s.enrollment_no ILIKE $${params.length} OR s.primary_phone ILIKE $${params.length})`;
   }
   if (sp.status) { params.push(sp.status); where += ` AND s.status = $${params.length}`; }
+  if (isSection(sp.section)) { params.push(sp.section); where += ` AND e.section = $${params.length}`; }
 
   // Sorting happens in the query, not the browser: the list is paged, and
   // sorting only the sixty rows on screen would put the wrong child first.
@@ -74,7 +78,7 @@ export default async function StudentsPage({
   const rows = await query<Row>(
     `SELECT count(*) OVER () AS total_rows,
             s.id, s.enrollment_no, s.first_name, s.last_name, s.status, s.admission_date,
-            cl.name AS class_name, ce.name AS center_name, e.section,
+            cl.name AS class_name, ce.name AS center_name, e.section, e.id AS enrollment_id,
             (e.id IS NOT NULL) AS enrolled_here,
             -- The best date there is for the current status: the dropout date for a
             -- dropout, the day a suspended or passed-out child left, otherwise the
@@ -100,6 +104,7 @@ export default async function StudentsPage({
   );
 
   const total = totalOf(rows);
+  const office = canChangeSection(user.role);
   const sortProps = { sort, dir, sp, basePath: "/students" };
   const win = pageWindow(pg, rows.length, total);
 
@@ -120,7 +125,9 @@ export default async function StudentsPage({
         sessions={sessions}
         current={{ ...sp, session: String(sessionId ?? "") }}
         searchPlaceholder="Search by name, enrolment no. or phone"
-        extra={[{ name: "status", label: "All statuses",
+        extra={[{ name: "section", label: "All sections",
+          options: SECTIONS.map((x) => ({ value: x.value, label: `Section ${x.label}` })) },
+          { name: "status", label: "All statuses",
           options: ["active", "inactive", "suspended", "graduated", "transferred", "dropped"]
             .map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) })) }]}
       />
@@ -161,7 +168,12 @@ export default async function StudentsPage({
                     <td className="font-mono text-[13px] text-[var(--muted)]">{r.enrollment_no}</td>
                     <td>
                       {r.class_name
-                        ? <>{r.class_name}{r.section ? ` · ${r.section}` : ""}</>
+                        ? (office && r.enrollment_id
+                            ? <span className="inline-flex items-center gap-2">
+                                {r.class_name}
+                                <SectionPicker enrollmentId={r.enrollment_id} section={r.section} compact />
+                              </span>
+                            : <>{r.class_name}{r.section ? ` · ${r.section}` : ""}</>)
                         : <span className="text-[13px] text-[var(--faint)]">Not enrolled</span>}
                     </td>
                     {!centerId && <td className="text-[var(--muted)]">{r.center_name}</td>}

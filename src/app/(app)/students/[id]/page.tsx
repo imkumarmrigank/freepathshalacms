@@ -7,7 +7,8 @@ import { Alert, Avatar, Badge, Card, Empty, Meter, PageHeader } from "@/componen
 import { IconPlus } from "@/components/icons";
 import { fmtDate, fullName, titleCase } from "@/lib/format";
 import { EXAM_TYPE_LABEL, grade, percentage } from "@/lib/exam-meta";
-import { canEditStudents, canMarkDropout, canTransferStudents, can } from "@/lib/roles";
+import { canEditStudents, canMarkDropout, canTransferStudents, canChangeSection, can } from "@/lib/roles";
+import SectionPicker from "../SectionPicker";
 import type { Student } from "@/lib/types";
 import EditStudent from "./EditStudent";
 import AdmissionRecord from "./AdmissionRecord";
@@ -315,7 +316,11 @@ export default async function StudentPage({
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-[14px] font-medium">{e.class_name}</span>
-                        {e.section && <span className="text-[13px] text-[var(--muted)]">Sec {e.section}</span>}
+                        {e.is_current && canChangeSection(user.role)
+                          ? <span className="inline-flex items-center gap-1.5 text-[13px] text-[var(--muted)]">
+                              Section <SectionPicker enrollmentId={e.id} section={e.section} />
+                            </span>
+                          : e.section && <span className="text-[13px] text-[var(--muted)]">Section {e.section}</span>}
                         {e.is_current && <Badge tone="info" dot={false}>Current</Badge>}
                       </div>
                       <div className="text-[12px] text-[var(--muted)]">

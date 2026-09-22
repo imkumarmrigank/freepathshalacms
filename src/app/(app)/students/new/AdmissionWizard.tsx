@@ -536,8 +536,9 @@ export default function AdmissionWizard({
                 options={centers} placeholder="Select Centre"
                 hint="Centres you add appear here automatically"
                 onChange={(x) => set("center_id", x)} />
-              <Text label="Section" name="section" value={v("section")}
-                placeholder="A" onChange={(x) => set("section", x)} />
+              <Select label="Section" name="section" value={v("section") || "M"}
+                options={["M", "E"]} hint="Every child starts in M; the office can move them to E"
+                onChange={(x) => set("section", x)} />
             </div>
             {(errors.class_level_id || errors.center_id) && (
               <p className="text-[12px] text-[var(--bad)]">Please choose a class and a centre.</p>

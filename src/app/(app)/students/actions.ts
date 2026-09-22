@@ -6,8 +6,9 @@ import { requireUser, canTouchCenter } from "@/lib/auth";
 import { tx, query, one } from "@/lib/db";
 import { nextEnrollmentNo } from "@/lib/enrollment";
 import { currentSession } from "@/lib/queries";
-import { isGlobalRole, isTeaching, canMarkDropout } from "@/lib/roles";
+import { isGlobalRole, isTeaching, canMarkDropout, canChangeSection } from "@/lib/roles";
 import { isDropoutReason } from "@/lib/dropout-meta";
+import { isSection, sectionOr } from "@/lib/sections";
 import { RECOMMENDERS, PTM_RECOMMENDER } from "@/lib/promotion-meta";
 
 const str = (f: FormData, k: string) => {
@@ -56,7 +57,7 @@ export async function createStudent(_prev: unknown, form: FormData) {
         `INSERT INTO enrollments (student_id, session_id, class_level_id, center_id,
             section, roll_no, enrolled_on, source)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [s.id, session.id, classLevelId, centerId, str(form, "section"),
+        [s.id, session.id, classLevelId, centerId, sectionOr(form.get("section")),
          form.get("roll_no") ? Number(form.get("roll_no")) : null, enrolledOn, source],
       );
       return { studentId: s.id, enrollmentNo: no };
@@ -354,4 +355,28 @@ export async function reinstateStudent(_prev: unknown, form: FormData) {
   revalidatePath(`/students/${id}`);
   revalidatePath("/students");
   return { ok: "Back on the roll." };
+}
+
+/**
+ * Put a child in section M or E for this year. The office's decision, so an
+ * admin or super admin only; it changes the current enrolment and nothing else.
+ */
+export async function changeSection(_prev: unknown, form: FormData) {
+  const user = await requireUser();
+  if (!canChangeSection(user.role))
+    return { error: "Only an admin or super admin can change a section." };
+
+  const enrollmentId = Number(form.get("enrollment_id"));
+  const section = String(form.get("section") ?? "");
+  if (!isSection(section)) return { error: "The section is M or E." };
+
+  const row = await one<{ student_id: number; section: string | null }>(
+    "SELECT student_id, section FROM enrollments WHERE id = $1", [enrollmentId]);
+  if (!row) return { error: "Enrolment not found." };
+  if (row.section === section) return { ok: `Already in section ${section}.` };
+
+  await query("UPDATE enrollments SET section = $2 WHERE id = $1", [enrollmentId, section]);
+  revalidatePath("/students");
+  revalidatePath(`/students/${row.student_id}`);
+  return { ok: `Moved to section ${section}.` };
 }

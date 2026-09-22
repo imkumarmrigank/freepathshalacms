@@ -229,6 +229,11 @@ export function canAdmitStudents(role: Role) {
   return role === "super_admin" || role === "admin" || role === "center_manager";
 }
 
+/** Which section, M or E, a child sits in — set by the office. */
+export function canChangeSection(role: Role) {
+  return role === "super_admin" || role === "admin";
+}
+
 /** Moving a child between centres: the office decides, neither centre does. */
 export function canTransferStudents(role: Role) {
   return role === "super_admin" || role === "admin";
