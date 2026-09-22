@@ -98,6 +98,7 @@ const MENU: Node[] = [
   {
     label: "Insights", icon: IconChart, children: [
       { href: "/statistics", label: "Statistics", feature: "statistics" },
+      { href: "/statistics/trends", label: "Trends", feature: "statistics" },
       { href: "/reports", label: "Reports", feature: "reports" },
     ],
   },
