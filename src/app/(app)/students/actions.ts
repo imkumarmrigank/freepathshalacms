@@ -160,6 +160,17 @@ export async function updateStudent(_prev: unknown, form: FormData) {
     `UPDATE students SET ${sets.join(", ")}, updated_at=now() WHERE id=$1`,
     values,
   );
+  // Back to active from the dropdown: this year's enrolment has to be active
+  // too, or the child shows in the student list but never on the register —
+  // the register lists active enrolments, not active students.
+  if (status === "active" && existing.status !== "active") {
+    await query(
+      `UPDATE enrollments SET status = 'active'
+        WHERE student_id = $1 AND status = 'left'
+          AND session_id = (SELECT id FROM academic_sessions WHERE is_current
+                             ORDER BY sequence DESC LIMIT 1)`,
+      [id]);
+  }
   // a child newly suspended is dated from today, with who did it
   if (status === "suspended" && existing.status !== "suspended") {
     await query(
