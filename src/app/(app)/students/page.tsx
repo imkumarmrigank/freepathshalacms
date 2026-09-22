@@ -7,6 +7,7 @@ import Filters from "@/components/Filters";
 import { fmtDate, fullName } from "@/lib/format";
 import { isGlobalRole, canAdmitStudents } from "@/lib/roles";
 import Pager from "@/components/Pager";
+import SortHeader, { sortFrom } from "@/components/SortHeader";
 import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
 
 const STATUS_TONE: Record<string, string> = {
@@ -20,6 +21,19 @@ type Row = {
   status_changed_on: string | null;
   total_rows: string;
 };
+
+/** What each sortable heading orders by. Aliases from the SELECT are allowed here. */
+const ORDER = {
+  name: ["lower(s.first_name)", "lower(COALESCE(s.last_name, ''))"],
+  enrolment: ["s.enrollment_no"],
+  class: ["cl.sequence"],
+  centre: ["lower(ce.name)"],
+  attendance: ["attendance_pct"],
+  admitted: ["s.admission_date"],
+  status: ["s.status"],
+  changed: ["status_changed_on"],
+} as const;
+const SORT_COLUMNS = Object.keys(ORDER) as (keyof typeof ORDER)[];
 
 export default async function StudentsPage({
   searchParams,
@@ -45,6 +59,14 @@ export default async function StudentsPage({
                     OR s.enrollment_no ILIKE $${params.length} OR s.primary_phone ILIKE $${params.length})`;
   }
   if (sp.status) { params.push(sp.status); where += ` AND s.status = $${params.length}`; }
+
+  // Sorting happens in the query, not the browser: the list is paged, and
+  // sorting only the sixty rows on screen would put the wrong child first.
+  const { sort, dir } = sortFrom(sp, SORT_COLUMNS);
+  const d = dir === "desc" ? "DESC" : "ASC";
+  const orderBy = sort
+    ? `${ORDER[sort].map((e) => `${e} ${d} NULLS LAST`).join(", ")}, s.first_name, s.id`
+    : "cl.sequence NULLS LAST, s.first_name, s.id";
 
   const pg = pageFrom(sp);
   params.push(pg.size, pg.offset);
@@ -72,12 +94,13 @@ export default async function StudentsPage({
        LEFT JOIN enrollments e ON e.student_id = s.id AND e.session_id = $1
        LEFT JOIN class_levels cl ON cl.id = e.class_level_id
       WHERE 1=1 ${where}
-      ORDER BY cl.sequence NULLS LAST, s.first_name, s.id
+      ORDER BY ${orderBy}
       LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params,
   );
 
   const total = totalOf(rows);
+  const sortProps = { sort, dir, sp, basePath: "/students" };
   const win = pageWindow(pg, rows.length, total);
 
   return (
@@ -116,9 +139,14 @@ export default async function StudentsPage({
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>Student</th><th>Enrolment no.</th><th>Class</th>
-                  {!centerId && <th>Centre</th>}
-                  <th>Attendance</th><th>Admitted</th><th>Status</th><th>Status changed</th>
+                  <SortHeader label="Student" col="name" {...sortProps} />
+                  <SortHeader label="Enrolment no." col="enrolment" {...sortProps} />
+                  <SortHeader label="Class" col="class" {...sortProps} />
+                  {!centerId && <SortHeader label="Centre" col="centre" {...sortProps} />}
+                  <SortHeader label="Attendance" col="attendance" {...sortProps} />
+                  <SortHeader label="Admitted" col="admitted" {...sortProps} />
+                  <SortHeader label="Status" col="status" {...sortProps} />
+                  <SortHeader label="Status changed" col="changed" {...sortProps} />
                 </tr>
               </thead>
               <tbody>
