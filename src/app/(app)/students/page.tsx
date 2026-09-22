@@ -17,6 +17,7 @@ type Row = {
   id: number; enrollment_no: string; first_name: string; last_name: string | null;
   status: string; class_name: string | null; center_name: string; section: string | null;
   admission_date: string; attendance_pct: string | null; enrolled_here: boolean;
+  status_changed_on: string | null;
   total_rows: string;
 };
 
@@ -53,6 +54,15 @@ export default async function StudentsPage({
             s.id, s.enrollment_no, s.first_name, s.last_name, s.status, s.admission_date,
             cl.name AS class_name, ce.name AS center_name, e.section,
             (e.id IS NOT NULL) AS enrolled_here,
+            -- The best date there is for the current status: the dropout date for a
+            -- dropout, the day a suspended or passed-out child left, otherwise the
+            -- moment the status was last changed. Blank for a child whose status
+            -- has not changed since admission.
+            to_char(COALESCE(
+              CASE WHEN s.status = 'dropped' THEN s.dropout_date END,
+              CASE WHEN s.status IN ('suspended','graduated') THEN s.left_on END,
+              (s.status_changed_at AT TIME ZONE 'Asia/Kolkata')::date
+            ), 'YYYY-MM-DD') AS status_changed_on,
             (SELECT round(100.0 * count(*) FILTER (WHERE a.status IN ('present','late','half_day'))
                     / NULLIF(count(*), 0), 0)
                FROM student_attendance a
@@ -108,7 +118,7 @@ export default async function StudentsPage({
                 <tr>
                   <th>Student</th><th>Enrolment no.</th><th>Class</th>
                   {!centerId && <th>Centre</th>}
-                  <th>Attendance</th><th>Admitted</th><th>Status</th>
+                  <th>Attendance</th><th>Admitted</th><th>Status</th><th>Status changed</th>
                 </tr>
               </thead>
               <tbody>
@@ -132,6 +142,14 @@ export default async function StudentsPage({
                       : <Meter value={Number(r.attendance_pct)} />}</td>
                     <td className="text-[var(--muted)]">{fmtDate(r.admission_date)}</td>
                     <td><Badge tone={STATUS_TONE[r.status]}>{r.status[0].toUpperCase() + r.status.slice(1)}</Badge></td>
+                    <td className="whitespace-nowrap text-[var(--muted)]">
+                      {r.status_changed_on
+                        ? fmtDate(r.status_changed_on)
+                        : r.status === "active"
+                          ? <span title="Active since admission">—</span>
+                          // taken off the roll before the date began to be kept
+                          : <span className="text-[12px] text-[var(--faint)]">Not recorded</span>}
+                    </td>
                   </tr>
                 ))}
               </tbody>
