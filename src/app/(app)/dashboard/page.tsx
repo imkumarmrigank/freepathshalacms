@@ -205,13 +205,24 @@ export default async function Dashboard({
     ? await Promise.all([staffToday(centerId), awayToday(centerId), pendingLeaveCount(centerId)])
     : [null, [], 0] as const)();
 
+  // Every child on the books by status — the whole record, not just this
+  // session's roll — for whoever can read the student list.
+  const byStatusP = can(user.role, "students")
+    ? query<{ status: string; n: number }>(
+        `SELECT status, count(*)::int AS n FROM students
+          ${centerId ? "WHERE center_id = $1" : ""} GROUP BY status`,
+        centerId ? [centerId] : [])
+    : Promise.resolve([] as { status: string; n: number }[]);
+
   const [
     [behind, counselling], audit, [students], [ptms], [followUps], attToday, recent,
-    upcoming, upcomingEvents, dailyDay, daily, [staff, away, leaveWaiting],
+    upcoming, upcomingEvents, dailyDay, daily, [staff, away, leaveWaiting], byStatus,
   ] = await Promise.all([
     supportP, auditP, studentsP, ptmsP, followUpsP, attTodayP, recentP,
-    upcomingP, upcomingEventsP, dailyDayP, dailyP, staffP,
+    upcomingP, upcomingEventsP, dailyDayP, dailyP, staffP, byStatusP,
   ]);
+  const countOf = (st: string) => byStatus.find((b) => b.status === st)?.n ?? 0;
+  const totalStudents = byStatus.reduce((n, b) => n + b.n, 0);
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -254,8 +265,25 @@ export default async function Dashboard({
         </p>
       </div>
 
+      {byStatus.length > 0 && (
+        <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {[
+            { label: "Total students", value: totalStudents, href: "/students", hint: "on the books" },
+            { label: "Active", value: countOf("active"), href: "/students?status=active", hint: "on the roll", tone: "ok" as const },
+            { label: "Inactive", value: countOf("inactive"), href: "/students?status=inactive", hint: "not attending" },
+            { label: "Suspended", value: countOf("suspended"), href: "/students?status=suspended", hint: "may come back", tone: "warn" as const },
+            { label: "Dropped", value: countOf("dropped"), href: "/students?status=dropped", hint: "left for good", tone: "bad" as const },
+            { label: "Passed out", value: countOf("graduated"), href: "/students?status=graduated", hint: "to formal school" },
+          ].map((c) => (
+            <Link key={c.label} href={c.href} className="block transition hover:-translate-y-0.5">
+              <StatCard label={c.label} value={c.value} hint={c.hint} tone={c.tone} />
+            </Link>
+          ))}
+        </div>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Students" value={students.n}
+        <StatCard label="Enrolled this session" value={students.n}
           hint={wantsDaily
             ? `Section M ${students.m} · Section E ${students.e}`
             : "enrolled this session"} />
