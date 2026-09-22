@@ -86,7 +86,7 @@ export default async function TrendsPage({
           table={{ head: ["Period", "Admissions"], rows: rows.map((r) => [r.label, r.admissions]) }}
         >
           <BarChart data={rows.map((r) => ({ label: r.label, value: r.admissions }))}
-            color={SERIES[0]} labelEvery={every} />
+            color={SERIES[0]} labelEvery={every} valueLabels={rows.length > 12 ? "key" : "all"} />
         </ChartFrame>
 
         <ChartFrame
@@ -107,7 +107,7 @@ export default async function TrendsPage({
           table={{ head: ["Period", "PTMs"], rows: rows.map((r) => [r.label, r.ptms]) }}
         >
           <BarChart data={rows.map((r) => ({ label: r.label, value: r.ptms }))}
-            color={SERIES[0]} labelEvery={every} />
+            color={SERIES[0]} labelEvery={every} valueLabels={rows.length > 12 ? "key" : "all"} />
         </ChartFrame>
       </div>
     </>

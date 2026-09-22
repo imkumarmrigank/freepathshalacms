@@ -89,13 +89,24 @@ function gridLines(max: number, count = 4) {
 /* ------------------------------------------------------------ column bar */
 
 export function BarChart({
-  data, color, height = 190, suffix = "", labelEvery = 1,
-}: { data: Point[]; color: string; height?: number; suffix?: string; labelEvery?: number }) {
+  data, color, height = 190, suffix = "", labelEvery = 1, valueLabels = "all",
+}: {
+  data: Point[]; color: string; height?: number; suffix?: string; labelEvery?: number;
+  /**
+   * "all" writes every bar's value; "key" only the highest and the latest —
+   * for a long run of bars, where a number on each one is noise. The rest are
+   * in the hover title and the table beneath.
+   */
+  valueLabels?: "all" | "key";
+}) {
   const W = 720, PL = 42, PR = 10, PT = 12, PB = 30;
   const plotW = W - PL - PR, plotH = height - PT - PB;
   const max = niceMax(Math.max(...data.map((d) => d.value), 0));
   const slot = plotW / Math.max(data.length, 1);
   const bw = Math.min(46, slot * 0.62);
+  const peak = data.reduce((best, d, i) => (d.value > (data[best]?.value ?? -1) ? i : best), 0);
+  const last = data.length - 1;
+  const labelled = (i: number) => valueLabels === "all" || i === peak || i === last;
 
   return (
     <svg viewBox={`0 0 ${W} ${height}`} className="w-full" role="img"
@@ -128,7 +139,7 @@ export function BarChart({
                 <title>{`${d.label}: ${d.value}${suffix}`}</title>
               </rect>
             )}
-            {d.value > 0 && (
+            {d.value > 0 && labelled(i) && (
               <text x={x + bw / 2} y={y - 5} textAnchor="middle" fontSize={11}
                 fill={INK.secondary} fontWeight={500}>
                 {d.value}{suffix}
