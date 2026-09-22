@@ -51,6 +51,7 @@ export function CriterionEditor({ c }: { c: Criterion }) {
                   placeholder={"One per line"} />
               </Field>
             </div>
+            <HindiFields c={c} />
             <div className="grid gap-3 sm:grid-cols-3">
               <Field label="Weight (1–5)">
                 <input className="input" type="number" min="1" max="5" name="weight"
@@ -119,6 +120,7 @@ export function NewCriterion({ sections }: { sections: string[] }) {
             <textarea className="textarea" name="reasons" rows={4} placeholder="One per line" />
           </Field>
         </div>
+        <HindiFields c={null} />
         <div className="grid gap-3 sm:grid-cols-3">
           <Field label="Weight (1–5)">
             <input className="input" type="number" min="1" max="5" name="weight" defaultValue={1} />
@@ -176,5 +178,41 @@ export function ScoringEditor({ settings }: { settings: ScoreSettings }) {
         <div className="flex justify-end"><Submit>Save scoring</Submit></div>
       </form>
     </Card>
+  );
+}
+
+/**
+ * The same question in Hindi. The auditor sees both; the English is what gets
+ * saved, so the Hindi lines must follow the English ones in the same order.
+ */
+function HindiFields({ c }: { c: Criterion | null }) {
+  return (
+    <details className="mb-3 rounded-[10px] border border-[var(--border)] px-3 py-2" open={Boolean(c?.title_hi)}>
+      <summary className="cursor-pointer text-[13px] font-medium">
+        Hindi / हिन्दी {c && !c.title_hi && <span className="text-[var(--bad)]">— not translated yet</span>}
+      </summary>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <Field label="Section in Hindi">
+          <input className="input" name="section_hi" defaultValue={c?.section_hi ?? ""} placeholder="बच्चे" />
+        </Field>
+        <Field label="Title in Hindi">
+          <input className="input" name="title_hi" defaultValue={c?.title_hi ?? ""} placeholder="उपस्थिति" />
+        </Field>
+      </div>
+      <Field label="Question in Hindi">
+        <input className="input" name="question_hi" defaultValue={c?.question_hi ?? ""}
+          placeholder="आज की उपस्थिति कैसी रही?" />
+      </Field>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="The four bands in Hindi, same order">
+          <textarea className="textarea" name="band_labels_hi" rows={4}
+            defaultValue={c?.band_labels_hi.join("\n") ?? ""} />
+        </Field>
+        <Field label="Reasons in Hindi, same order as English">
+          <textarea className="textarea" name="reasons_hi" rows={4}
+            defaultValue={c?.reasons_hi.join("\n") ?? ""} />
+        </Field>
+      </div>
+    </details>
   );
 }

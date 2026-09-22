@@ -42,7 +42,8 @@ export async function auditSettings(): Promise<ScoreSettings> {
 
 export async function listCriteria(includeRetired = false) {
   return query<Criterion>(
-    `SELECT id, section, position, title, question, band_labels, reasons, weight, is_active
+    `SELECT id, section, position, title, question, band_labels, reasons, weight, is_active,
+            section_hi, title_hi, question_hi, band_labels_hi, reasons_hi
        FROM audit_criteria
       ${includeRetired ? "" : "WHERE is_active"}
       ORDER BY position, id`);
@@ -132,7 +133,10 @@ export async function getVisit(user: SessionUser, id: number) {
 export async function ratingsFor(visitId: number) {
   return query<RatingRow>(
     `SELECT r.id, r.criterion_id, r.section, r.criterion_title, r.weight,
-            r.band, r.reason, r.note
+            r.band, r.reason, r.note,
+            c.section_hi, c.title_hi,
+            -- the reason is saved in English; its Hindi is the line in the same place
+            c.reasons_hi[array_position(c.reasons, r.reason)] AS reason_hi
        FROM audit_ratings r
        LEFT JOIN audit_criteria c ON c.id = r.criterion_id
       WHERE r.visit_id = $1

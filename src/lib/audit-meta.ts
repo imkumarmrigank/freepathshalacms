@@ -231,6 +231,9 @@ export function centrePriority(x: {
 export type Criterion = {
   id: number; section: string; position: number; title: string; question: string;
   band_labels: string[]; reasons: string[]; weight: number; is_active: boolean;
+  /** Hindi, shown under the English; blank where nobody has translated it yet. */
+  section_hi: string | null; title_hi: string | null; question_hi: string | null;
+  band_labels_hi: string[]; reasons_hi: string[];
 };
 
 export type VisitRow = {
@@ -247,6 +250,7 @@ export type VisitRow = {
 export type RatingRow = {
   id: number; criterion_id: number | null; section: string; criterion_title: string;
   weight: number; band: number; reason: string | null; note: string | null;
+  section_hi?: string | null; title_hi?: string | null; reason_hi?: string | null;
 };
 
 export type SuggestionRow = {
@@ -280,3 +284,44 @@ export type MonthlyRow = {
   closed: number; action: number | null;
   score: number | null;
 };
+
+/* ------------------------------------------------------------------ Hindi */
+
+/**
+ * The form is read in Hindi and English together. What is saved is always the
+ * English value, so reports, scores and the award read exactly as before.
+ */
+export const VISIT_KIND_LABEL_HI: Record<VisitKind, string> = {
+  scheduled: "निर्धारित भ्रमण", follow_up: "फ़ॉलो-अप भ्रमण", special: "विशेष (अचानक) भ्रमण",
+};
+
+export const OVERALL_LABEL_HI: Record<Overall, string> = {
+  healthy: "अच्छी स्थिति", attention: "ध्यान देने की ज़रूरत",
+  support: "मदद की ज़रूरत", urgent: "तुरंत हस्तक्षेप",
+};
+
+export const OVERALL_BLURB_HI: Record<Overall, string> = {
+  healthy: "सब कुछ ठीक चल रहा है", attention: "छोटी-मोटी समस्याएँ हैं",
+  support: "केंद्र के बाहर से मदद चाहिए", urgent: "आज ही कार्रवाई करें",
+};
+
+export const BAND_LABEL_HI: Record<number, string> = {
+  4: "अच्छा", 3: "ठीक", 2: "कमज़ोर", 1: "खराब", 0: "लागू नहीं",
+};
+
+export const PRIORITY_LABEL_HI: Record<Priority, string> = {
+  low: "कम", medium: "मध्यम", high: "ऊँची", critical: "अत्यंत ज़रूरी",
+};
+
+export const VERDICT_LABEL_HI: Record<Verdict, string> = {
+  done_well: "ठीक से किया गया", partly: "आंशिक रूप से किया गया", not_done: "नहीं किया गया",
+};
+
+/** For a section the super admin added later with one of the usual names. */
+export const SECTION_HI: Record<string, string> = {
+  Children: "बच्चे", Centre: "केंद्र", Learning: "पढ़ाई", Teacher: "शिक्षक",
+  Facilities: "सुविधाएँ", Community: "समुदाय",
+};
+
+/** "English / हिन्दी", or just the English when there is no Hindi. */
+export const bi = (en: string, hi: string | null | undefined) => (hi ? `${en} / ${hi}` : en);

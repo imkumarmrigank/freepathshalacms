@@ -4,7 +4,7 @@ import { requireFeature } from "@/lib/auth";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { fmtDate, today } from "@/lib/format";
 import {
-  BAND_LABEL, OVERALL_BLURB, OVERALL_LABEL, PRIORITY_LABEL,
+  BAND_LABEL, BAND_LABEL_HI, OVERALL_BLURB, OVERALL_LABEL, PRIORITY_LABEL,
   SUGGESTION_STATUS_LABEL, VERDICT_LABEL, VISIT_KIND_BLURB, VISIT_KIND_LABEL,
   VISIT_STATUS_LABEL,
   getVisit, listCriteria, listSuggestions, outstandingForCentre, ratingsFor,
@@ -141,7 +141,7 @@ export default async function VisitPage({
 
       {visit.summary && (
         <Card className="mt-5">
-          <div className="label-cap mb-1.5">What the auditor wrote</div>
+          <div className="label-cap mb-1.5">What the auditor wrote / ऑडिटर ने क्या लिखा</div>
           <p className="whitespace-pre-line text-[14px] leading-relaxed">{visit.summary}</p>
         </Card>
       )}
@@ -150,18 +150,25 @@ export default async function VisitPage({
       {ratings.length > 0 && (
         <Card className="mt-5" pad={false}>
           <div className="border-b border-[var(--border)] px-5 py-3">
-            <h2 className="text-[14px] font-semibold">What was checked</h2>
+            <h2 className="text-[14px] font-semibold">What was checked / क्या जाँचा गया</h2>
           </div>
           <ul>
             {ratings.map((r) => (
               <li key={r.id} className="border-t border-[#f1f1f6] px-5 py-3 first:border-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="label-cap text-[var(--faint)]">{r.section}</span>
-                  <span className="text-[14px] font-medium">{r.criterion_title}</span>
-                  <Badge tone={BAND_TONE[r.band]}>{BAND_LABEL[r.band]}</Badge>
+                  <span className="label-cap text-[var(--faint)]">
+                    {r.section}{r.section_hi ? ` / ${r.section_hi}` : ""}
+                  </span>
+                  <span className="text-[14px] font-medium">
+                    {r.criterion_title}
+                    {r.title_hi && <span className="font-normal text-[var(--muted)]"> / {r.title_hi}</span>}
+                  </span>
+                  <Badge tone={BAND_TONE[r.band]}>{BAND_LABEL[r.band]} / {BAND_LABEL_HI[r.band]}</Badge>
                 </div>
                 {r.reason && (
-                  <p className="mt-1 text-[13px] text-[var(--muted)]">Reason: {r.reason}</p>
+                  <p className="mt-1 text-[13px] text-[var(--muted)]">
+                    Reason / कारण: {r.reason}{r.reason_hi ? ` / ${r.reason_hi}` : ""}
+                  </p>
                 )}
                 {r.note && <p className="mt-1 text-[13px]">{r.note}</p>}
               </li>
@@ -173,9 +180,10 @@ export default async function VisitPage({
       {/* ------------------------------------------------- the suggestions */}
       <Card className="mt-5" pad={false}>
         <div className="border-b border-[var(--border)] px-5 py-3">
-          <h2 className="text-[14px] font-semibold">What the centre was asked to do</h2>
+          <h2 className="text-[14px] font-semibold">What the centre was asked to do / केंद्र को क्या करने को कहा गया</h2>
           <p className="text-[12.5px] text-[var(--muted)]">
             Each of these is expected to be done before the next visit.
+            <br />अगले भ्रमण से पहले इनमें से हर एक का पूरा होना अपेक्षित है।
           </p>
         </div>
         {suggestions.length === 0 ? (
