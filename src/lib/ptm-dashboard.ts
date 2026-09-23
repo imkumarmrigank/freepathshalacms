@@ -9,6 +9,7 @@ export async function ptmDay(day: string, centerId: number | null, mentorId: num
     + (mentorId ? ` AND i.mentor_id = $${p.push(mentorId)}` : "");
   const row = await one<{
     held: string; centres: string; children: string; both_parents: string;
+    mother: string; father: string; guardian: string;
     attentive: string; neutral: string; resistant: string;
     follow_ups: string; no_follow_up: string; support: string;
     confidence: string | null; rated: string;
@@ -17,6 +18,9 @@ export async function ptmDay(day: string, centerId: number | null, mentorId: num
             count(DISTINCT i.center_id) AS centres,
             count(DISTINCT i.student_id) AS children,
             count(*) FILTER (WHERE i.parent_present = 'both')        AS both_parents,
+            count(*) FILTER (WHERE i.parent_present = 'mother')      AS mother,
+            count(*) FILTER (WHERE i.parent_present = 'father')      AS father,
+            count(*) FILTER (WHERE i.parent_present = 'guardian')    AS guardian,
             count(*) FILTER (WHERE i.engagement = 'attentive')       AS attentive,
             count(*) FILTER (WHERE i.engagement = 'neutral')         AS neutral,
             count(*) FILTER (WHERE i.engagement = 'resistant')       AS resistant,

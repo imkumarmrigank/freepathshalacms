@@ -96,6 +96,8 @@ export default async function PtmDashboardPage({
   const n = (v: string | undefined) => Number(v ?? 0);
   const held = n(summary?.held);
   const confidence = summary?.confidence == null ? null : Number(summary.confidence);
+  /** A count as a share of the day's meetings, for the line under a card. */
+  const share = (v: number) => (held ? `${Math.round((v / held) * 100)}%` : "—");
   const engagementParts = [
     { label: "Attentive", value: n(summary?.attentive) },
     { label: "Neutral", value: n(summary?.neutral) },
@@ -263,11 +265,21 @@ export default async function PtmDashboardPage({
         )}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Meetings held" value={held}
           hint={held ? `${n(summary?.centres)} centre${n(summary?.centres) === 1 ? "" : "s"} · ${n(summary?.children)} children` : "none recorded"} />
+        {/* who actually turned up, one card each: a centre where only mothers
+            ever come is a different problem from one where nobody does */}
         <StatCard label="Both parents came" value={n(summary?.both_parents)}
-          hint={held ? `${Math.round((n(summary?.both_parents) / held) * 100)}% of meetings` : "—"} />
+          hint={held ? `${share(n(summary?.both_parents))} of meetings` : "—"} />
+        <StatCard label="Mother came" value={n(summary?.mother)}
+          hint={held ? `${share(n(summary?.mother))} of meetings · on her own` : "—"} />
+        <StatCard label="Father came" value={n(summary?.father)}
+          hint={held ? `${share(n(summary?.father))} of meetings · on his own` : "—"} />
+        {n(summary?.guardian) > 0 && (
+          <StatCard label="Guardian came" value={n(summary?.guardian)}
+            hint={`${share(n(summary?.guardian))} of meetings · neither parent`} />
+        )}
         <StatCard label="Parents engaged" value={n(summary?.attentive)}
           hint={`${n(summary?.neutral)} neutral · ${n(summary?.resistant)} resistant`}
           tone={held && n(summary?.resistant) > n(summary?.attentive) ? "warn" : "default"} />
