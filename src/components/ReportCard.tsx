@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import Image from "next/image";
+import Brand from "@/components/Brand";
 import { fmtDate, fullName } from "@/lib/format";
 import { conductLabel, grade, percentage } from "@/lib/exam-meta";
 import type { ReportCardData } from "@/lib/report-card";
@@ -54,8 +54,7 @@ export default function ReportCard({ data }: { data: ReportCardData }) {
       {/* ------------------------------------------------------------ letterhead */}
       <div className="grid items-center gap-6 border-b-2 border-[var(--brand)] pb-4
         [grid-template-columns:1fr_auto_1fr]">
-        <Image src="/logo.png" alt="Pehchaan" width={500} height={153}
-          className="h-auto w-[150px]" />
+        <Brand size="md" />
         {/* the title belongs between the two marks of identity, not under them */}
         <div className="text-center">
           <h1 className="text-[20px] font-semibold tracking-[-0.01em]">Progress Report</h1>

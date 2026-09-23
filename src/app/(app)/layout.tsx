@@ -1,6 +1,6 @@
 import Link from "next/link";
-import Image from "next/image";
 import { redirect } from "next/navigation";
+import Brand from "@/components/Brand";
 import Sidebar from "@/components/Sidebar";
 import MobileNav from "@/components/MobileNav";
 import ChatBubble from "@/components/ChatBubble";
@@ -52,9 +52,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="flex min-h-screen">
       <aside className="sticky top-0 hidden h-screen w-[236px] flex-none flex-col border-r border-[var(--border)] bg-white lg:flex">
         <Link href="/dashboard" className="block px-5 py-5">
-          <Image src="/logo.png" alt="Pehchaan" width={500} height={153}
-            className="h-auto w-[168px]" priority />
-          <span className="mt-1.5 block text-[11px] text-[var(--muted)]">Centre Management</span>
+          <Brand size="md" />
+          <span className="mt-2 block text-[11px] text-[var(--muted)]">Centre Management</span>
         </Link>
 
         <div className="flex-1 overflow-y-auto">
@@ -90,8 +89,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             logout={logout}
           />
           <Link href="/dashboard" className="lg:hidden">
-            <Image src="/logo.png" alt="Pehchaan" width={500} height={153}
-              className="h-auto w-[124px]" priority />
+            <Brand size="sm" />
           </Link>
           <div className="hidden text-[13px] text-[var(--muted)] lg:block">
             {user.centerName ?? scopeLabel}

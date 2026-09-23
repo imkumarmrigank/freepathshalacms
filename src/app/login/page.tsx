@@ -1,4 +1,4 @@
-import Image from "next/image";
+import Brand from "@/components/Brand";
 import { redirect } from "next/navigation";
 import { createSession, getSession, verifyLogin } from "@/lib/auth";
 
@@ -23,10 +23,7 @@ export default async function LoginPage({
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       <div className="hidden flex-col justify-between bg-[var(--brand)] p-12 text-white lg:flex">
-        <div className="w-fit self-start rounded-[12px] bg-white px-5 py-3.5 shadow-sm">
-          <Image src="/logo.png" alt="Pehchaan" width={500} height={153}
-            className="h-auto w-[184px]" priority />
-        </div>
+        <Brand size="lg" onDark className="self-start" />
         <div>
           <h2 className="max-w-md text-[30px] font-semibold leading-[1.2] tracking-[-0.02em]">
             One place for every centre, every student, every session.
@@ -44,8 +41,7 @@ export default async function LoginPage({
       <div className="flex items-center justify-center px-6 py-16">
         <div className="w-full max-w-[352px]">
           <div className="mb-8 lg:hidden">
-            <Image src="/logo.png" alt="Pehchaan" width={500} height={153}
-              className="h-auto w-[168px]" priority />
+            <Brand size="md" />
           </div>
           <h1 className="text-[22px] font-semibold tracking-[-0.01em]">Sign in</h1>
           <p className="mt-1 text-[13px] text-[var(--muted)]">Use the credentials issued by your administrator.</p>
