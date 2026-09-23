@@ -4,7 +4,7 @@ import { initials } from "@/lib/format";
 
 export function PageHeader({
   title, subtitle, right, back,
-}: { title: string; subtitle?: string; right?: ReactNode; back?: { href: string; label: string } }) {
+}: { title: ReactNode; subtitle?: string; right?: ReactNode; back?: { href: string; label: string } }) {
   return (
     <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
       <div>

@@ -8,6 +8,7 @@ import {
   ABSENT_REASONS, LEAVE_REASONS, LEGACY_STATUS_LABEL, MARKABLE, MARK_OPTIONS,
   needsReason, reasonRequiredOn, reasonsFor,
 } from "@/lib/attendance-meta";
+import FlagMark from "@/components/FlagMark";
 
 export type Row = {
   enrollment_id: number; student_id: number; enrollment_no: string;
@@ -15,6 +16,7 @@ export type Row = {
   section: string | null;
   status: string | null;
   reason: string | null;
+  flag_status: string | null; flag_urgency: string | null;
 };
 
 const OPTIONS = MARK_OPTIONS;
@@ -153,6 +155,7 @@ export default function AttendanceSheet({
                         <Link href={`/students/${r.student_id}`}
                           className="block truncate font-medium hover:text-[var(--brand)]">
                           {r.first_name} {r.last_name ?? ""}
+                          <FlagMark status={r.flag_status} urgency={r.flag_urgency} />
                         </Link>
                         <div className="font-mono text-[11px] text-[var(--faint)]">
                           {r.enrollment_no}
@@ -164,10 +167,17 @@ export default function AttendanceSheet({
                         </div>
                       </div>
                       {/* the moment a teacher notices something is while they are
-                          looking at the class, so the referral starts here */}
-                      <Link href={`/students/${r.student_id}?flag=1`}
-                        title="Flag for counselling"
-                        className="ml-auto flex-none rounded-lg border border-[var(--border)] px-2 py-1 text-[13px] leading-none text-[var(--faint)] hover:border-[var(--warn)] hover:text-[var(--warn)]">
+                          looking at the class, so the referral starts here — and
+                          a child already referred shows that instead, since a
+                          second referral would only be refused */}
+                      <Link href={`/students/${r.student_id}${r.flag_status ? "" : "?flag=1"}`}
+                        title={r.flag_status
+                          ? "Already flagged for counselling — open the referral"
+                          : "Flag for counselling"}
+                        className={`ml-auto flex-none rounded-lg border px-2 py-1 text-[13px] leading-none ${
+                          r.flag_status
+                            ? "border-[var(--warn)] bg-[var(--warn-soft)] text-[#b45309]"
+                            : "border-[var(--border)] text-[var(--faint)] hover:border-[var(--warn)] hover:text-[var(--warn)]"}`}>
                         &#9873;
                       </Link>
                     </div>

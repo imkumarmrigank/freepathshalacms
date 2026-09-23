@@ -4,6 +4,7 @@ import { query } from "@/lib/db";
 import { centersForUser, currentSession, listClasses, resolveCenterId } from "@/lib/queries";
 import { Avatar, Badge, Card, Empty, PageHeader } from "@/components/ui";
 import Filters from "@/components/Filters";
+import FlagMark from "@/components/FlagMark";
 import { IconPlus } from "@/components/icons";
 import { fmtDate, fullName, titleCase } from "@/lib/format";
 import { isGlobalRole } from "@/lib/roles";
@@ -40,17 +41,20 @@ export default async function PtmPage({
     id: number; interaction_date: string; first_name: string; last_name: string | null;
     enrollment_no: string; mentor: string | null; parent_present: string; engagement: string;
     center_name: string; class_name: string | null;
-    follow_up_required: boolean; follow_up_status: string; total_rows: string;
+    follow_up_required: boolean; follow_up_status: string;
+    flag_status: string | null; flag_urgency: string | null; total_rows: string;
   }>(
     `SELECT count(*) OVER () AS total_rows,
             i.id, i.interaction_date, s.first_name, s.last_name, s.enrollment_no,
             u.name AS mentor, i.parent_present, i.engagement, ce.name AS center_name,
-            cl.name AS class_name, i.follow_up_required, i.follow_up_status
+            cl.name AS class_name, i.follow_up_required, i.follow_up_status,
+            cf.status AS flag_status, cf.urgency AS flag_urgency
        FROM ptm_interactions i
        JOIN students s ON s.id = i.student_id
        JOIN centers ce ON ce.id = i.center_id
        LEFT JOIN users u ON u.id = i.mentor_id
        LEFT JOIN class_levels cl ON cl.id = i.class_level_id
+       LEFT JOIN counselling_flags cf ON cf.student_id = s.id AND cf.status <> 'closed'
       WHERE i.session_id = $1 ${where}
       ORDER BY i.interaction_date DESC, i.id DESC
       LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -112,7 +116,10 @@ export default async function PtmPage({
                       <div className="flex items-center gap-2.5">
                         <Avatar name={fullName(r)} size={30} />
                         <div className="min-w-0">
-                          <div className="truncate font-medium">{fullName(r)}</div>
+                          <div className="truncate font-medium">
+                            {fullName(r)}
+                            <FlagMark status={r.flag_status} urgency={r.flag_urgency} />
+                          </div>
                           <div className="font-mono text-[11px] text-[var(--faint)]">{r.enrollment_no}</div>
                         </div>
                       </div>

@@ -1,0 +1,29 @@
+import { IconFlag } from "./icons";
+import { FLAG_STATUS_LABEL } from "@/lib/counselling-meta";
+
+/**
+ * A small flag beside a child's name: this one has been referred to the mentor
+ * and the referral is still open.
+ *
+ * It rides next to the name wherever children are listed — the register, the
+ * student list, the PTM tables — because the teacher reading that list is the
+ * person who needs to know, and they should not have to open the profile to
+ * find out.
+ */
+export default function FlagMark({ status, urgency }:
+  { status?: string | null; urgency?: string | null }) {
+  if (!status || status === "closed") return null;
+  const urgent = urgency === "high";
+  return (
+    <span
+      title={`Flagged for counselling · ${FLAG_STATUS_LABEL[status] ?? status}${
+        urgent ? " · urgent" : ""}`}
+      aria-label={`Flagged for counselling${urgent ? ", urgent" : ""}`}
+      className={`ml-1.5 inline-flex h-[18px] w-[18px] flex-none items-center justify-center
+        rounded-[5px] align-middle ${urgent
+          ? "bg-[var(--bad-soft)] text-[var(--bad)]"
+          : "bg-[var(--warn-soft)] text-[#b45309]"}`}>
+      <IconFlag className="h-[11px] w-[11px]" />
+    </span>
+  );
+}

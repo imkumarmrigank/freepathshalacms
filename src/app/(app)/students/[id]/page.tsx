@@ -14,6 +14,7 @@ import EditStudent from "./EditStudent";
 import AdmissionRecord from "./AdmissionRecord";
 import DropoutControl from "./DropoutControl";
 import FlagForCounselling, { type OpenFlag } from "./FlagForCounselling";
+import FlagMark from "@/components/FlagMark";
 import EnrollmentControls from "./EnrollmentControls";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
 
@@ -137,7 +138,7 @@ export default async function StudentPage({
       )}
 
       <PageHeader
-        title={fullName(student)}
+        title={<>{fullName(student)}<FlagMark status={flag?.status} urgency={flag?.urgency} /></>}
         subtitle={`${student.enrollment_no} · ${student.center_name}${
           currentEnr ? ` · ${currentEnr.class_name}` : ""}`}
         back={{ href: "/students", label: "Students" }}

@@ -10,6 +10,7 @@ import { SECTIONS, isSection } from "@/lib/sections";
 import SectionPicker from "./SectionPicker";
 import Pager from "@/components/Pager";
 import SortHeader, { sortFrom } from "@/components/SortHeader";
+import FlagMark from "@/components/FlagMark";
 import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
 
 const STATUS_TONE: Record<string, string> = {
@@ -22,6 +23,7 @@ type Row = {
   enrollment_id: number | null;
   admission_date: string; attendance_pct: string | null; enrolled_here: boolean;
   status_changed_on: string | null;
+  flag_status: string | null; flag_urgency: string | null;
   total_rows: string;
 };
 
@@ -79,6 +81,7 @@ export default async function StudentsPage({
     `SELECT count(*) OVER () AS total_rows,
             s.id, s.enrollment_no, s.first_name, s.last_name, s.status, s.admission_date,
             cl.name AS class_name, ce.name AS center_name, e.section, e.id AS enrollment_id,
+            cf.status AS flag_status, cf.urgency AS flag_urgency,
             (e.id IS NOT NULL) AS enrolled_here,
             -- The best date there is for the current status: the dropout date for a
             -- dropout, the day a suspended or passed-out child left, otherwise the
@@ -97,6 +100,8 @@ export default async function StudentsPage({
        JOIN centers ce ON ce.id = s.center_id
        LEFT JOIN enrollments e ON e.student_id = s.id AND e.session_id = $1
        LEFT JOIN class_levels cl ON cl.id = e.class_level_id
+       -- at most one open referral per child, so this cannot multiply the rows
+       LEFT JOIN counselling_flags cf ON cf.student_id = s.id AND cf.status <> 'closed'
       WHERE 1=1 ${where}
       ORDER BY ${orderBy}
       LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -163,6 +168,7 @@ export default async function StudentsPage({
                       <Link href={`/students/${r.id}`} className="flex items-center gap-2.5 hover:text-[var(--brand)]">
                         <Avatar name={fullName(r)} size={32} />
                         <span className="font-medium">{fullName(r)}</span>
+                        <FlagMark status={r.flag_status} urgency={r.flag_urgency} />
                       </Link>
                     </td>
                     <td className="font-mono text-[13px] text-[var(--muted)]">{r.enrollment_no}</td>
