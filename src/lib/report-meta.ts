@@ -270,6 +270,16 @@ export const REPORTS: ReportMeta[] = [
     filters: ["dates", "center"],
   },
   {
+    key: "ptm-attendance",
+    label: "PTM attendance — who came and who did not",
+    group: "PTM",
+    description:
+      "Family by family, on every day parents were expected: whether they came, who came, how "
+      + "it went, and for those who did not — the parents' names, a number to ring and when "
+      + "the family was last sat down with.",
+    filters: ["dates", "center", "class"],
+  },
+  {
     key: "ptm-concerns",
     label: "What parents raise",
     group: "PTM",

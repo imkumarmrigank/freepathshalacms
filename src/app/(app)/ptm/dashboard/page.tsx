@@ -3,14 +3,15 @@ import { requireFeature } from "@/lib/auth";
 import { centersForUser, resolveCenterId } from "@/lib/queries";
 import { Badge, Card, Empty, PageHeader, StatCard } from "@/components/ui";
 import Filters from "@/components/Filters";
+import FlagMark from "@/components/FlagMark";
 import { ChartFrame, HBarChart, StackedBarChart } from "@/components/charts";
 import { SERIES } from "@/lib/chart-palette";
 import { fmtDate, today, titleCase } from "@/lib/format";
 import { isGlobalRole, ROLE_LABEL, type Role } from "@/lib/roles";
 import { engagementLabel, modeLabel, parentLabel } from "@/lib/ptm-meta";
 import {
-  ptmByCentre, ptmCommitments, ptmConcerns, ptmDay, ptmInteractionsOn, ptmPeople, ptmPerDay,
-  ptmScheduled,
+  ptmAbsentees, ptmByCentre, ptmCommitments, ptmConcerns, ptmDay, ptmDayCoverage,
+  ptmInteractionsOn, ptmPeople, ptmPerDay, ptmScheduled,
 } from "@/lib/ptm-dashboard";
 
 export const metadata = { title: "PTM dashboard · Pehchaan" };
@@ -62,7 +63,8 @@ export default async function PtmDashboardPage({
   const who = people.some((p) => String(p.id) === sp.who) ? Number(sp.who) : null;
   const chosen = people.find((p) => p.id === who);
 
-  const [centers, summary, byCentre, concerns, commitments, perDay, rows, scheduled, scheduledDay] =
+  const [centers, summary, byCentre, concerns, commitments, perDay, rows, scheduled, scheduledDay,
+    coverage, missed] =
     await Promise.all([
       centersForUser(user),
       ptmDay(day, centerId, who),
@@ -73,6 +75,10 @@ export default async function PtmDashboardPage({
       ptmInteractionsOn(day, centerId, who),
       ptmScheduled(now, centerId),
       ptmScheduled(day, centerId),
+      // who was expected is a question about the centre, not about one mentor,
+      // so neither of these narrows to the person chosen above
+      ptmDayCoverage(day, centerId),
+      ptmAbsentees(day, centerId),
     ]);
 
   /** Every link keeps the filters already chosen. */
@@ -273,7 +279,8 @@ export default async function PtmDashboardPage({
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>Student</th><th>Centre</th><th>Class</th><th>Who came</th>
+                  <th>Student</th><th>Centre</th><th>Class</th>
+                  <th>Who came, and on what number</th>
                   <th>How it went</th><th>Concerns</th><th>Follow-up</th>
                 </tr>
               </thead>
@@ -282,11 +289,19 @@ export default async function PtmDashboardPage({
                   <tr key={r.id}>
                     <td>
                       <Link href={`/ptm/${r.id}`} className="font-medium hover:underline">{r.student}</Link>
+                      <FlagMark status={r.flag_status} urgency={r.flag_urgency} />
                       <div className="font-mono text-[11px] text-[var(--faint)]">{r.enrollment_no}</div>
                     </td>
                     <td className="text-[var(--muted)]">{r.center_name}</td>
                     <td className="text-[var(--muted)]">{r.class_name ?? "—"}</td>
-                    <td className="text-[var(--muted)]">{parentLabel(r.parent_present)}</td>
+                    <td>
+                      <div>{parentLabel(r.parent_present)}</div>
+                      <div className="text-[12px] text-[var(--muted)]">
+                        {r.parent_name ?? "name not on record"}
+                        {r.phone ? <> · <a href={`tel:${r.phone}`}
+                          className="hover:text-[var(--brand)]">{r.phone}</a></> : ""}
+                      </div>
+                    </td>
                     <td><Badge tone={ENGAGEMENT_TONE[r.engagement]}>{engagementLabel(r.engagement)}</Badge></td>
                     <td className="max-w-[260px] text-[12.5px] text-[var(--muted)]">
                       {r.concern_tags.length ? r.concern_tags.join(", ") : "—"}
@@ -300,6 +315,82 @@ export default async function PtmDashboardPage({
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </Card>
+
+      {/* ------------------------------------- the parents who did not come */}
+      <div className="label-cap mb-2.5 mt-6 flex flex-wrap items-center gap-2">
+        <span>Parents who did not come on {fmtDate(day)}</span>
+        {coverage.expected > 0 && (
+          <span className="text-[12px] font-normal normal-case text-[var(--muted)]">
+            {coverage.met} of {coverage.expected} families seen
+            {coverage.missed > 0 ? ` · ${coverage.missed} to follow up` : ""}
+          </span>
+        )}
+      </div>
+      <Card pad={false}>
+        {coverage.expected === 0 ? (
+          <Empty title="Nobody was expected that day"
+            hint="This list fills once a PTM day is in the diary for a centre, or a meeting is recorded there." />
+        ) : missed.length === 0 ? (
+          <Empty title="Every family expected that day was seen"
+            hint={`All ${coverage.expected} of them. Pick another day above to check that one.`} />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  {!centerId && <th>Centre</th>}
+                  <th>Class</th><th>Parents</th><th>Phone</th><th>Last sat down with</th><th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {missed.map((r) => (
+                  <tr key={r.student_id}>
+                    <td>
+                      <Link href={`/students/${r.student_id}`}
+                        className="font-medium hover:text-[var(--brand)]">{r.student}</Link>
+                      <FlagMark status={r.flag_status} urgency={r.flag_urgency} />
+                      <div className="font-mono text-[11px] text-[var(--faint)]">{r.enrollment_no}</div>
+                    </td>
+                    {!centerId && <td className="text-[var(--muted)]">{r.center_name}</td>}
+                    <td className="text-[var(--muted)]">{r.class_name ?? "—"}</td>
+                    <td className="text-[13px] text-[var(--muted)]">
+                      {[r.father_name, r.mother_name, r.guardian_name].filter(Boolean).join(" · ")
+                        || <span className="text-[var(--faint)]">not on record</span>}
+                    </td>
+                    <td className="whitespace-nowrap">
+                      {r.phone
+                        ? <a href={`tel:${r.phone}`} className="hover:text-[var(--brand)]">{r.phone}</a>
+                        : <span className="text-[13px] text-[var(--faint)]">no number</span>}
+                    </td>
+                    <td className="whitespace-nowrap text-[13px]">
+                      {r.last_met
+                        ? <>{fmtDate(r.last_met)}
+                            <span className="text-[12px] text-[var(--muted)]">
+                              {" "}· {r.met_this_session} this session
+                            </span></>
+                        : <Badge tone="warn">Never met</Badge>}
+                    </td>
+                    <td className="whitespace-nowrap">
+                      <Link href={`/ptm/new?student=${r.student_id}`} className="btn btn-ghost btn-sm">
+                        Record a meeting
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {Number(missed[0]?.total_rows ?? 0) > missed.length && (
+              <p className="px-5 py-3 text-[13px] text-[var(--muted)]">
+                Showing the {missed.length} families longest unseen, of{" "}
+                {Number(missed[0].total_rows)}. The full list, for any period, is in{" "}
+                <Link href="/reports?report=ptm-attendance"
+                  className="text-[var(--brand)] hover:underline">Reports</Link>.
+              </p>
+            )}
           </div>
         )}
       </Card>

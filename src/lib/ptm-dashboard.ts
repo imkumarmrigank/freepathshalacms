@@ -116,6 +116,36 @@ export function ptmPerDay(
     args);
 }
 
+/**
+ * The parent to write down, and the number to ring.
+ *
+ * A meeting records who came; the name and mobile behind that are on the
+ * child's admission record, which is where a teacher would otherwise have to
+ * go, child by child, to follow anyone up.
+ */
+export const PARENT_NAME = `NULLIF(trim(CASE i.parent_present
+         WHEN 'mother'   THEN COALESCE(s.mother_name, '')
+         WHEN 'father'   THEN COALESCE(s.father_name, '')
+         WHEN 'guardian' THEN COALESCE(s.guardian_name, '')
+         WHEN 'both'     THEN concat_ws(' & ', NULLIF(s.father_name, ''), NULLIF(s.mother_name, ''))
+         ELSE '' END), '') AS parent_name`;
+
+/** Whichever number the family actually answers, best first. */
+export const PHONE = `COALESCE(
+         NULLIF(CASE i.parent_present
+                  WHEN 'mother' THEN s.mother_mobile
+                  WHEN 'father' THEN s.father_mobile
+                  ELSE NULL END, ''),
+         NULLIF(s.primary_phone, ''), NULLIF(s.whatsapp_number, ''),
+         NULLIF(s.mother_mobile, ''), NULLIF(s.father_mobile, ''),
+         NULLIF(s.alt_phone, '')) AS phone`;
+
+/** The same, for a child nobody met: there is no meeting to say who came. */
+export const FAMILY_PHONE = `COALESCE(
+         NULLIF(s.primary_phone, ''), NULLIF(s.whatsapp_number, ''),
+         NULLIF(s.mother_mobile, ''), NULLIF(s.father_mobile, ''),
+         NULLIF(s.alt_phone, '')) AS phone`;
+
 /** The meetings themselves on a day — who was seen, and what was said. */
 export function ptmInteractionsOn(day: string, centerId: number | null, mentorId: number | null) {
   const args: unknown[] = [day];
@@ -123,22 +153,122 @@ export function ptmInteractionsOn(day: string, centerId: number | null, mentorId
   const c = `${centerId ? `AND i.center_id = $${args.length}` : ""}`
     + (mentorId ? ` AND i.mentor_id = $${args.push(mentorId)}` : "");
   return query<{
-    id: number; student: string; enrollment_no: string; class_name: string | null;
-    center_name: string; mentor: string | null; parent_present: string; engagement: string;
-    concern_tags: string[]; follow_up_required: boolean; follow_up_date: string | null;
+    id: number; student_id: number; student: string; enrollment_no: string;
+    class_name: string | null; center_name: string; mentor: string | null;
+    parent_present: string; engagement: string; concern_tags: string[];
+    follow_up_required: boolean; follow_up_date: string | null;
     follow_up_status: string; discussion: string | null;
+    parent_name: string | null; phone: string | null;
+    flag_status: string | null; flag_urgency: string | null;
   }>(
-    `SELECT i.id, trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
+    `SELECT i.id, i.student_id, trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
             s.enrollment_no, cl.name AS class_name, ce.name AS center_name,
             u.name AS mentor, i.parent_present, i.engagement, i.concern_tags,
-            i.follow_up_required, i.follow_up_date, i.follow_up_status, i.discussion
+            i.follow_up_required, i.follow_up_date, i.follow_up_status, i.discussion,
+            ${PARENT_NAME}, ${PHONE},
+            cf.status AS flag_status, cf.urgency AS flag_urgency
        FROM ptm_interactions i
        JOIN students s ON s.id = i.student_id
        JOIN centers ce ON ce.id = i.center_id
        LEFT JOIN class_levels cl ON cl.id = i.class_level_id
        LEFT JOIN users u ON u.id = i.mentor_id
+       LEFT JOIN counselling_flags cf ON cf.student_id = s.id AND cf.status <> 'closed'
       WHERE i.interaction_date = $1 ${c}
       ORDER BY ce.code, student`,
+    args);
+}
+
+/**
+ * Who was expected at a centre on a day.
+ *
+ * A PTM day in the diary says which centre — and sometimes which class — is
+ * expecting parents, so the children on that roll are the ones to measure
+ * against. Where no day was booked but meetings happened anyway, the centre's
+ * own roll stands in; where neither happened, nobody was expected and the
+ * list stays empty rather than naming every child in the organisation.
+ */
+const EXPECTED_ON_DAY = (centerId: number | null) => `
+  WITH booked AS (
+    SELECT m.center_id, m.session_id, m.class_level_id
+      FROM ptm_meetings m
+     WHERE m.meeting_date = $1 AND m.status <> 'cancelled'
+       ${centerId ? "AND m.center_id = $2" : ""}
+    UNION
+    SELECT i.center_id, i.session_id, NULL::bigint
+      FROM ptm_interactions i
+     WHERE i.interaction_date = $1
+       ${centerId ? "AND i.center_id = $2" : ""}
+       AND NOT EXISTS (SELECT 1 FROM ptm_meetings m2
+                        WHERE m2.meeting_date = $1 AND m2.center_id = i.center_id
+                          AND m2.status <> 'cancelled')
+  ),
+  expected AS (
+    SELECT DISTINCT e.student_id, e.center_id, e.class_level_id
+      FROM booked b
+      JOIN enrollments e ON e.center_id = b.center_id AND e.session_id = b.session_id
+                        AND e.status = 'active'
+                        AND (b.class_level_id IS NULL OR e.class_level_id = b.class_level_id)
+      JOIN students s ON s.id = e.student_id AND s.status = 'active'
+  )`;
+
+/** Expected, seen and missed on a day — the three numbers above the two lists. */
+export async function ptmDayCoverage(day: string, centerId: number | null) {
+  const args: unknown[] = centerId ? [day, centerId] : [day];
+  const rows = await query<{ expected: number; met: number; missed: number }>(
+    `${EXPECTED_ON_DAY(centerId)}
+     SELECT count(*)::int AS expected,
+            count(*) FILTER (WHERE met.ok)::int AS met,
+            count(*) FILTER (WHERE NOT met.ok)::int AS missed
+       FROM expected x
+       CROSS JOIN LATERAL (
+         SELECT EXISTS (SELECT 1 FROM ptm_interactions i
+                         WHERE i.student_id = x.student_id
+                           AND i.interaction_date = $1) AS ok) met`,
+    args);
+  return rows[0] ?? { expected: 0, met: 0, missed: 0 };
+}
+
+/**
+ * The parents who did not come — the list the follow-up is made from. Each
+ * child carries the parents' names, a number to ring and when the family was
+ * last sat down with, so the call can be made from this page.
+ */
+export function ptmAbsentees(day: string, centerId: number | null, limit = 200) {
+  const args: unknown[] = centerId ? [day, centerId] : [day];
+  args.push(limit);
+  return query<{
+    student_id: number; student: string; enrollment_no: string; class_name: string | null;
+    center_name: string; father_name: string | null; mother_name: string | null;
+    guardian_name: string | null; phone: string | null; last_met: string | null;
+    met_this_session: number; flag_status: string | null; flag_urgency: string | null;
+    total_rows: string;
+  }>(
+    `${EXPECTED_ON_DAY(centerId)}
+     SELECT count(*) OVER () AS total_rows,
+            s.id AS student_id,
+            trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
+            s.enrollment_no, cl.name AS class_name, ce.name AS center_name,
+            NULLIF(s.father_name, '') AS father_name,
+            NULLIF(s.mother_name, '') AS mother_name,
+            NULLIF(s.guardian_name, '') AS guardian_name,
+            ${FAMILY_PHONE},
+            to_char(seen.last_met, 'YYYY-MM-DD') AS last_met,
+            seen.n_session AS met_this_session,
+            cf.status AS flag_status, cf.urgency AS flag_urgency
+       FROM expected x
+       JOIN students s ON s.id = x.student_id
+       JOIN centers ce ON ce.id = x.center_id
+       LEFT JOIN class_levels cl ON cl.id = x.class_level_id
+       LEFT JOIN counselling_flags cf ON cf.student_id = s.id AND cf.status <> 'closed'
+       CROSS JOIN LATERAL (
+         SELECT max(i.interaction_date) AS last_met,
+                count(*) FILTER (WHERE i.session_id = (SELECT id FROM academic_sessions
+                                                        WHERE is_current LIMIT 1))::int AS n_session
+           FROM ptm_interactions i WHERE i.student_id = x.student_id) seen
+      WHERE NOT EXISTS (SELECT 1 FROM ptm_interactions i
+                         WHERE i.student_id = x.student_id AND i.interaction_date = $1)
+      ORDER BY seen.last_met NULLS FIRST, ce.code, cl.sequence NULLS LAST, s.first_name
+      LIMIT $${args.length}`,
     args);
 }
 

@@ -4,6 +4,7 @@ import { groupByOf, reportByKey, type GroupBy } from "./report-meta";
 import { titleCase } from "./format";
 import type { SessionUser } from "./auth";
 import { isGlobalRole, ROLE_LABEL, type Role } from "./roles";
+import { FAMILY_PHONE, PARENT_NAME, PHONE } from "./ptm-dashboard";
 
 export type ReportColumn = { key: string; label: string; width?: number; numeric?: boolean };
 export type ReportRow = Record<string, string | number | null>;
@@ -94,6 +95,7 @@ export async function runReport(
     case "exam-summary":                 return examSummary(scoped, period);
     case "ptm-summary":                  return ptmSummary(scoped, period);
     case "ptm-daily":                    return ptmDaily(scoped, period);
+    case "ptm-attendance":               return ptmAttendance(scoped, period);
     case "ptm-concerns":                 return ptmConcernsReport(scoped, period);
     case "teaching-plan-progress":       return teachingPlanProgress(scoped);
     case "timetable":                    return timetableReport(scoped);
@@ -2021,6 +2023,104 @@ async function reactivations(p: ReportParams, period: string): Promise<ReportRes
 }
 
 /* ------------------------------------------------------------------- PTM */
+
+/**
+ * Family by family, on every day parents were expected: who came, and who did
+ * not. The list a teacher follows up from, so it carries the parents' names
+ * and a number to ring rather than only a count.
+ */
+async function ptmAttendance(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.from, p.to];
+  const centre = p.centerId ? ` AND center_id = $${params.push(p.centerId)}` : "";
+  const cls = p.classId ? ` AND e.class_level_id = $${params.push(p.classId)}` : "";
+
+  const rows = await query<{
+    ptm_day: string; center_name: string; class_name: string | null; student: string;
+    enrollment_no: string; came: boolean; parent_present: string | null;
+    parent_name: string | null; phone: string | null; family_phone: string | null;
+    engagement: string | null; concerns: string[] | null; follow_up: string | null;
+    last_met: string | null; father_name: string | null; mother_name: string | null;
+  }>(
+    `WITH booked AS (
+       SELECT m.meeting_date AS ptm_day, m.center_id, m.session_id, m.class_level_id
+         FROM ptm_meetings m
+        WHERE m.meeting_date BETWEEN $1 AND $2 AND m.status <> 'cancelled'${centre}
+       UNION
+       SELECT i.interaction_date, i.center_id, i.session_id, NULL::bigint
+         FROM ptm_interactions i
+        WHERE i.interaction_date BETWEEN $1 AND $2${centre}
+          AND NOT EXISTS (SELECT 1 FROM ptm_meetings m2
+                           WHERE m2.meeting_date = i.interaction_date
+                             AND m2.center_id = i.center_id AND m2.status <> 'cancelled')
+     ),
+     expected AS (
+       SELECT DISTINCT b.ptm_day, e.student_id, e.center_id, e.class_level_id
+         FROM booked b
+         JOIN enrollments e ON e.center_id = b.center_id AND e.session_id = b.session_id
+                           AND e.status = 'active'
+                           AND (b.class_level_id IS NULL OR e.class_level_id = b.class_level_id)${cls}
+         JOIN students s ON s.id = e.student_id AND s.status = 'active'
+     )
+     SELECT to_char(x.ptm_day, 'YYYY-MM-DD') AS ptm_day, ce.name AS center_name,
+            cl.name AS class_name,
+            trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
+            s.enrollment_no, (i.id IS NOT NULL) AS came,
+            i.parent_present, i.engagement, i.concern_tags AS concerns,
+            CASE WHEN i.follow_up_required
+                 THEN to_char(i.follow_up_date, 'YYYY-MM-DD') END AS follow_up,
+            NULLIF(s.father_name, '') AS father_name, NULLIF(s.mother_name, '') AS mother_name,
+            ${PARENT_NAME}, ${PHONE.replace("AS phone", "AS phone")},
+            ${FAMILY_PHONE.replace("AS phone", "AS family_phone")},
+            to_char((SELECT max(j.interaction_date) FROM ptm_interactions j
+                      WHERE j.student_id = s.id AND j.interaction_date < x.ptm_day),
+                    'YYYY-MM-DD') AS last_met
+       FROM expected x
+       JOIN students s ON s.id = x.student_id
+       JOIN centers ce ON ce.id = x.center_id
+       LEFT JOIN class_levels cl ON cl.id = x.class_level_id
+       LEFT JOIN ptm_interactions i ON i.student_id = x.student_id
+                                   AND i.interaction_date = x.ptm_day
+      ORDER BY x.ptm_day DESC, ce.code, cl.sequence NULLS LAST, s.first_name`,
+    params,
+  );
+
+  const came = rows.filter((r) => r.came).length;
+  return {
+    title: "PTM attendance — who came and who did not",
+    subtitle: `${period} · ${came} of ${rows.length} families seen`,
+    columns: [
+      { key: "ptm_day", label: "PTM day", width: 12 },
+      { key: "center_name", label: "Centre", width: 16 },
+      { key: "class_name", label: "Class" },
+      { key: "student", label: "Student", width: 22 },
+      { key: "enrollment_no", label: "Enrolment no.", width: 14 },
+      { key: "came", label: "Came?", width: 10 },
+      { key: "parent_present", label: "Who came", width: 14 },
+      { key: "parent_name", label: "Parent", width: 22 },
+      { key: "phone", label: "Phone", width: 14 },
+      { key: "engagement", label: "How it went", width: 14 },
+      { key: "concerns", label: "Concerns raised", width: 32 },
+      { key: "follow_up", label: "Follow-up due", width: 12 },
+      { key: "last_met", label: "Last met before this", width: 14 },
+    ],
+    rows: rows.map((r) => ({
+      ptm_day: r.ptm_day,
+      center_name: r.center_name,
+      class_name: r.class_name ?? "—",
+      student: r.student,
+      enrollment_no: r.enrollment_no,
+      came: r.came ? "Came" : "Did not come",
+      parent_present: r.came ? titleCase(r.parent_present ?? "") : "",
+      parent_name: r.parent_name
+        ?? [r.father_name, r.mother_name].filter(Boolean).join(" & "),
+      phone: r.phone ?? r.family_phone ?? "",
+      engagement: r.came ? titleCase(r.engagement ?? "") : "",
+      concerns: (r.concerns ?? []).join("; "),
+      follow_up: r.follow_up ?? "",
+      last_met: r.last_met ?? "never",
+    })),
+  };
+}
 
 /** A day at a centre, as the parent meetings left it. */
 async function ptmDaily(p: ReportParams, period: string): Promise<ReportResult> {
