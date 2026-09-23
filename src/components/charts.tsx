@@ -281,14 +281,20 @@ export function LineChart({
 /* -------------------------------------------------------- horizontal bar */
 
 export function HBarChart({
-  data, color, suffix = "",
-}: { data: Point[]; color: string; suffix?: string }) {
+  data, color, suffix = "", labelWidth = 104,
+}: {
+  data: Point[]; color: string; suffix?: string;
+  /** Room for the names down the side; widen it when they carry a detail. */
+  labelWidth?: number;
+}) {
   const max = Math.max(...data.map((d) => d.value), 1);
   return (
     <ul className="space-y-2">
       {data.map((d) => (
-        <li key={d.label} className="flex items-center gap-3" title={`${d.label}: ${d.value}${suffix}`}>
-          <span className="w-[104px] flex-none truncate text-[13px] text-[var(--muted)]">{d.label}</span>
+        <li key={d.label} className="flex items-center gap-3"
+          title={`${d.label}: ${d.value}${suffix}${d.hint ? ` — ${d.hint}` : ""}`}>
+          <span className="flex-none truncate text-[13px] text-[var(--muted)]"
+            style={{ width: labelWidth }}>{d.label}</span>
           <span className="h-[18px] flex-1 overflow-hidden rounded-[4px] bg-[#f1f1f6]">
             <span className="block h-full rounded-[4px]"
               style={{ width: `${(d.value / max) * 100}%`, background: color, minWidth: d.value > 0 ? 3 : 0 }} />

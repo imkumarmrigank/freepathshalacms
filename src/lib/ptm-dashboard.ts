@@ -28,21 +28,32 @@ export async function ptmDay(day: string, centerId: number | null, mentorId: num
   return row;
 }
 
-/** Which centres held meetings on a day, and how each went. */
+/**
+ * Which centres held meetings on a day, how each went, and how many children
+ * are on that centre's roll — twelve meetings at a centre of twenty is a
+ * different day from twelve at a centre of a hundred.
+ */
 export function ptmByCentre(day: string, centerId: number | null, mentorId: number | null) {
   const args: unknown[] = [day];
   if (centerId) args.push(centerId);
   const c = `${centerId ? `AND i.center_id = $${args.length}` : ""}`
     + (mentorId ? ` AND i.mentor_id = $${args.push(mentorId)}` : "");
   return query<{
-    center_name: string; held: number; attentive: number; follow_ups: number;
+    center_name: string; held: number; children: number; attentive: number;
+    follow_ups: number; roll: number;
   }>(
     `SELECT ce.name AS center_name, count(*)::int AS held,
+            count(DISTINCT i.student_id)::int AS children,
             count(*) FILTER (WHERE i.engagement = 'attentive')::int AS attentive,
-            count(*) FILTER (WHERE i.follow_up_required)::int       AS follow_ups
+            count(*) FILTER (WHERE i.follow_up_required)::int       AS follow_ups,
+            (SELECT count(*) FROM enrollments e
+               JOIN students s ON s.id = e.student_id
+               JOIN academic_sessions a ON a.id = e.session_id AND a.is_current
+              WHERE e.center_id = ce.id AND e.status = 'active'
+                AND s.status = 'active')::int                       AS roll
        FROM ptm_interactions i JOIN centers ce ON ce.id = i.center_id
       WHERE i.interaction_date = $1 ${c}
-      GROUP BY ce.code, ce.name ORDER BY count(*) DESC, ce.code`,
+      GROUP BY ce.id, ce.code, ce.name ORDER BY count(*) DESC, ce.code`,
     args);
 }
 
@@ -78,7 +89,11 @@ export function ptmCommitments(
     args);
 }
 
-/** Meetings per day over a run of days, for the trend. */
+/**
+ * Meetings per day over a run of days, split by who came — a day of twenty
+ * meetings that only mothers attended is a different day from twenty where
+ * both parents came.
+ */
 export function ptmPerDay(
   from: string, to: string, centerId: number | null, mentorId: number | null,
 ) {
@@ -86,9 +101,15 @@ export function ptmPerDay(
   if (centerId) args.push(centerId);
   const c = `${centerId ? `AND i.center_id = $${args.length}` : ""}`
     + (mentorId ? ` AND i.mentor_id = $${args.push(mentorId)}` : "");
-  return query<{ day: string; n: number }>(
+  return query<{
+    day: string; n: number; mother: number; father: number; both: number; guardian: number;
+  }>(
     `SELECT to_char(d::date, 'YYYY-MM-DD') AS day,
-            count(i.id)::int AS n
+            count(i.id)::int AS n,
+            count(i.id) FILTER (WHERE i.parent_present = 'mother')::int   AS mother,
+            count(i.id) FILTER (WHERE i.parent_present = 'father')::int   AS father,
+            count(i.id) FILTER (WHERE i.parent_present = 'both')::int     AS both,
+            count(i.id) FILTER (WHERE i.parent_present = 'guardian')::int AS guardian
        FROM generate_series($1::date, $2::date, interval '1 day') d
        LEFT JOIN ptm_interactions i ON i.interaction_date = d::date ${c}
       GROUP BY d ORDER BY d`,

@@ -3,7 +3,7 @@ import { requireFeature } from "@/lib/auth";
 import { centersForUser, resolveCenterId } from "@/lib/queries";
 import { Badge, Card, Empty, PageHeader, StatCard } from "@/components/ui";
 import Filters from "@/components/Filters";
-import { BarChart, ChartFrame, HBarChart } from "@/components/charts";
+import { ChartFrame, HBarChart, StackedBarChart } from "@/components/charts";
 import { SERIES } from "@/lib/chart-palette";
 import { fmtDate, today, titleCase } from "@/lib/format";
 import { isGlobalRole } from "@/lib/roles";
@@ -21,6 +21,17 @@ function addDays(iso: string, n: number) {
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 }
+
+/**
+ * Who came to the meeting. Four fixed colours in a fixed order, so mother is
+ * the same colour on every chart and a quiet day does not repaint the rest.
+ */
+const WHO_CAME = [
+  { key: "mother", label: "Mother", color: SERIES[0] },
+  { key: "father", label: "Father", color: SERIES[1] },
+  { key: "both", label: "Both parents", color: SERIES[2] },
+  { key: "guardian", label: "Guardian", color: SERIES[3] },
+];
 
 const ENGAGEMENT_TONE: Record<string, string> = {
   attentive: "ok", neutral: "warn", resistant: "bad",
@@ -180,20 +191,33 @@ export default async function PtmDashboardPage({
 
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
         <ChartFrame title={`Meetings by centre · ${fmtDate(day)}`}
-          subtitle="Where parents were seen that day"
+          subtitle="Meetings held, against the children on each centre's roll"
           empty={byCentre.length === 0}
-          table={{ head: ["Centre", "Meetings", "Parents engaged", "Follow-ups"],
-            rows: byCentre.map((c) => [c.center_name, c.held, c.attentive, c.follow_ups]) }}>
-          <HBarChart data={byCentre.map((c) => ({ label: c.center_name, value: c.held }))}
-            color={SERIES[0]} />
+          table={{ head: ["Centre", "Meetings", "Children seen", "On the roll", "Share of roll",
+            "Parents engaged", "Follow-ups"],
+            rows: byCentre.map((c) => [c.center_name, c.held, c.children, c.roll,
+              c.roll ? `${Math.round((c.children / c.roll) * 100)}%` : "—",
+              c.attentive, c.follow_ups]) }}>
+          <HBarChart data={byCentre.map((c) => ({
+            label: `${c.center_name} · ${c.roll} on roll`,
+            value: c.held,
+            hint: c.roll ? `${c.children} of ${c.roll} children seen` : undefined,
+          }))} color={SERIES[0]} labelWidth={150} />
         </ChartFrame>
 
         <ChartFrame title="Meetings over the last fortnight"
-          subtitle="Parent interactions recorded each day"
+          subtitle="Each day's meetings, by who came to them"
+          series={WHO_CAME}
           empty={perDay.every((d) => d.n === 0)}
-          table={{ head: ["Day", "Meetings"], rows: perDay.map((d) => [fmtDate(d.day), d.n]) }}>
-          <BarChart data={perDay.map((d) => ({ label: d.day.slice(8) + "/" + d.day.slice(5, 7), value: d.n }))}
-            color={SERIES[0]} valueLabels="key" labelEvery={2} />
+          table={{ head: ["Day", "Mother", "Father", "Both parents", "Guardian", "Meetings"],
+            rows: perDay.filter((d) => d.n > 0).map((d) =>
+              [fmtDate(d.day), d.mother, d.father, d.both, d.guardian, d.n]) }}>
+          <StackedBarChart
+            data={perDay.map((d) => ({
+              label: d.day.slice(8) + "/" + d.day.slice(5, 7),
+              parts: { mother: d.mother, father: d.father, both: d.both, guardian: d.guardian },
+            }))}
+            series={WHO_CAME} />
         </ChartFrame>
 
         <ChartFrame title="What parents raised"
