@@ -93,7 +93,12 @@ const MENU: Node[] = [
     ],
   },
 
-  { href: "/sports", label: "Sports", icon: IconBall, feature: "sports" },
+  {
+    label: "Sports", icon: IconBall, feature: "sports", children: [
+      { href: "/sports/dashboard", label: "Sports dashboard", roles: ["super_admin", "admin"] },
+      { href: "/sports", label: "Sports by centre", feature: "sports" },
+    ],
+  },
 
   { href: "/calendar", label: "Calendar", icon: IconCal, feature: "calendar" },
   { href: "/supplies", label: "Supplies", icon: IconBox, feature: "supplies" },

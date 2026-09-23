@@ -8,8 +8,11 @@ import { fmtDate, today } from "@/lib/format";
 import { canScheduleVisits } from "@/lib/roles";
 import { BAND_LABEL, PRIORITY_LABEL, SUGGESTION_STATUS_LABEL } from "@/lib/audit-meta";
 import {
-  auditHeadline, auditorWork, centresBySilence, overdueSuggestions, visitsPerMonth, weakestChecks,
+  auditHeadline, auditorList, auditorWork, centresBySilence, overdueSuggestions,
+  visitsPerMonth, weakestChecks,
 } from "@/lib/audit-dashboard";
+import Filters from "@/components/Filters";
+import { centersForUser, resolveCenterId } from "@/lib/queries";
 
 export const metadata = { title: "Auditor dashboard · Pehchaan" };
 
@@ -32,7 +35,7 @@ const RANGES = [
  */
 export default async function AuditorDashboardPage({
   searchParams,
-}: { searchParams: Promise<{ days?: string }> }) {
+}: { searchParams: Promise<Record<string, string | undefined>> }) {
   const user = await requireUser();
   if (!canScheduleVisits(user.role)) redirect("/audits");
   const sp = await searchParams;
@@ -40,10 +43,27 @@ export default async function AuditorDashboardPage({
   const now = today();
   const from = addDays(now, -(days - 1));
 
+  const [people, centers] = await Promise.all([auditorList(), centersForUser(user)]);
+  // with more than one auditor, the office reads one auditor's work at a time
+  const who = people.some((p) => String(p.id) === sp.who) ? Number(sp.who) : null;
+  const whoName = people.find((p) => p.id === who)?.name;
+  const centerId = resolveCenterId(user, sp.center);
+
   const [head, auditors, perMonth, weak, centres, overdue] = await Promise.all([
-    auditHeadline(from, now), auditorWork(from, now), visitsPerMonth(6),
-    weakestChecks(from, now), centresBySilence(), overdueSuggestions(),
+    auditHeadline(from, now, who, centerId), auditorWork(from, now, who, centerId),
+    visitsPerMonth(6, who, centerId), weakestChecks(from, now, who, centerId),
+    centresBySilence(centerId), overdueSuggestions(who, centerId),
   ]);
+
+  /** Every link keeps the filters already chosen. */
+  const link = (over: Record<string, string | null>) => {
+    const q = new URLSearchParams();
+    const merged: Record<string, string | null> = {
+      days: String(days), who: who ? String(who) : null, center: sp.center ?? null, ...over,
+    };
+    for (const [k, v] of Object.entries(merged)) if (v) q.set(k, v);
+    return `/audits/dashboard?${q.toString()}`;
+  };
 
   const n = (v: string | null | undefined) => Number(v ?? 0);
   const neverSeen = centres.filter((c) => !c.last_visited_on);
@@ -52,19 +72,38 @@ export default async function AuditorDashboardPage({
   return (
     <>
       <PageHeader title="Auditor dashboard"
-        subtitle="Every auditor's work, and what the office needs to decide"
+        subtitle={whoName
+          ? `${whoName}'s visits, scores and suggestions`
+          : "Every auditor's work, and what the office needs to decide"}
         right={<Link href="/audits" className="btn btn-ghost btn-sm">Visits &amp; standing</Link>} />
 
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        {people.length > 1 && (
+          <>
+            <Link href={link({ who: null })} scroll={false}
+              className={`btn btn-sm ${who === null ? "btn-primary" : "btn-ghost"}`}>
+              Every auditor
+            </Link>
+            {people.map((p) => (
+              <Link key={p.id} href={link({ who: String(p.id) })} scroll={false}
+                className={`btn btn-sm ${who === p.id ? "btn-primary" : "btn-ghost"}`}>
+                {p.name}
+              </Link>
+            ))}
+            <span className="mx-1 text-[var(--border-strong)]">|</span>
+          </>
+        )}
         {RANGES.map((r) => (
-          <Link key={r.value} href={`/audits/dashboard?days=${r.value}`} scroll={false}
+          <Link key={r.value} href={link({ days: r.value })} scroll={false}
             className={`btn btn-sm ${String(days) === r.value ? "btn-primary" : "btn-ghost"}`}>
             {r.label}
           </Link>
         ))}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <Filters centers={centers} current={sp} />
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Visits filed" value={n(head?.filed)}
           hint={`${n(head?.centres_seen)} centres · ${n(head?.special)} unannounced`} />
         <StatCard label="Average score" value={head?.avg_score ? `${head.avg_score}%` : "—"}

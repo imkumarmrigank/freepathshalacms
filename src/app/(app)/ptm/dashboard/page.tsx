@@ -9,7 +9,8 @@ import { fmtDate, today, titleCase } from "@/lib/format";
 import { isGlobalRole } from "@/lib/roles";
 import { engagementLabel, modeLabel, parentLabel } from "@/lib/ptm-meta";
 import {
-  ptmByCentre, ptmCommitments, ptmConcerns, ptmDay, ptmInteractionsOn, ptmPerDay, ptmScheduled,
+  ptmByCentre, ptmCommitments, ptmConcerns, ptmDay, ptmInteractionsOn, ptmPeople, ptmPerDay,
+  ptmScheduled,
 } from "@/lib/ptm-dashboard";
 
 export const metadata = { title: "PTM dashboard · Pehchaan" };
@@ -42,18 +43,34 @@ export default async function PtmDashboardPage({
   const days = Number(sp.days) || 30;
   const from = addDays(now, -(days - 1));
 
+  const people = await ptmPeople();
+  // several mentors record meetings; the office reads one mentor at a time
+  const who = people.some((p) => String(p.id) === sp.who) ? Number(sp.who) : null;
+  const whoName = people.find((p) => p.id === who)?.name;
+
   const [centers, summary, byCentre, concerns, commitments, perDay, rows, scheduled, scheduledDay] =
     await Promise.all([
       centersForUser(user),
-      ptmDay(day, centerId),
-      ptmByCentre(day, centerId),
-      ptmConcerns(from, now, centerId),
-      ptmCommitments(from, now, centerId),
-      ptmPerDay(addDays(now, -13), now, centerId),
-      ptmInteractionsOn(day, centerId),
+      ptmDay(day, centerId, who),
+      ptmByCentre(day, centerId, who),
+      ptmConcerns(from, now, centerId, who),
+      ptmCommitments(from, now, centerId, who),
+      ptmPerDay(addDays(now, -13), now, centerId, who),
+      ptmInteractionsOn(day, centerId, who),
       ptmScheduled(now, centerId),
       ptmScheduled(day, centerId),
     ]);
+
+  /** Every link keeps the filters already chosen. */
+  const link = (over: Record<string, string | null>) => {
+    const q = new URLSearchParams();
+    const merged: Record<string, string | null> = {
+      center: sp.center ?? null, days: sp.days ?? null, who: who ? String(who) : null,
+      day: day === addDays(now, -1) ? null : day, ...over,
+    };
+    for (const [k, v] of Object.entries(merged)) if (v) q.set(k, v);
+    return `/ptm/dashboard?${q.toString()}`;
+  };
 
   const n = (v: string | undefined) => Number(v ?? 0);
   const held = n(summary?.held);
@@ -66,8 +83,25 @@ export default async function PtmDashboardPage({
   return (
     <>
       <PageHeader title="PTM dashboard"
-        subtitle={`Yesterday's meetings, today's diary, and what parents are raising`}
+        subtitle={whoName
+          ? `${whoName}'s meetings, and what the parents they saw are raising`
+          : "Yesterday's meetings, today's diary, and what parents are raising"}
         right={<Link href="/ptm" className="btn btn-ghost btn-sm">All interactions</Link>} />
+
+      {people.length > 1 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <Link href={link({ who: null })} scroll={false}
+            className={`btn btn-sm ${who === null ? "btn-primary" : "btn-ghost"}`}>
+            Every mentor
+          </Link>
+          {people.map((p) => (
+            <Link key={p.id} href={link({ who: String(p.id) })} scroll={false}
+              className={`btn btn-sm ${who === p.id ? "btn-primary" : "btn-ghost"}`}>
+              {p.name}
+            </Link>
+          ))}
+        </div>
+      )}
 
       <Filters
         centers={isGlobalRole(user.role) ? centers : []}
@@ -120,15 +154,13 @@ export default async function PtmDashboardPage({
       {/* --------------------------------------------------- yesterday */}
       <div className="label-cap mb-2.5 mt-6 flex flex-wrap items-center gap-2">
         <span>Meetings on {fmtDate(day)}</span>
-        <Link href={`/ptm/dashboard?${new URLSearchParams({
-          ...(sp.center ? { center: sp.center } : {}), day: addDays(day, -1),
-        }).toString()}`} className="text-[12px] font-normal text-[var(--brand)] hover:underline">
+        <Link href={link({ day: addDays(day, -1) })}
+          className="text-[12px] font-normal text-[var(--brand)] hover:underline">
           ← day before
         </Link>
         {day < addDays(now, -1) && (
-          <Link href={`/ptm/dashboard?${new URLSearchParams({
-            ...(sp.center ? { center: sp.center } : {}), day: addDays(day, 1),
-          }).toString()}`} className="text-[12px] font-normal text-[var(--brand)] hover:underline">
+          <Link href={link({ day: addDays(day, 1) })}
+            className="text-[12px] font-normal text-[var(--brand)] hover:underline">
             day after →
           </Link>
         )}

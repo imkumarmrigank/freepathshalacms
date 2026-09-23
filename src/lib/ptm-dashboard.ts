@@ -2,9 +2,11 @@ import "server-only";
 import { one, query } from "./db";
 
 /** Yesterday's headline: how many meetings were held, and what came of them. */
-export async function ptmDay(day: string, centerId: number | null) {
-  const c = centerId ? "AND i.center_id = $2" : "";
-  const p = centerId ? [day, centerId] : [day];
+export async function ptmDay(day: string, centerId: number | null, mentorId: number | null) {
+  const p: unknown[] = [day];
+  if (centerId) p.push(centerId);
+  const c = `${centerId ? `AND i.center_id = $${p.length}` : ""}`
+    + (mentorId ? ` AND i.mentor_id = $${p.push(mentorId)}` : "");
   const row = await one<{
     held: string; centres: string; children: string; both_parents: string;
     attentive: string; neutral: string; resistant: string;
@@ -27,8 +29,11 @@ export async function ptmDay(day: string, centerId: number | null) {
 }
 
 /** Which centres held meetings on a day, and how each went. */
-export function ptmByCentre(day: string, centerId: number | null) {
-  const c = centerId ? "AND i.center_id = $2" : "";
+export function ptmByCentre(day: string, centerId: number | null, mentorId: number | null) {
+  const args: unknown[] = [day];
+  if (centerId) args.push(centerId);
+  const c = `${centerId ? `AND i.center_id = $${args.length}` : ""}`
+    + (mentorId ? ` AND i.mentor_id = $${args.push(mentorId)}` : "");
   return query<{
     center_name: string; held: number; attentive: number; follow_ups: number;
   }>(
@@ -38,46 +43,64 @@ export function ptmByCentre(day: string, centerId: number | null) {
        FROM ptm_interactions i JOIN centers ce ON ce.id = i.center_id
       WHERE i.interaction_date = $1 ${c}
       GROUP BY ce.code, ce.name ORDER BY count(*) DESC, ce.code`,
-    centerId ? [day, centerId] : [day]);
+    args);
 }
 
 /** What parents were worried about, counted across a period. */
-export function ptmConcerns(from: string, to: string, centerId: number | null) {
-  const c = centerId ? "AND i.center_id = $3" : "";
+export function ptmConcerns(
+  from: string, to: string, centerId: number | null, mentorId: number | null,
+) {
+  const args: unknown[] = [from, to];
+  if (centerId) args.push(centerId);
+  const c = `${centerId ? `AND i.center_id = $${args.length}` : ""}`
+    + (mentorId ? ` AND i.mentor_id = $${args.push(mentorId)}` : "");
   return query<{ concern: string; n: number; centres: number }>(
     `SELECT t AS concern, count(*)::int AS n, count(DISTINCT i.center_id)::int AS centres
        FROM ptm_interactions i, unnest(i.concern_tags) AS t
       WHERE i.interaction_date BETWEEN $1 AND $2 ${c}
       GROUP BY t ORDER BY count(*) DESC, t`,
-    centerId ? [from, to, centerId] : [from, to]);
+    args);
 }
 
 /** What parents promised, over the same period — the other half of a PTM. */
-export function ptmCommitments(from: string, to: string, centerId: number | null) {
-  const c = centerId ? "AND i.center_id = $3" : "";
+export function ptmCommitments(
+  from: string, to: string, centerId: number | null, mentorId: number | null,
+) {
+  const args: unknown[] = [from, to];
+  if (centerId) args.push(centerId);
+  const c = `${centerId ? `AND i.center_id = $${args.length}` : ""}`
+    + (mentorId ? ` AND i.mentor_id = $${args.push(mentorId)}` : "");
   return query<{ commitment: string; n: number }>(
     `SELECT t AS commitment, count(*)::int AS n
        FROM ptm_interactions i, unnest(i.commitment_tags) AS t
       WHERE i.interaction_date BETWEEN $1 AND $2 ${c}
       GROUP BY t ORDER BY count(*) DESC, t`,
-    centerId ? [from, to, centerId] : [from, to]);
+    args);
 }
 
 /** Meetings per day over a run of days, for the trend. */
-export function ptmPerDay(from: string, to: string, centerId: number | null) {
-  const c = centerId ? "AND i.center_id = $3" : "";
+export function ptmPerDay(
+  from: string, to: string, centerId: number | null, mentorId: number | null,
+) {
+  const args: unknown[] = [from, to];
+  if (centerId) args.push(centerId);
+  const c = `${centerId ? `AND i.center_id = $${args.length}` : ""}`
+    + (mentorId ? ` AND i.mentor_id = $${args.push(mentorId)}` : "");
   return query<{ day: string; n: number }>(
     `SELECT to_char(d::date, 'YYYY-MM-DD') AS day,
             count(i.id)::int AS n
        FROM generate_series($1::date, $2::date, interval '1 day') d
        LEFT JOIN ptm_interactions i ON i.interaction_date = d::date ${c}
       GROUP BY d ORDER BY d`,
-    centerId ? [from, to, centerId] : [from, to]);
+    args);
 }
 
 /** The meetings themselves on a day — who was seen, and what was said. */
-export function ptmInteractionsOn(day: string, centerId: number | null) {
-  const c = centerId ? "AND i.center_id = $2" : "";
+export function ptmInteractionsOn(day: string, centerId: number | null, mentorId: number | null) {
+  const args: unknown[] = [day];
+  if (centerId) args.push(centerId);
+  const c = `${centerId ? `AND i.center_id = $${args.length}` : ""}`
+    + (mentorId ? ` AND i.mentor_id = $${args.push(mentorId)}` : "");
   return query<{
     id: number; student: string; enrollment_no: string; class_name: string | null;
     center_name: string; mentor: string | null; parent_present: string; engagement: string;
@@ -95,7 +118,7 @@ export function ptmInteractionsOn(day: string, centerId: number | null) {
        LEFT JOIN users u ON u.id = i.mentor_id
       WHERE i.interaction_date = $1 ${c}
       ORDER BY ce.code, student`,
-    centerId ? [day, centerId] : [day]);
+    args);
 }
 
 /** PTM days in the diary for a date — the centres expecting parents today. */
@@ -123,4 +146,12 @@ export function ptmScheduled(day: string, centerId: number | null) {
       WHERE m.meeting_date = $1 ${c}
       ORDER BY m.start_time NULLS LAST, ce.code`,
     centerId ? [day, centerId] : [day]);
+}
+
+/** Whoever has recorded a parent meeting — mentors, and anyone else who has. */
+export function ptmPeople() {
+  return query<{ id: number; name: string; role: string }>(
+    `SELECT DISTINCT u.id, u.name, u.role
+       FROM ptm_interactions i JOIN users u ON u.id = i.mentor_id
+      ORDER BY u.name`);
 }

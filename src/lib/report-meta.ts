@@ -301,6 +301,36 @@ export const REPORTS: ReportMeta[] = [
     filters: ["center", "class", "session"],
   },
   {
+    key: "audit-visits",
+    label: "Centre audit visits",
+    group: "Centre audits",
+    description:
+      "Every visit filed in the period: centre, auditor, kind of visit, how the centre was found, "
+      + "its score, the roll seen on the day, and the suggestions raised.",
+    filters: ["dates", "center"],
+    roles: ["super_admin", "admin", "auditor"],
+  },
+  {
+    key: "audit-suggestions",
+    label: "Audit suggestions",
+    group: "Centre audits",
+    description:
+      "What centres were asked to do: priority, when it was due, where it stands, how late it is, "
+      + "and what the centre replied.",
+    filters: ["dates", "center"],
+    roles: ["super_admin", "admin", "auditor"],
+  },
+  {
+    key: "audit-ratings",
+    label: "Audit checklist scores",
+    group: "Centre audits",
+    description:
+      "Every point of the checklist as it was scored, visit by visit — the detail behind a "
+      + "centre's score, and where the same weakness keeps appearing.",
+    filters: ["dates", "center"],
+    roles: ["super_admin", "admin", "auditor"],
+  },
+  {
     key: "sports-visits",
     label: "Sports teacher visits",
     group: "Sports",

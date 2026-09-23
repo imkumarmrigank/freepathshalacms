@@ -2,7 +2,16 @@ import "server-only";
 import { one, query } from "./db";
 
 /** The month's headline, across every centre. */
-export function auditHeadline(from: string, to: string) {
+export function auditHeadline(
+  from: string, to: string, auditorId: number | null, centerId: number | null,
+) {
+  const args: unknown[] = [from, to];
+  if (auditorId) args.push(auditorId);
+  const a = auditorId ? `$${args.length}` : null;
+  if (centerId) args.push(centerId);
+  const c = centerId ? `$${args.length}` : null;
+  const v = `${a ? `AND v.auditor_id = ${a}` : ""} ${c ? `AND v.center_id = ${c}` : ""}`;
+  const sug = `${a ? `AND raised_by = ${a}` : ""} ${c ? `AND center_id = ${c}` : ""}`;
   return one<{
     filed: string; in_progress: string; planned: string; special: string;
     centres_seen: string; avg_score: string | null;
@@ -10,29 +19,38 @@ export function auditHeadline(from: string, to: string) {
   }>(
     `SELECT
        (SELECT count(*) FROM audit_visits v
-         WHERE v.status = 'submitted' AND v.visited_on BETWEEN $1 AND $2)        AS filed,
-       (SELECT count(*) FROM audit_visits WHERE status = 'in_progress')          AS in_progress,
-       (SELECT count(*) FROM audit_visits
-         WHERE status = 'planned' AND scheduled_for >= CURRENT_DATE)             AS planned,
+         WHERE v.status = 'submitted' AND v.visited_on BETWEEN $1 AND $2 ${v})   AS filed,
+       (SELECT count(*) FROM audit_visits v WHERE v.status = 'in_progress' ${v})  AS in_progress,
+       (SELECT count(*) FROM audit_visits v
+         WHERE v.status = 'planned' AND v.scheduled_for >= CURRENT_DATE ${v})     AS planned,
        (SELECT count(*) FROM audit_visits v
          WHERE v.status = 'submitted' AND v.kind = 'special'
-           AND v.visited_on BETWEEN $1 AND $2)                                   AS special,
+           AND v.visited_on BETWEEN $1 AND $2 ${v})                               AS special,
        (SELECT count(DISTINCT v.center_id) FROM audit_visits v
-         WHERE v.status = 'submitted' AND v.visited_on BETWEEN $1 AND $2)        AS centres_seen,
+         WHERE v.status = 'submitted' AND v.visited_on BETWEEN $1 AND $2 ${v})    AS centres_seen,
        (SELECT round(avg(v.score_pct), 1) FROM audit_visits v
-         WHERE v.status = 'submitted' AND v.visited_on BETWEEN $1 AND $2)        AS avg_score,
+         WHERE v.status = 'submitted' AND v.visited_on BETWEEN $1 AND $2 ${v})    AS avg_score,
        (SELECT count(*) FROM audit_suggestions
-         WHERE status IN ('open','in_progress','done'))                          AS open_suggestions,
+         WHERE status IN ('open','in_progress','done') ${sug})                    AS open_suggestions,
        (SELECT count(*) FROM audit_suggestions
          WHERE status IN ('open','in_progress','done')
-           AND due_on IS NOT NULL AND due_on < CURRENT_DATE)                     AS overdue,
+           AND due_on IS NOT NULL AND due_on < CURRENT_DATE ${sug})               AS overdue,
        (SELECT count(*) FROM audit_suggestions
-         WHERE status IN ('open','in_progress','done') AND priority = 'critical') AS critical_open`,
-    [from, to]);
+         WHERE status IN ('open','in_progress','done') AND priority = 'critical'
+           ${sug})                                                                AS critical_open`,
+    args);
 }
 
 /** Each auditor's work: what they have done, and what they have left hanging. */
-export function auditorWork(from: string, to: string) {
+export function auditorWork(
+  from: string, to: string, auditorId: number | null, centerId: number | null,
+) {
+  const args: unknown[] = [from, to];
+  if (auditorId) args.push(auditorId);
+  const who = auditorId ? `AND u.id = $${args.length}` : "";
+  if (centerId) args.push(centerId);
+  const atCentre = centerId ? `AND v.center_id = $${args.length}` : "";
+  const sugCentre = centerId ? `AND s.center_id = $${args.length}` : "";
   return query<{
     auditor_id: number; auditor: string; is_active: boolean;
     filed: number; in_period: number; planned: number; in_progress: number;
@@ -49,36 +67,51 @@ export function auditorWork(from: string, to: string) {
             round(avg(v.score_pct) FILTER (WHERE v.status = 'submitted'), 1)  AS avg_score,
             to_char(max(v.visited_on) FILTER (WHERE v.status = 'submitted'), 'YYYY-MM-DD') AS last_visit,
             (SELECT count(*) FROM audit_suggestions s
-              WHERE s.raised_by = u.id)::int                                  AS suggestions,
+              WHERE s.raised_by = u.id ${sugCentre})::int                                  AS suggestions,
             (SELECT count(*) FROM audit_suggestions s
-              WHERE s.raised_by = u.id
+              WHERE s.raised_by = u.id ${sugCentre}
                 AND s.status IN ('open','in_progress','done'))::int           AS still_open,
             (SELECT count(*) FROM audit_suggestions s
-              WHERE s.raised_by = u.id AND s.status IN ('open','in_progress','done')
+              WHERE s.raised_by = u.id ${sugCentre}
+                AND s.status IN ('open','in_progress','done')
                 AND s.due_on IS NOT NULL AND s.due_on < CURRENT_DATE)::int    AS overdue,
             (SELECT count(*) FROM audit_suggestions s
-              WHERE s.raised_by = u.id AND s.status = 'verified')::int        AS verified
+              WHERE s.raised_by = u.id ${sugCentre} AND s.status = 'verified')::int        AS verified
        FROM users u
-       LEFT JOIN audit_visits v ON v.auditor_id = u.id
-      WHERE u.role = 'auditor'
+       LEFT JOIN audit_visits v ON v.auditor_id = u.id ${atCentre}
+      WHERE u.role = 'auditor' ${who}
       GROUP BY u.id, u.name, u.is_active
       ORDER BY u.is_active DESC, count(v.id) DESC, u.name`,
-    [from, to]);
+    args);
 }
 
 /** Visits filed month by month, for the trend. */
-export function visitsPerMonth(months: number) {
+export function visitsPerMonth(months: number, auditorId: number | null, centerId: number | null) {
+  const args: unknown[] = [];
+  if (auditorId) args.push(auditorId);
+  const a = auditorId ? `AND v.auditor_id = $${args.length}` : "";
+  if (centerId) args.push(centerId);
+  const c = centerId ? `AND v.center_id = $${args.length}` : "";
   return query<{ month: string; label: string; n: number }>(
     `SELECT to_char(m, 'YYYY-MM') AS month, to_char(m, 'Mon YY') AS label,
             count(v.id)::int AS n
        FROM generate_series(date_trunc('month', CURRENT_DATE) - interval '${months - 1} months',
                             date_trunc('month', CURRENT_DATE), interval '1 month') m
-       LEFT JOIN audit_visits v ON date_trunc('month', v.visited_on) = m AND v.status = 'submitted'
-      GROUP BY m ORDER BY m`);
+       LEFT JOIN audit_visits v ON date_trunc('month', v.visited_on) = m
+              AND v.status = 'submitted' ${a} ${c}
+      GROUP BY m ORDER BY m`,
+    args);
 }
 
 /** Where the checklist keeps finding trouble — the weakest points across centres. */
-export function weakestChecks(from: string, to: string) {
+export function weakestChecks(
+  from: string, to: string, auditorId: number | null, centerId: number | null,
+) {
+  const args: unknown[] = [from, to];
+  if (auditorId) args.push(auditorId);
+  const a = auditorId ? `AND v.auditor_id = $${args.length}` : "";
+  if (centerId) args.push(centerId);
+  const c = centerId ? `AND v.center_id = $${args.length}` : "";
   return query<{
     section: string; criterion_title: string; rated: number; weak: number; avg_band: string;
   }>(
@@ -88,16 +121,16 @@ export function weakestChecks(from: string, to: string) {
             round(avg(r.band) FILTER (WHERE r.band > 0), 2)              AS avg_band
        FROM audit_ratings r
        JOIN audit_visits v ON v.id = r.visit_id
-      WHERE v.status = 'submitted' AND v.visited_on BETWEEN $1 AND $2
+      WHERE v.status = 'submitted' AND v.visited_on BETWEEN $1 AND $2 ${a} ${c}
       GROUP BY r.section, r.criterion_title
      HAVING count(*) FILTER (WHERE r.band > 0) > 0
       ORDER BY avg(r.band) FILTER (WHERE r.band > 0), count(*) DESC
       LIMIT 10`,
-    [from, to]);
+    args);
 }
 
 /** Centres by how long it is since an auditor was there — where to send them next. */
-export function centresBySilence() {
+export function centresBySilence(centerId: number | null) {
   return query<{
     center_id: number; center_name: string; center_code: string;
     last_visited_on: string | null; days_since: number | null;
@@ -122,12 +155,20 @@ export function centresBySilence() {
           WHERE v.center_id = c.id AND v.status IN ('planned','in_progress')
             AND v.scheduled_for >= CURRENT_DATE
           ORDER BY v.scheduled_for LIMIT 1) next ON TRUE
-      WHERE c.is_active
-      ORDER BY last.visited_on NULLS FIRST, c.code`);
+      WHERE c.is_active ${centerId ? "AND c.id = $1" : ""}
+      ORDER BY last.visited_on NULLS FIRST, c.code`,
+    centerId ? [centerId] : []);
 }
 
 /** Suggestions past the date the centre was given — the office's business. */
-export function overdueSuggestions(limit = 25) {
+export function overdueSuggestions(
+  auditorId: number | null, centerId: number | null, limit = 25,
+) {
+  const args: unknown[] = [];
+  if (auditorId) args.push(auditorId);
+  const a = auditorId ? `AND s.raised_by = $${args.length}` : "";
+  if (centerId) args.push(centerId);
+  const c = centerId ? `AND s.center_id = $${args.length}` : "";
   return query<{
     id: number; title: string; center_name: string; priority: string; status: string;
     due_on: string; days_over: number; auditor: string | null; replies: number;
@@ -141,7 +182,14 @@ export function overdueSuggestions(limit = 25) {
        JOIN centers c ON c.id = s.center_id
        LEFT JOIN users u ON u.id = s.raised_by
       WHERE s.status IN ('open','in_progress','done')
-        AND s.due_on IS NOT NULL AND s.due_on < CURRENT_DATE
+        AND s.due_on IS NOT NULL AND s.due_on < CURRENT_DATE ${a} ${c}
       ORDER BY (s.priority = 'critical') DESC, s.due_on
-      LIMIT ${limit}`);
+      LIMIT ${limit}`,
+    args);
+}
+
+/** The auditors, for the office's "whose work?" picker. */
+export function auditorList() {
+  return query<{ id: number; name: string }>(
+    `SELECT id, name FROM users WHERE role = 'auditor' ORDER BY is_active DESC, name`);
 }

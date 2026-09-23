@@ -97,6 +97,9 @@ export async function runReport(
     case "ptm-concerns":                 return ptmConcernsReport(scoped, period);
     case "teaching-plan-progress":       return teachingPlanProgress(scoped);
     case "timetable":                    return timetableReport(scoped);
+    case "audit-visits":                 return auditVisitsReport(scoped, period);
+    case "audit-suggestions":            return auditSuggestionsReport(scoped, period);
+    case "audit-ratings":                return auditRatingsReport(scoped, period);
     case "sports-visits":                return sportsVisits(scoped, period);
     case "sports-teacher-days":          return sportsTeacherDays(scoped, period);
     case "sports-players":               return sportsPlayers(scoped);
@@ -2116,6 +2119,177 @@ async function ptmConcernsReport(p: ReportParams, period: string): Promise<Repor
     rows: rows.map((r) => ({
       kind: r.kind, tag: r.tag, center_name: r.center_name, n: Number(r.n),
       children: Number(r.children), first_seen: r.first_seen, last_seen: r.last_seen,
+    })),
+  };
+}
+
+/* --------------------------------------------------------------- audits */
+
+const OVERALL_WORDS: Record<string, string> = {
+  healthy: "Healthy", attention: "Needs attention",
+  support: "Support required", urgent: "Immediate intervention",
+};
+
+async function auditVisitsReport(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND v.center_id = $${params.length}`; }
+
+  const rows = await query<{
+    visited_on: string; center_name: string; auditor: string | null; kind: string;
+    status: string; overall: string | null; score_pct: string | null;
+    children_present: number | null; children_on_roll: number | null;
+    staff_present: number | null; staff_on_roll: number | null; summary: string | null;
+    checks: number; weak: number; suggestions: number;
+  }>(
+    `SELECT to_char(COALESCE(v.visited_on, v.scheduled_for), 'YYYY-MM-DD') AS visited_on,
+            c.name AS center_name, u.name AS auditor, v.kind, v.status, v.overall, v.score_pct,
+            v.children_present, v.children_on_roll, v.staff_present, v.staff_on_roll, v.summary,
+            (SELECT count(*) FROM audit_ratings r
+              WHERE r.visit_id = v.id AND r.band > 0)::int                       AS checks,
+            (SELECT count(*) FROM audit_ratings r
+              WHERE r.visit_id = v.id AND r.band BETWEEN 1 AND 2)::int           AS weak,
+            (SELECT count(*) FROM audit_suggestions s WHERE s.visit_id = v.id)::int AS suggestions
+       FROM audit_visits v
+       JOIN centers c ON c.id = v.center_id
+       LEFT JOIN users u ON u.id = v.auditor_id
+      WHERE COALESCE(v.visited_on, v.scheduled_for) BETWEEN $1 AND $2 ${where}
+      ORDER BY COALESCE(v.visited_on, v.scheduled_for) DESC, c.code`,
+    params,
+  );
+
+  return {
+    title: "Centre audit visits",
+    subtitle: `${period} · ${rows.length} visit${rows.length === 1 ? "" : "s"}`,
+    columns: [
+      { key: "visited_on", label: "Date", width: 12 },
+      { key: "center_name", label: "Centre", width: 16 },
+      { key: "auditor", label: "Auditor", width: 18 },
+      { key: "kind", label: "Kind of visit", width: 14 },
+      { key: "status", label: "Status", width: 12 },
+      { key: "overall", label: "How the centre was found", width: 22 },
+      { key: "score_pct", label: "Score %", numeric: true },
+      { key: "children", label: "Children present", width: 15 },
+      { key: "staff", label: "Staff present", width: 13 },
+      { key: "checks", label: "Points checked", numeric: true, width: 13 },
+      { key: "weak", label: "Weak or poor", numeric: true, width: 12 },
+      { key: "suggestions", label: "Suggestions", numeric: true },
+      { key: "summary", label: "What the auditor wrote", width: 44 },
+    ],
+    rows: rows.map((r) => ({
+      visited_on: r.visited_on, center_name: r.center_name, auditor: r.auditor ?? "",
+      kind: titleCase(r.kind.replace(/_/g, " ")), status: titleCase(r.status.replace(/_/g, " ")),
+      overall: r.overall ? OVERALL_WORDS[r.overall] ?? r.overall : "",
+      score_pct: r.score_pct == null ? null : Number(r.score_pct),
+      children: r.children_present == null ? "" : `${r.children_present} of ${r.children_on_roll ?? "—"}`,
+      staff: r.staff_present == null ? "" : `${r.staff_present} of ${r.staff_on_roll ?? "—"}`,
+      checks: r.checks, weak: r.weak, suggestions: r.suggestions, summary: r.summary ?? "",
+    })),
+  };
+}
+
+async function auditSuggestionsReport(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND s.center_id = $${params.length}`; }
+
+  const rows = await query<{
+    raised_on: string; center_name: string; auditor: string | null; title: string;
+    detail: string | null; criterion: string | null; priority: string; status: string;
+    due_on: string | null; days_late: number | null; verdict: string | null;
+    replies: number; last_reply: string | null;
+  }>(
+    `SELECT to_char(s.created_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') AS raised_on,
+            c.name AS center_name, u.name AS auditor, s.title, s.detail,
+            cr.title AS criterion, s.priority, s.status,
+            to_char(s.due_on, 'YYYY-MM-DD') AS due_on,
+            CASE WHEN s.due_on IS NOT NULL AND s.status IN ('open','in_progress','done')
+                   AND s.due_on < CURRENT_DATE THEN (CURRENT_DATE - s.due_on)::int END AS days_late,
+            s.verdict,
+            (SELECT count(*) FROM audit_replies r WHERE r.suggestion_id = s.id)::int AS replies,
+            (SELECT r.body FROM audit_replies r WHERE r.suggestion_id = s.id
+              ORDER BY r.created_at DESC LIMIT 1) AS last_reply
+       FROM audit_suggestions s
+       JOIN centers c ON c.id = s.center_id
+       LEFT JOIN users u ON u.id = s.raised_by
+       LEFT JOIN audit_criteria cr ON cr.id = s.criterion_id
+      WHERE s.created_at::date BETWEEN $1 AND $2 ${where}
+      ORDER BY s.created_at DESC`,
+    params,
+  );
+
+  return {
+    title: "Audit suggestions",
+    subtitle: `${period} · ${rows.length} suggestion${rows.length === 1 ? "" : "s"}`,
+    columns: [
+      { key: "raised_on", label: "Raised", width: 12 },
+      { key: "center_name", label: "Centre", width: 16 },
+      { key: "auditor", label: "Raised by", width: 18 },
+      { key: "title", label: "What needs doing", width: 36 },
+      { key: "criterion", label: "Against which check", width: 20 },
+      { key: "priority", label: "Priority", width: 10 },
+      { key: "due_on", label: "Due", width: 12 },
+      { key: "status", label: "Where it stands", width: 18 },
+      { key: "days_late", label: "Days late", numeric: true },
+      { key: "verdict", label: "Auditor's verdict", width: 16 },
+      { key: "replies", label: "Replies", numeric: true },
+      { key: "last_reply", label: "What the centre said", width: 40 },
+      { key: "detail", label: "Detail", width: 36 },
+    ],
+    rows: rows.map((r) => ({
+      raised_on: r.raised_on, center_name: r.center_name, auditor: r.auditor ?? "",
+      title: r.title, criterion: r.criterion ?? "", priority: titleCase(r.priority),
+      due_on: r.due_on ?? "", status: titleCase(r.status.replace(/_/g, " ")),
+      days_late: r.days_late, verdict: r.verdict ? titleCase(r.verdict.replace(/_/g, " ")) : "",
+      replies: r.replies, last_reply: r.last_reply ?? "", detail: r.detail ?? "",
+    })),
+  };
+}
+
+async function auditRatingsReport(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND v.center_id = $${params.length}`; }
+
+  const rows = await query<{
+    visited_on: string; center_name: string; auditor: string | null; section: string;
+    criterion_title: string; band: number; weight: number; reason: string | null;
+    note: string | null;
+  }>(
+    `SELECT to_char(v.visited_on, 'YYYY-MM-DD') AS visited_on, c.name AS center_name,
+            u.name AS auditor, r.section, r.criterion_title, r.band, r.weight, r.reason, r.note
+       FROM audit_ratings r
+       JOIN audit_visits v ON v.id = r.visit_id
+       JOIN centers c ON c.id = v.center_id
+       LEFT JOIN users u ON u.id = v.auditor_id
+      WHERE v.status = 'submitted' AND v.visited_on BETWEEN $1 AND $2 ${where}
+      ORDER BY v.visited_on DESC, c.code, r.section, r.criterion_title`,
+    params,
+  );
+
+  const BAND: Record<number, string> = {
+    4: "Good", 3: "Fair", 2: "Weak", 1: "Poor", 0: "Not applicable",
+  };
+  return {
+    title: "Audit checklist scores",
+    subtitle: `${period} · ${rows.length} point${rows.length === 1 ? "" : "s"} scored`,
+    columns: [
+      { key: "visited_on", label: "Date", width: 12 },
+      { key: "center_name", label: "Centre", width: 16 },
+      { key: "auditor", label: "Auditor", width: 18 },
+      { key: "section", label: "Section", width: 14 },
+      { key: "criterion_title", label: "Check", width: 24 },
+      { key: "band_label", label: "How it was found", width: 16 },
+      { key: "band", label: "Band", numeric: true },
+      { key: "weight", label: "Weight", numeric: true },
+      { key: "reason", label: "Reason given", width: 30 },
+      { key: "note", label: "Note", width: 36 },
+    ],
+    rows: rows.map((r) => ({
+      visited_on: r.visited_on, center_name: r.center_name, auditor: r.auditor ?? "",
+      section: r.section, criterion_title: r.criterion_title,
+      band_label: BAND[r.band] ?? String(r.band), band: r.band, weight: r.weight,
+      reason: r.reason ?? "", note: r.note ?? "",
     })),
   };
 }
