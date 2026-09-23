@@ -11,6 +11,7 @@ export async function ptmDay(day: string, centerId: number | null, mentorId: num
     held: string; centres: string; children: string; both_parents: string;
     attentive: string; neutral: string; resistant: string;
     follow_ups: string; no_follow_up: string; support: string;
+    confidence: string | null; rated: string;
   }>(
     `SELECT count(*) AS held,
             count(DISTINCT i.center_id) AS centres,
@@ -21,7 +22,11 @@ export async function ptmDay(day: string, centerId: number | null, mentorId: num
             count(*) FILTER (WHERE i.engagement = 'resistant')       AS resistant,
             count(*) FILTER (WHERE i.follow_up_required)             AS follow_ups,
             count(*) FILTER (WHERE NOT i.follow_up_required)         AS no_follow_up,
-            count(*) FILTER (WHERE i.support_needed IS NOT NULL)     AS support
+            count(*) FILTER (WHERE i.support_needed IS NOT NULL)     AS support,
+            -- how sure the mentor is about each family's progress, 1 to 5;
+            -- the average is only over the meetings where it was rated
+            round(avg(i.confidence), 1)                              AS confidence,
+            count(i.confidence)                                      AS rated
        FROM ptm_interactions i
       WHERE i.interaction_date = $1 ${c}`,
     p);
@@ -40,12 +45,13 @@ export function ptmByCentre(day: string, centerId: number | null, mentorId: numb
     + (mentorId ? ` AND i.mentor_id = $${args.push(mentorId)}` : "");
   return query<{
     center_name: string; held: number; children: number; attentive: number;
-    follow_ups: number; roll: number;
+    follow_ups: number; roll: number; confidence: string | null;
   }>(
     `SELECT ce.name AS center_name, count(*)::int AS held,
             count(DISTINCT i.student_id)::int AS children,
             count(*) FILTER (WHERE i.engagement = 'attentive')::int AS attentive,
             count(*) FILTER (WHERE i.follow_up_required)::int       AS follow_ups,
+            round(avg(i.confidence), 1)                             AS confidence,
             (SELECT count(*) FROM enrollments e
                JOIN students s ON s.id = e.student_id
                JOIN academic_sessions a ON a.id = e.session_id AND a.is_current
@@ -269,6 +275,45 @@ export function ptmAbsentees(day: string, centerId: number | null, limit = 200) 
                          WHERE i.student_id = x.student_id AND i.interaction_date = $1)
       ORDER BY seen.last_met NULLS FIRST, ce.code, cl.sequence NULLS LAST, s.first_name
       LIMIT $${args.length}`,
+    args);
+}
+
+/**
+ * PTM days that came and went with nothing written up.
+ *
+ * A day in the diary is a promise to the parents of that centre; if no
+ * interaction was recorded against it, either the meeting did not happen or
+ * nobody entered it, and both need chasing. A cancelled day is not a failure
+ * and is left out; a day marked completed with no record is the worst case of
+ * all and is kept in.
+ */
+export function ptmMissedDays(from: string, to: string, centerId: number | null) {
+  const args: unknown[] = [from, to];
+  const c = centerId ? ` AND m.center_id = $${args.push(centerId)}` : "";
+  return query<{
+    id: number; title: string; meeting_date: string; center_name: string;
+    class_name: string | null; mode: string; status: string; start_time: string | null;
+    roll: number; days_ago: number;
+  }>(
+    `SELECT m.id, m.title, to_char(m.meeting_date, 'YYYY-MM-DD') AS meeting_date,
+            ce.name AS center_name, cl.name AS class_name, m.mode, m.status,
+            to_char(m.start_time, 'HH12:MI AM') AS start_time,
+            (SELECT count(*) FROM enrollments e JOIN students s ON s.id = e.student_id
+              WHERE e.center_id = m.center_id AND e.session_id = m.session_id
+                AND e.status = 'active' AND s.status = 'active'
+                AND (m.class_level_id IS NULL OR e.class_level_id = m.class_level_id))::int AS roll,
+            (CURRENT_DATE - m.meeting_date) AS days_ago
+       FROM ptm_meetings m
+       JOIN centers ce ON ce.id = m.center_id
+       LEFT JOIN class_levels cl ON cl.id = m.class_level_id
+      WHERE m.meeting_date BETWEEN $1 AND $2
+        AND m.meeting_date < CURRENT_DATE
+        AND m.status <> 'cancelled'${c}
+        AND NOT EXISTS (
+          SELECT 1 FROM ptm_interactions i
+           WHERE i.center_id = m.center_id AND i.interaction_date = m.meeting_date
+             AND (m.class_level_id IS NULL OR i.class_level_id = m.class_level_id))
+      ORDER BY m.meeting_date DESC, ce.code`,
     args);
 }
 

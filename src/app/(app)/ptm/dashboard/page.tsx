@@ -11,7 +11,7 @@ import { isGlobalRole, ROLE_LABEL, type Role } from "@/lib/roles";
 import { engagementLabel, modeLabel, parentLabel } from "@/lib/ptm-meta";
 import {
   ptmAbsentees, ptmByCentre, ptmCommitments, ptmConcerns, ptmDay, ptmDayCoverage,
-  ptmInteractionsOn, ptmPeople, ptmPerDay, ptmScheduled,
+  ptmInteractionsOn, ptmMissedDays, ptmPeople, ptmPerDay, ptmScheduled,
 } from "@/lib/ptm-dashboard";
 
 export const metadata = { title: "PTM dashboard · Pehchaan" };
@@ -64,7 +64,7 @@ export default async function PtmDashboardPage({
   const chosen = people.find((p) => p.id === who);
 
   const [centers, summary, byCentre, concerns, commitments, perDay, rows, scheduled, scheduledDay,
-    coverage, missed] =
+    coverage, missed, notWrittenUp] =
     await Promise.all([
       centersForUser(user),
       ptmDay(day, centerId, who),
@@ -79,6 +79,7 @@ export default async function PtmDashboardPage({
       // so neither of these narrows to the person chosen above
       ptmDayCoverage(day, centerId),
       ptmAbsentees(day, centerId),
+      ptmMissedDays(from, now, centerId),
     ]);
 
   /** Every link keeps the filters already chosen. */
@@ -94,6 +95,7 @@ export default async function PtmDashboardPage({
 
   const n = (v: string | undefined) => Number(v ?? 0);
   const held = n(summary?.held);
+  const confidence = summary?.confidence == null ? null : Number(summary.confidence);
   const engagementParts = [
     { label: "Attentive", value: n(summary?.attentive) },
     { label: "Neutral", value: n(summary?.neutral) },
@@ -170,12 +172,74 @@ export default async function PtmDashboardPage({
                     </td>
                     <td className="text-[var(--muted)]">{modeLabel(m.mode)}</td>
                     <td className="tabular-nums">
-                      {m.held} of {m.roll}
-                      <span className="text-[12px] text-[var(--muted)]"> children</span>
+                      {m.held === 0
+                        ? <Badge tone="warn">Nothing recorded yet</Badge>
+                        : <>{m.held} of {m.roll}
+                            <span className="text-[12px] text-[var(--muted)]"> children</span></>}
                     </td>
                     <td><Badge tone={m.status === "cancelled" ? "bad" : m.status === "completed" ? "ok" : "info"}>
                       {titleCase(m.status)}
                     </Badge></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {/* ------------------------------- days in the diary nobody wrote up */}
+      <div className="label-cap mb-2.5 mt-6 flex flex-wrap items-center gap-2">
+        <span>PTM days scheduled but not written up</span>
+        <span className="text-[12px] font-normal normal-case text-[var(--muted)]">
+          last {days} days
+          {notWrittenUp.length > 0 ? ` · ${notWrittenUp.length} to chase` : ""}
+        </span>
+      </div>
+      <Card pad={false}>
+        {notWrittenUp.length === 0 ? (
+          <Empty title="Every PTM day was written up"
+            hint={`No day in the diary over the last ${days} days passed without a meeting recorded against it.`} />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Date</th><th>Centre</th><th>Class</th><th>What was planned</th>
+                  <th>Children expected</th><th>Marked as</th><th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {notWrittenUp.map((m) => (
+                  <tr key={m.id}>
+                    <td className="whitespace-nowrap">
+                      <Link href={link({ day: m.meeting_date })}
+                        className="font-medium hover:text-[var(--brand)]">
+                        {fmtDate(m.meeting_date)}
+                      </Link>
+                      <div className="text-[12px] text-[var(--muted)]">
+                        {m.days_ago} day{m.days_ago === 1 ? "" : "s"} ago
+                      </div>
+                    </td>
+                    <td className="font-medium">{m.center_name}</td>
+                    <td className="text-[var(--muted)]">{m.class_name ?? "All classes"}</td>
+                    <td className="text-[var(--muted)]">
+                      {m.title}
+                      <div className="text-[12px]">
+                        {modeLabel(m.mode)}{m.start_time ? ` · ${m.start_time}` : ""}
+                      </div>
+                    </td>
+                    <td className="tabular-nums text-[var(--muted)]">{m.roll}</td>
+                    <td>
+                      {/* a day the centre closed off as done, with nothing behind
+                          it, is worse than one still sitting open */}
+                      <Badge tone={m.status === "completed" ? "bad" : "warn"}>
+                        {m.status === "completed" ? "Completed, nothing recorded" : "Nothing recorded"}
+                      </Badge>
+                    </td>
+                    <td className="whitespace-nowrap">
+                      <Link href="/ptm/new" className="btn btn-ghost btn-sm">Record a meeting</Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -199,7 +263,7 @@ export default async function PtmDashboardPage({
         )}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard label="Meetings held" value={held}
           hint={held ? `${n(summary?.centres)} centre${n(summary?.centres) === 1 ? "" : "s"} · ${n(summary?.children)} children` : "none recorded"} />
         <StatCard label="Both parents came" value={n(summary?.both_parents)}
@@ -209,6 +273,15 @@ export default async function PtmDashboardPage({
           tone={held && n(summary?.resistant) > n(summary?.attentive) ? "warn" : "default"} />
         <StatCard label="Follow-ups promised" value={n(summary?.follow_ups)}
           hint={`${n(summary?.no_follow_up)} needed none`} />
+        {/* the mentor's own reading of how the family is going, 1 to 5,
+            averaged over the meetings where it was rated */}
+        <StatCard label="Confidence in progress"
+          value={confidence === null ? "—" : `${confidence.toFixed(1)} of 5`}
+          hint={confidence === null
+            ? "not rated in any meeting"
+            : `across ${n(summary?.rated)} of ${held} meeting${held === 1 ? "" : "s"}`}
+          tone={confidence === null ? "default"
+            : confidence < 2.5 ? "bad" : confidence < 3.5 ? "warn" : "ok"} />
       </div>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
@@ -216,10 +289,11 @@ export default async function PtmDashboardPage({
           subtitle="Meetings held, against the children on each centre's roll"
           empty={byCentre.length === 0}
           table={{ head: ["Centre", "Meetings", "Children seen", "On the roll", "Share of roll",
-            "Parents engaged", "Follow-ups"],
+            "Parents engaged", "Follow-ups", "Confidence"],
             rows: byCentre.map((c) => [c.center_name, c.held, c.children, c.roll,
               c.roll ? `${Math.round((c.children / c.roll) * 100)}%` : "—",
-              c.attentive, c.follow_ups]) }}>
+              c.attentive, c.follow_ups,
+              c.confidence == null ? "—" : `${Number(c.confidence).toFixed(1)} of 5`]) }}>
           <HBarChart data={byCentre.map((c) => ({
             label: `${c.center_name} · ${c.roll} on roll`,
             value: c.held,
