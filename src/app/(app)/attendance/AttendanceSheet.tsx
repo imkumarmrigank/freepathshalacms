@@ -9,6 +9,7 @@ import {
   needsReason, reasonRequiredOn, reasonsFor,
 } from "@/lib/attendance-meta";
 import FlagMark from "@/components/FlagMark";
+import SiblingMark from "@/components/SiblingMark";
 
 export type Row = {
   enrollment_id: number; student_id: number; enrollment_no: string;
@@ -17,6 +18,7 @@ export type Row = {
   status: string | null;
   reason: string | null;
   flag_status: string | null; flag_urgency: string | null;
+  sibling_count: number; sibling_names: string | null;
 };
 
 const OPTIONS = MARK_OPTIONS;
@@ -156,6 +158,7 @@ export default function AttendanceSheet({
                           className="block truncate font-medium hover:text-[var(--brand)]">
                           {r.first_name} {r.last_name ?? ""}
                           <FlagMark status={r.flag_status} urgency={r.flag_urgency} />
+                          <SiblingMark count={r.sibling_count} names={r.sibling_names} />
                         </Link>
                         <div className="font-mono text-[11px] text-[var(--faint)]">
                           {r.enrollment_no}

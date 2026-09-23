@@ -19,11 +19,11 @@ export default function FlagMark({ status, urgency }:
       title={`Flagged for counselling · ${FLAG_STATUS_LABEL[status] ?? status}${
         urgent ? " · urgent" : ""}`}
       aria-label={`Flagged for counselling${urgent ? ", urgent" : ""}`}
-      className={`ml-1.5 inline-flex h-[18px] w-[18px] flex-none items-center justify-center
-        rounded-[5px] align-middle ${urgent
+      className={`ml-1.5 inline-flex h-[20px] w-[20px] flex-none items-center justify-center
+        rounded-[6px] align-middle ${urgent
           ? "bg-[var(--bad-soft)] text-[var(--bad)]"
           : "bg-[var(--warn-soft)] text-[#b45309]"}`}>
-      <IconFlag className="h-[11px] w-[11px]" />
+      <IconFlag className="h-[13px] w-[13px]" />
     </span>
   );
 }

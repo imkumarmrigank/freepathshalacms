@@ -15,6 +15,8 @@ import AdmissionRecord from "./AdmissionRecord";
 import DropoutControl from "./DropoutControl";
 import FlagForCounselling, { type OpenFlag } from "./FlagForCounselling";
 import FlagMark from "@/components/FlagMark";
+import SiblingMark from "@/components/SiblingMark";
+import { siblingMark } from "@/lib/siblings";
 import EnrollmentControls from "./EnrollmentControls";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
 
@@ -94,6 +96,8 @@ export default async function StudentPage({
     [sid],
   );
 
+  const sib = await siblingMark(sid);
+
   // the live counselling referral, if the child has one
   const flag = await one<OpenFlag>(
     `SELECT f.id, f.status, f.urgency, f.reasons, f.note, f.raised_on,
@@ -138,7 +142,9 @@ export default async function StudentPage({
       )}
 
       <PageHeader
-        title={<>{fullName(student)}<FlagMark status={flag?.status} urgency={flag?.urgency} /></>}
+        title={<>{fullName(student)}
+          <FlagMark status={flag?.status} urgency={flag?.urgency} />
+          <SiblingMark count={sib.n} names={sib.names} /></>}
         subtitle={`${student.enrollment_no} · ${student.center_name}${
           currentEnr ? ` · ${currentEnr.class_name}` : ""}`}
         back={{ href: "/students", label: "Students" }}

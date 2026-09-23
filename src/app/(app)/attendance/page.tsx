@@ -7,6 +7,7 @@ import AttendancePicker from "./AttendancePicker";
 import { fmtDate, today } from "@/lib/format";
 import { closeRegisterUpToYesterday } from "@/lib/attendance";
 import { holidayOn } from "@/lib/calendar";
+import { SIBLING_COLS, SIBLING_JOIN } from "@/lib/siblings";
 import { EVENT_LABEL } from "@/lib/calendar-meta";
 import { canMarkAttendance, isGlobalRole } from "@/lib/roles";
 import { isSection } from "@/lib/sections";
@@ -40,12 +41,14 @@ export default async function AttendancePage({
     rows = await query<Row>(
       `SELECT e.id AS enrollment_id, s.id AS student_id, s.enrollment_no,
               s.first_name, s.last_name, e.roll_no, e.section, a.status, a.reason,
-              cf.status AS flag_status, cf.urgency AS flag_urgency
+              cf.status AS flag_status, cf.urgency AS flag_urgency,
+              ${SIBLING_COLS}
          FROM enrollments e
          JOIN students s ON s.id = e.student_id
          LEFT JOIN student_attendance a
            ON a.student_id = s.id AND a.att_date = $4
          LEFT JOIN counselling_flags cf ON cf.student_id = s.id AND cf.status <> 'closed'
+         ${SIBLING_JOIN}
         WHERE e.session_id = $1 AND e.class_level_id = $2 AND e.center_id = $3
           AND e.status = 'active' AND s.status = 'active'
           AND ($5::text IS NULL OR e.section = $5)

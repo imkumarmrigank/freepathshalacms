@@ -5,6 +5,8 @@ import { centersForUser, currentSession, listClasses, resolveCenterId } from "@/
 import { Avatar, Badge, Card, Empty, PageHeader } from "@/components/ui";
 import Filters from "@/components/Filters";
 import FlagMark from "@/components/FlagMark";
+import SiblingMark from "@/components/SiblingMark";
+import { SIBLING_COLS, SIBLING_JOIN } from "@/lib/siblings";
 import { IconPlus } from "@/components/icons";
 import { fmtDate, fullName, titleCase } from "@/lib/format";
 import { isGlobalRole } from "@/lib/roles";
@@ -42,19 +44,22 @@ export default async function PtmPage({
     enrollment_no: string; mentor: string | null; parent_present: string; engagement: string;
     center_name: string; class_name: string | null;
     follow_up_required: boolean; follow_up_status: string;
-    flag_status: string | null; flag_urgency: string | null; total_rows: string;
+    flag_status: string | null; flag_urgency: string | null;
+    sibling_count: number; sibling_names: string | null; total_rows: string;
   }>(
     `SELECT count(*) OVER () AS total_rows,
             i.id, i.interaction_date, s.first_name, s.last_name, s.enrollment_no,
             u.name AS mentor, i.parent_present, i.engagement, ce.name AS center_name,
             cl.name AS class_name, i.follow_up_required, i.follow_up_status,
-            cf.status AS flag_status, cf.urgency AS flag_urgency
+            cf.status AS flag_status, cf.urgency AS flag_urgency,
+            ${SIBLING_COLS}
        FROM ptm_interactions i
        JOIN students s ON s.id = i.student_id
        JOIN centers ce ON ce.id = i.center_id
        LEFT JOIN users u ON u.id = i.mentor_id
        LEFT JOIN class_levels cl ON cl.id = i.class_level_id
        LEFT JOIN counselling_flags cf ON cf.student_id = s.id AND cf.status <> 'closed'
+       ${SIBLING_JOIN}
       WHERE i.session_id = $1 ${where}
       ORDER BY i.interaction_date DESC, i.id DESC
       LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -119,6 +124,7 @@ export default async function PtmPage({
                           <div className="truncate font-medium">
                             {fullName(r)}
                             <FlagMark status={r.flag_status} urgency={r.flag_urgency} />
+                            <SiblingMark count={r.sibling_count} names={r.sibling_names} />
                           </div>
                           <div className="font-mono text-[11px] text-[var(--faint)]">{r.enrollment_no}</div>
                         </div>

@@ -4,6 +4,8 @@ import { query } from "@/lib/db";
 import { centersForUser, listClasses, resolveCenterId } from "@/lib/queries";
 import { Badge, Card, Empty, PageHeader, StatCard } from "@/components/ui";
 import Filters from "@/components/Filters";
+import SiblingMark from "@/components/SiblingMark";
+import { SIBLING_COLS, SIBLING_JOIN } from "@/lib/siblings";
 import Pager from "@/components/Pager";
 import SortHeader, { sortFrom } from "@/components/SortHeader";
 import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
@@ -24,7 +26,8 @@ type Row = {
   raised_on: string; raised_by_name: string | null; raised_by_role: string | null;
   mentor_name: string | null; picked_up_on: string | null;
   outcome: string | null; closed_on: string | null; days_open: string;
-  steps: number; trail: Step[] | null; total_rows: string;
+  steps: number; trail: Step[] | null;
+  sibling_count: number; sibling_names: string | null; total_rows: string;
 };
 
 const SORT = ["flagged", "student", "class", "centre", "status", "waiting", "action"] as const;
@@ -93,7 +96,7 @@ export default async function FlaggedStudentsPage({
               f.outcome, f.closed_on,
               r.name AS raised_by_name, r.role AS raised_by_role, m.name AS mentor_name,
               COALESCE(f.closed_on, CURRENT_DATE) - f.raised_on AS days_open,
-              COALESCE(a.steps, 0) AS steps, a.trail
+              COALESCE(a.steps, 0) AS steps, a.trail, ${SIBLING_COLS}
          FROM counselling_flags f
          JOIN students s ON s.id = f.student_id
          JOIN centers ce ON ce.id = f.center_id
@@ -101,6 +104,7 @@ export default async function FlaggedStudentsPage({
          LEFT JOIN users r ON r.id = f.raised_by
          LEFT JOIN users m ON m.id = f.mentor_id
          ${trail}
+         ${SIBLING_JOIN}
         WHERE 1=1 ${where}
         ORDER BY ${orderBy}
         LIMIT $${listParams.length - 1} OFFSET $${listParams.length}`,
@@ -208,6 +212,7 @@ export default async function FlaggedStudentsPage({
                         className="font-medium hover:text-[var(--brand)]">
                         {[r.first_name, r.last_name].filter(Boolean).join(" ")}
                       </Link>
+                      <SiblingMark count={r.sibling_count} names={r.sibling_names} />
                       <div className="font-mono text-[12px] text-[var(--faint)]">
                         {r.enrollment_no}
                       </div>

@@ -1,4 +1,5 @@
 import "server-only";
+import { SIBLING_COLS, SIBLING_JOIN } from "./siblings";
 import { one, query } from "./db";
 
 /** Yesterday's headline: how many meetings were held, and what came of them. */
@@ -170,19 +171,22 @@ export function ptmInteractionsOn(day: string, centerId: number | null, mentorId
     follow_up_status: string; discussion: string | null;
     parent_name: string | null; phone: string | null;
     flag_status: string | null; flag_urgency: string | null;
+    sibling_count: number; sibling_names: string | null;
   }>(
     `SELECT i.id, i.student_id, trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
             s.enrollment_no, cl.name AS class_name, ce.name AS center_name,
             u.name AS mentor, i.parent_present, i.engagement, i.concern_tags,
             i.follow_up_required, i.follow_up_date, i.follow_up_status, i.discussion,
             ${PARENT_NAME}, ${PHONE},
-            cf.status AS flag_status, cf.urgency AS flag_urgency
+            cf.status AS flag_status, cf.urgency AS flag_urgency,
+            ${SIBLING_COLS}
        FROM ptm_interactions i
        JOIN students s ON s.id = i.student_id
        JOIN centers ce ON ce.id = i.center_id
        LEFT JOIN class_levels cl ON cl.id = i.class_level_id
        LEFT JOIN users u ON u.id = i.mentor_id
        LEFT JOIN counselling_flags cf ON cf.student_id = s.id AND cf.status <> 'closed'
+       ${SIBLING_JOIN}
       WHERE i.interaction_date = $1 ${c}
       ORDER BY ce.code, student`,
     args);
@@ -251,6 +255,7 @@ export function ptmAbsentees(day: string, centerId: number | null, limit = 200) 
     center_name: string; father_name: string | null; mother_name: string | null;
     guardian_name: string | null; phone: string | null; last_met: string | null;
     met_this_session: number; flag_status: string | null; flag_urgency: string | null;
+    sibling_count: number; sibling_names: string | null;
     total_rows: string;
   }>(
     `${EXPECTED_ON_DAY(centerId)}
@@ -264,12 +269,14 @@ export function ptmAbsentees(day: string, centerId: number | null, limit = 200) 
             ${FAMILY_PHONE},
             to_char(seen.last_met, 'YYYY-MM-DD') AS last_met,
             seen.n_session AS met_this_session,
-            cf.status AS flag_status, cf.urgency AS flag_urgency
+            cf.status AS flag_status, cf.urgency AS flag_urgency,
+            ${SIBLING_COLS}
        FROM expected x
        JOIN students s ON s.id = x.student_id
        JOIN centers ce ON ce.id = x.center_id
        LEFT JOIN class_levels cl ON cl.id = x.class_level_id
        LEFT JOIN counselling_flags cf ON cf.student_id = s.id AND cf.status <> 'closed'
+       ${SIBLING_JOIN}
        CROSS JOIN LATERAL (
          SELECT max(i.interaction_date) AS last_met,
                 count(*) FILTER (WHERE i.session_id = (SELECT id FROM academic_sessions

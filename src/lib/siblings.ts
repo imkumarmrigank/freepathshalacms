@@ -86,3 +86,51 @@ export async function siblingsOf(studentId: number) {
     [studentId],
   );
 }
+
+/**
+ * Brothers and sisters of the row's student, for a list that already joins
+ * `students s`. Left-joined as `sib`, it adds `sib.n` and `sib.names`.
+ *
+ * Two children count as siblings when the admission clerk confirmed it, when
+ * they share a parent's Aadhaar — families here give the same number for every
+ * child — or when they share a phone and a parent's name. Only children still
+ * on the roll are counted: the point of the mark is that the teacher in front
+ * of this child has the other one too.
+ */
+export const SIBLING_JOIN = `LEFT JOIN LATERAL (
+         SELECT count(*)::int AS n,
+                string_agg(trim(o.first_name || ' ' || COALESCE(o.last_name, '')), ', '
+                           ORDER BY o.first_name) AS names
+           FROM students o
+          WHERE o.id <> s.id AND o.status = 'active'
+            AND (
+              EXISTS (SELECT 1 FROM student_siblings sb
+                       WHERE (sb.student_a = s.id AND sb.student_b = o.id)
+                          OR (sb.student_b = s.id AND sb.student_a = o.id))
+              OR (NULLIF(s.father_aadhaar_number, '') IS NOT NULL
+                  AND o.father_aadhaar_number = s.father_aadhaar_number)
+              OR (NULLIF(s.mother_aadhaar_number, '') IS NOT NULL
+                  AND o.mother_aadhaar_number = s.mother_aadhaar_number)
+              OR (NULLIF(s.guardian_aadhaar_number, '') IS NOT NULL
+                  AND o.guardian_aadhaar_number = s.guardian_aadhaar_number)
+              OR (NULLIF(s.primary_phone, '') IS NOT NULL
+                  AND o.primary_phone = s.primary_phone
+                  AND (
+                    (NULLIF(btrim(s.father_name), '') IS NOT NULL
+                     AND lower(btrim(o.father_name)) = lower(btrim(s.father_name)))
+                    OR (NULLIF(btrim(s.mother_name), '') IS NOT NULL
+                        AND lower(btrim(o.mother_name)) = lower(btrim(s.mother_name)))))
+            )) sib ON TRUE`;
+
+/** The two columns that go with {@link SIBLING_JOIN}. */
+export const SIBLING_COLS = `COALESCE(sib.n, 0) AS sibling_count, sib.names AS sibling_names`;
+
+/** The same reckoning for one child, for their own page. */
+export async function siblingMark(studentId: number) {
+  const rows = await query<{ n: number; names: string | null }>(
+    `SELECT COALESCE(sib.n, 0) AS n, sib.names
+       FROM students s ${SIBLING_JOIN}
+      WHERE s.id = $1`,
+    [studentId]);
+  return rows[0] ?? { n: 0, names: null };
+}
