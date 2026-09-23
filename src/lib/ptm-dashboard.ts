@@ -173,13 +173,22 @@ export function ptmScheduled(day: string, centerId: number | null) {
  * Who can be asked for on the dashboard: every mentor, and separately anyone
  * else who has recorded a meeting — a teacher who wrote one up is not a
  * mentor, and must not be listed as one.
+ *
+ * A teacher reads this page for their own centre, so the names are cut to that
+ * centre too: the mentors posted there and anyone who has actually written up
+ * a meeting there. Someone else's mentor is not their business, and the count
+ * beside a name is the work done at the centre in view.
  */
-export function ptmPeople() {
+export function ptmPeople(centerId: number | null) {
+  const args: unknown[] = [];
+  if (centerId) args.push(centerId);
+  const at = centerId ? ` AND i.center_id = $1` : "";
   return query<{ id: number; name: string; role: string; recorded: number }>(
     `SELECT u.id, u.name, u.role,
-            (SELECT count(*) FROM ptm_interactions i WHERE i.mentor_id = u.id)::int AS recorded
+            (SELECT count(*) FROM ptm_interactions i
+              WHERE i.mentor_id = u.id${at})::int AS recorded
        FROM users u
-      WHERE u.role = 'mentor'
-         OR EXISTS (SELECT 1 FROM ptm_interactions i WHERE i.mentor_id = u.id)
-      ORDER BY (u.role = 'mentor') DESC, u.name`);
+      WHERE (u.role = 'mentor'${centerId ? " AND u.center_id = $1" : ""})
+         OR EXISTS (SELECT 1 FROM ptm_interactions i WHERE i.mentor_id = u.id${at})
+      ORDER BY (u.role = 'mentor') DESC, u.name`, args);
 }

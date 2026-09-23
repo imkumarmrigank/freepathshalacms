@@ -54,7 +54,7 @@ export default async function PtmDashboardPage({
   const days = Number(sp.days) || 30;
   const from = addDays(now, -(days - 1));
 
-  const people = await ptmPeople();
+  const people = await ptmPeople(centerId);
   // several mentors record meetings; the office reads one at a time. Anyone
   // else who has written one up is kept apart — a teacher is not a mentor.
   const mentors = people.filter((p) => p.role === "mentor");
