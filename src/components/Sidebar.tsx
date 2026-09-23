@@ -71,6 +71,7 @@ const MENU: Node[] = [
 
   {
     label: "Parents & support", icon: IconChat, children: [
+      { href: "/ptm/dashboard", label: "PTM dashboard", feature: "ptm" },
       { href: "/ptm", label: "PTM interactions", feature: "ptm" },
       { href: "/follow-ups", label: "Follow-ups", feature: "followUps" },
       { href: "/counselling", label: "Counselling", feature: "counselling" },

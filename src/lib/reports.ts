@@ -93,6 +93,8 @@ export async function runReport(
     case "exam-marks":                   return examMarks(scoped, period);
     case "exam-summary":                 return examSummary(scoped, period);
     case "ptm-summary":                  return ptmSummary(scoped, period);
+    case "ptm-daily":                    return ptmDaily(scoped, period);
+    case "ptm-concerns":                 return ptmConcernsReport(scoped, period);
     case "teaching-plan-progress":       return teachingPlanProgress(scoped);
     case "timetable":                    return timetableReport(scoped);
     case "sports-visits":                return sportsVisits(scoped, period);
@@ -1997,6 +1999,123 @@ async function reactivations(p: ReportParams, period: string): Promise<ReportRes
       from_centre: r.from_centre ?? "", to_centre: r.to_centre, from_class: r.from_class ?? "—",
       to_class: r.to_class, left_reason: r.left_reason ?? "", note: r.note ?? "",
       by_name: r.by_name ?? "",
+    })),
+  };
+}
+
+/* ------------------------------------------------------------------- PTM */
+
+/** A day at a centre, as the parent meetings left it. */
+async function ptmDaily(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND i.center_id = $${params.length}`; }
+
+  const rows = await query<{
+    ptm_day: string; center_name: string; held: string; children: string; both: string;
+    mother: string; father: string; guardian: string; attentive: string; neutral: string;
+    resistant: string; follow_ups: string; support: string; concerns: string[] | null;
+  }>(
+    `SELECT to_char(i.interaction_date, 'YYYY-MM-DD') AS ptm_day, ce.name AS center_name,
+            count(*) AS held, count(DISTINCT i.student_id) AS children,
+            count(*) FILTER (WHERE i.parent_present = 'both')     AS both,
+            count(*) FILTER (WHERE i.parent_present = 'mother')   AS mother,
+            count(*) FILTER (WHERE i.parent_present = 'father')   AS father,
+            count(*) FILTER (WHERE i.parent_present = 'guardian') AS guardian,
+            count(*) FILTER (WHERE i.engagement = 'attentive')    AS attentive,
+            count(*) FILTER (WHERE i.engagement = 'neutral')      AS neutral,
+            count(*) FILTER (WHERE i.engagement = 'resistant')    AS resistant,
+            count(*) FILTER (WHERE i.follow_up_required)          AS follow_ups,
+            count(*) FILTER (WHERE i.support_needed IS NOT NULL)  AS support,
+            (SELECT array_agg(x.t || ' (' || x.n || ')' ORDER BY x.n DESC, x.t)
+               FROM (SELECT t, count(*) AS n
+                       FROM ptm_interactions j, unnest(j.concern_tags) t
+                      WHERE j.center_id = i.center_id
+                        AND j.interaction_date = i.interaction_date
+                      GROUP BY t ORDER BY count(*) DESC, t LIMIT 3) x) AS concerns
+       FROM ptm_interactions i
+       JOIN centers ce ON ce.id = i.center_id
+      WHERE i.interaction_date BETWEEN $1 AND $2 ${where}
+      GROUP BY i.interaction_date, i.center_id, ce.code, ce.name
+      ORDER BY i.interaction_date DESC, ce.code`,
+    params,
+  );
+
+  const total = rows.reduce((n, r) => n + Number(r.held), 0);
+  return {
+    title: "PTM day by day, centre by centre",
+    subtitle: `${period} · ${total} meeting${total === 1 ? "" : "s"} over ${rows.length} centre-day${rows.length === 1 ? "" : "s"}`,
+    columns: [
+      { key: "day", label: "Date", width: 12 },
+      { key: "center_name", label: "Centre", width: 16 },
+      { key: "held", label: "Meetings", numeric: true },
+      { key: "children", label: "Children", numeric: true },
+      { key: "both", label: "Both parents", numeric: true, width: 12 },
+      { key: "mother", label: "Mother", numeric: true },
+      { key: "father", label: "Father", numeric: true },
+      { key: "guardian", label: "Guardian", numeric: true },
+      { key: "attentive", label: "Attentive", numeric: true },
+      { key: "neutral", label: "Neutral", numeric: true },
+      { key: "resistant", label: "Resistant", numeric: true },
+      { key: "follow_ups", label: "Follow-ups", numeric: true },
+      { key: "support", label: "Asked for help", numeric: true, width: 13 },
+      { key: "concerns", label: "Concerns raised most", width: 46 },
+    ],
+    rows: rows.map((r) => ({
+      day: r.ptm_day, center_name: r.center_name, held: Number(r.held),
+      children: Number(r.children), both: Number(r.both), mother: Number(r.mother),
+      father: Number(r.father), guardian: Number(r.guardian), attentive: Number(r.attentive),
+      neutral: Number(r.neutral), resistant: Number(r.resistant),
+      follow_ups: Number(r.follow_ups), support: Number(r.support),
+      concerns: (r.concerns ?? []).join(", "),
+    })),
+  };
+}
+
+/** Concerns and commitments, counted per centre. */
+async function ptmConcernsReport(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND i.center_id = $${params.length}`; }
+
+  const rows = await query<{
+    kind: string; tag: string; center_name: string; n: string; children: string;
+    first_seen: string; last_seen: string;
+  }>(
+    `SELECT kind, tag, center_name, count(*) AS n, count(DISTINCT student_id) AS children,
+            to_char(min(interaction_date), 'YYYY-MM-DD') AS first_seen,
+            to_char(max(interaction_date), 'YYYY-MM-DD') AS last_seen
+       FROM (
+         SELECT 'Concern' AS kind, t AS tag, ce.name AS center_name, i.student_id, i.interaction_date
+           FROM ptm_interactions i JOIN centers ce ON ce.id = i.center_id,
+                unnest(i.concern_tags) t
+          WHERE i.interaction_date BETWEEN $1 AND $2 ${where}
+         UNION ALL
+         SELECT 'Commitment', t, ce.name, i.student_id, i.interaction_date
+           FROM ptm_interactions i JOIN centers ce ON ce.id = i.center_id,
+                unnest(i.commitment_tags) t
+          WHERE i.interaction_date BETWEEN $1 AND $2 ${where}
+       ) x
+      GROUP BY kind, tag, center_name
+      ORDER BY kind, count(*) DESC, tag, center_name`,
+    params,
+  );
+
+  return {
+    title: "What parents raise",
+    subtitle: `${period} · concerns ticked and commitments made, by centre`,
+    columns: [
+      { key: "kind", label: "Kind", width: 12 },
+      { key: "tag", label: "What", width: 30 },
+      { key: "center_name", label: "Centre", width: 16 },
+      { key: "n", label: "Times", numeric: true },
+      { key: "children", label: "Children", numeric: true },
+      { key: "first_seen", label: "First", width: 12 },
+      { key: "last_seen", label: "Last", width: 12 },
+    ],
+    rows: rows.map((r) => ({
+      kind: r.kind, tag: r.tag, center_name: r.center_name, n: Number(r.n),
+      children: Number(r.children), first_seen: r.first_seen, last_seen: r.last_seen,
     })),
   };
 }

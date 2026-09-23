@@ -260,6 +260,24 @@ export const REPORTS: ReportMeta[] = [
     filters: ["dates", "center", "class", "session"],
   },
   {
+    key: "ptm-daily",
+    label: "PTM day by day, centre by centre",
+    group: "PTM",
+    description:
+      "One row per date and centre: meetings held, who came, how parents engaged, follow-ups "
+      + "promised, and the concerns raised most that day.",
+    filters: ["dates", "center"],
+  },
+  {
+    key: "ptm-concerns",
+    label: "What parents raise",
+    group: "PTM",
+    description:
+      "Every concern ticked in the period, counted by centre — and the commitments parents "
+      + "made in return.",
+    filters: ["dates", "center"],
+  },
+  {
     key: "ptm-summary",
     label: "PTM and follow-ups",
     group: "PTM",
