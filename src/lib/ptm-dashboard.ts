@@ -169,10 +169,17 @@ export function ptmScheduled(day: string, centerId: number | null) {
     centerId ? [day, centerId] : [day]);
 }
 
-/** Whoever has recorded a parent meeting — mentors, and anyone else who has. */
+/**
+ * Who can be asked for on the dashboard: every mentor, and separately anyone
+ * else who has recorded a meeting — a teacher who wrote one up is not a
+ * mentor, and must not be listed as one.
+ */
 export function ptmPeople() {
-  return query<{ id: number; name: string; role: string }>(
-    `SELECT DISTINCT u.id, u.name, u.role
-       FROM ptm_interactions i JOIN users u ON u.id = i.mentor_id
-      ORDER BY u.name`);
+  return query<{ id: number; name: string; role: string; recorded: number }>(
+    `SELECT u.id, u.name, u.role,
+            (SELECT count(*) FROM ptm_interactions i WHERE i.mentor_id = u.id)::int AS recorded
+       FROM users u
+      WHERE u.role = 'mentor'
+         OR EXISTS (SELECT 1 FROM ptm_interactions i WHERE i.mentor_id = u.id)
+      ORDER BY (u.role = 'mentor') DESC, u.name`);
 }

@@ -6,7 +6,7 @@ import Filters from "@/components/Filters";
 import { ChartFrame, HBarChart, StackedBarChart } from "@/components/charts";
 import { SERIES } from "@/lib/chart-palette";
 import { fmtDate, today, titleCase } from "@/lib/format";
-import { isGlobalRole } from "@/lib/roles";
+import { isGlobalRole, ROLE_LABEL, type Role } from "@/lib/roles";
 import { engagementLabel, modeLabel, parentLabel } from "@/lib/ptm-meta";
 import {
   ptmByCentre, ptmCommitments, ptmConcerns, ptmDay, ptmInteractionsOn, ptmPeople, ptmPerDay,
@@ -55,9 +55,12 @@ export default async function PtmDashboardPage({
   const from = addDays(now, -(days - 1));
 
   const people = await ptmPeople();
-  // several mentors record meetings; the office reads one mentor at a time
+  // several mentors record meetings; the office reads one at a time. Anyone
+  // else who has written one up is kept apart — a teacher is not a mentor.
+  const mentors = people.filter((p) => p.role === "mentor");
+  const others = people.filter((p) => p.role !== "mentor" && p.recorded > 0);
   const who = people.some((p) => String(p.id) === sp.who) ? Number(sp.who) : null;
-  const whoName = people.find((p) => p.id === who)?.name;
+  const chosen = people.find((p) => p.id === who);
 
   const [centers, summary, byCentre, concerns, commitments, perDay, rows, scheduled, scheduledDay] =
     await Promise.all([
@@ -94,8 +97,9 @@ export default async function PtmDashboardPage({
   return (
     <>
       <PageHeader title="PTM dashboard"
-        subtitle={whoName
-          ? `${whoName}'s meetings, and what the parents they saw are raising`
+        subtitle={chosen
+          ? `${chosen.name}${chosen.role === "mentor" ? "" : ` (${ROLE_LABEL[chosen.role as Role]})`}`
+            + "'s meetings, and what the parents they saw are raising"
           : "Yesterday's meetings, today's diary, and what parents are raising"}
         right={<Link href="/ptm" className="btn btn-ghost btn-sm">All interactions</Link>} />
 
@@ -103,14 +107,26 @@ export default async function PtmDashboardPage({
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <Link href={link({ who: null })} scroll={false}
             className={`btn btn-sm ${who === null ? "btn-primary" : "btn-ghost"}`}>
-            Every mentor
+            Everyone
           </Link>
-          {people.map((p) => (
+          {mentors.map((p) => (
             <Link key={p.id} href={link({ who: String(p.id) })} scroll={false}
               className={`btn btn-sm ${who === p.id ? "btn-primary" : "btn-ghost"}`}>
               {p.name}
             </Link>
           ))}
+          {others.length > 0 && (
+            <>
+              <span className="text-[12.5px] text-[var(--muted)]">also written up by</span>
+              {others.map((p) => (
+                <Link key={p.id} href={link({ who: String(p.id) })} scroll={false}
+                  className={`btn btn-sm ${who === p.id ? "btn-primary" : "btn-ghost"}`}>
+                  {p.name}
+                  <span className="ml-1 text-[11px] opacity-70">{ROLE_LABEL[p.role as Role]}</span>
+                </Link>
+              ))}
+            </>
+          )}
         </div>
       )}
 
