@@ -157,7 +157,8 @@ export const REPORTS: ReportMeta[] = [
     group: "Parents & support",
     description:
       "Every child a teacher has referred to the mentor: the reasons ticked, what the teacher "
-      + "wrote, how urgent, who has it, how long it has been open and how it ended.",
+      + "wrote, how urgent, who has it, the day it was picked up, each step the mentor took "
+      + "with its date, how long it has been open and how it ended.",
     filters: ["dates", "center", "class"],
   },
   {

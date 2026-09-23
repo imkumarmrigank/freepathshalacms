@@ -128,13 +128,23 @@ async function counsellingReferrals(p: ReportParams, period: string): Promise<Re
     center_name: string; reasons: string[]; note: string | null; urgency: string;
     status: string; raised_by: string | null; mentor: string | null;
     outcome: string | null; closed_on: string | null; days_open: string;
+    picked_up_on: string | null; actions: string | null;
   }>(
     `SELECT f.raised_on, s.enrollment_no,
             trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
             cl.name AS class_name, ce.name AS center_name,
             f.reasons, f.note, f.urgency, f.status, f.outcome, f.closed_on,
-            r.name AS raised_by, m.name AS mentor,
-            COALESCE(f.closed_on, CURRENT_DATE) - f.raised_on AS days_open
+            f.picked_up_on, r.name AS raised_by, m.name AS mentor,
+            COALESCE(f.closed_on, CURRENT_DATE) - f.raised_on AS days_open,
+            (SELECT string_agg(
+                      to_char(x.acted_on, 'DD Mon') || ' — '
+                      || CASE x.kind WHEN 'picked_up' THEN 'Picked up'
+                                     WHEN 'note'      THEN 'Followed up'
+                                     WHEN 'closed'    THEN 'Closed'
+                                     ELSE 'Reopened' END
+                      || COALESCE(': ' || x.note, ''),
+                      ' | ' ORDER BY x.acted_on, x.id)
+               FROM counselling_actions x WHERE x.flag_id = f.id) AS actions
        FROM counselling_flags f
        JOIN students s ON s.id = f.student_id
        JOIN centers ce ON ce.id = f.center_id
@@ -161,6 +171,8 @@ async function counsellingReferrals(p: ReportParams, period: string): Promise<Re
       { key: "raised_by", label: "Raised by", width: 18 },
       { key: "status", label: "Status", width: 20 },
       { key: "mentor", label: "With", width: 18 },
+      { key: "picked_up_on", label: "Picked up", width: 12 },
+      { key: "actions", label: "What the mentor did, step by step", width: 60 },
       { key: "days_open", label: "Days open", numeric: true },
       { key: "outcome", label: "Outcome", width: 40 },
       { key: "closed_on", label: "Closed", width: 12 },
@@ -178,6 +190,8 @@ async function counsellingReferrals(p: ReportParams, period: string): Promise<Re
       status: r.status === "open" ? "Awaiting mentor"
         : r.status === "in_progress" ? "Counselling under way" : "Closed",
       mentor: r.mentor ?? "—",
+      picked_up_on: r.picked_up_on ?? "",
+      actions: r.actions ?? "",
       days_open: Number(r.days_open),
       outcome: r.outcome ?? "",
       closed_on: r.closed_on ?? "",

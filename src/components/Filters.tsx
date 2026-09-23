@@ -6,13 +6,16 @@ import { IconSearch } from "./icons";
 type Opt = { value: string | number; label: string };
 
 export default function Filters({
-  centers = [], classes = [], sessions = [], searchPlaceholder, extra = [], current,
+  centers = [], classes = [], sessions = [], searchPlaceholder, extra = [], dates = false,
+  current,
 }: {
   centers?: { id: number; name: string; code: string }[];
   classes?: { id: number; name: string }[];
   sessions?: { id: number; name: string; is_current: boolean }[];
   searchPlaceholder?: string;
   extra?: { name: string; label: string; options: Opt[] }[];
+  /** A from/to pair, for a list that is read by the period it covers. */
+  dates?: boolean;
   current?: Record<string, string | undefined>;
 }) {
   const router = useRouter();
@@ -61,6 +64,16 @@ export default function Filters({
           <option value="">All centres</option>
           {centers.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
         </select>
+      )}
+      {dates && (
+        <div className="flex items-center gap-2 text-[13px] text-[var(--muted)]">
+          <span>From</span>
+          <input type="date" className="input w-auto" value={params.get("from") ?? ""}
+            onChange={(e) => set("from", e.target.value)} />
+          <span>to</span>
+          <input type="date" className="input w-auto" value={params.get("to") ?? ""}
+            onChange={(e) => set("to", e.target.value)} />
+        </div>
       )}
       {extra.map((f) => (
         <select key={f.name} className="select w-auto" value={params.get(f.name) ?? ""}

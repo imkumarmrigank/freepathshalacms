@@ -67,12 +67,17 @@ export async function raiseFlag(_prev: unknown, form: FormData) {
   );
 
   revalidatePath("/counselling");
+  revalidatePath("/counselling/flagged");
   revalidatePath(`/students/${studentId}`);
   revalidatePath("/dashboard");
   return { ok: "Referred to the mentor." };
 }
 
-/** The mentor picks it up, or records how it ended. */
+/**
+ * The mentor's side of a referral: pick it up, write down what was done, and
+ * in the end say how it went. Every save leaves a dated line of its own, so
+ * the register shows the steps and not only the ending.
+ */
 export async function updateFlag(_prev: unknown, form: FormData) {
   const user = await requireUser();
   if (!canWork(user.role))
@@ -83,26 +88,42 @@ export async function updateFlag(_prev: unknown, form: FormData) {
   if (!["open", "in_progress", "closed"].includes(status))
     return { error: "Unknown status." };
 
-  const flag = await one<{ center_id: number; student_id: number }>(
-    "SELECT center_id, student_id FROM counselling_flags WHERE id = $1", [id]);
+  const flag = await one<{ center_id: number; student_id: number; status: string }>(
+    "SELECT center_id, student_id, status FROM counselling_flags WHERE id = $1", [id]);
   if (!flag) return { error: "Referral not found." };
   if (!canTouchCenter(user, flag.center_id))
     return { error: "That referral is at another centre." };
 
   const outcome = str(form, "outcome");
+  const note = str(form, "note");
   if (status === "closed" && !outcome)
     return { error: "Say what came of it before closing the referral." };
+  if (status === "in_progress" && flag.status === "in_progress" && !note)
+    return { error: "Write down what you did this time." };
 
   await query(
     `UPDATE counselling_flags
         SET status = $2, outcome = COALESCE($3, outcome), mentor_id = $4,
+            picked_up_on = COALESCE(picked_up_on,
+                                    CASE WHEN $2 <> 'open' THEN CURRENT_DATE END),
             closed_on = CASE WHEN $2 = 'closed' THEN CURRENT_DATE ELSE NULL END,
             updated_at = now()
       WHERE id = $1`,
     [id, status, outcome, user.uid],
   );
 
+  // One line per save. Picking a child up and writing the first note is a
+  // single step, so it is recorded once, as the pick-up.
+  const kind = status === "closed" ? "closed"
+    : status === "open" ? "reopened"
+    : flag.status === "open" ? "picked_up" : "note";
+  await query(
+    `INSERT INTO counselling_actions (flag_id, kind, note, acted_by) VALUES ($1,$2,$3,$4)`,
+    [id, kind, kind === "closed" ? outcome : note, user.uid],
+  );
+
   revalidatePath("/counselling");
+  revalidatePath("/counselling/flagged");
   revalidatePath(`/students/${flag.student_id}`);
   revalidatePath("/dashboard");
   return { ok: status === "closed" ? "Referral closed." : "Referral updated." };

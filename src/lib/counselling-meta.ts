@@ -34,3 +34,14 @@ export const FLAG_STATUS_TONE: Record<string, string> = {
 export const URGENCY_LABEL: Record<string, string> = {
   normal: "Normal", high: "Urgent",
 };
+
+/**
+ * A step in the mentor's trail. The wording is what an administrator reading
+ * the register wants to see, not the database's word for it.
+ */
+export const ACTION_LABEL: Record<string, string> = {
+  picked_up: "Picked up",
+  note: "Followed up",
+  closed: "Closed",
+  reopened: "Reopened",
+};
