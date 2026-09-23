@@ -82,6 +82,8 @@ const MENU: Node[] = [
 
   {
     label: "Centre audits", icon: IconClipboard, feature: "auditReports", children: [
+      { href: "/audits/dashboard", label: "Auditor dashboard",
+        roles: ["super_admin", "admin"] },
       { href: "/audits", label: "Visits & standing", feature: "auditReports" },
       { href: "/audits/suggestions", label: "Suggestions", icon: IconFlag,
         feature: "auditReports" },
