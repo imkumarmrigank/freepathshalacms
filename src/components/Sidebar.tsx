@@ -137,6 +137,8 @@ const MENU: Node[] = [
 
   {
     label: "Staff training", icon: IconAward, children: [
+      { href: "/manage/tests/dashboard", label: "Training dashboard",
+        roles: ["super_admin", "admin"] },
       { href: "/my-test", label: "My test",
         roles: ["teacher", "backup_teacher", "mentor", "sports_teacher", "center_manager"] },
       { href: "/manage/tests", label: "Question bank", roles: ["super_admin", "admin"] },
