@@ -5,7 +5,14 @@ import { Alert, Avatar, Badge, Card, Empty, PageHeader } from "@/components/ui";
 import Filters from "@/components/Filters";
 import { fmtDate, minutesToHours, titleCase, today } from "@/lib/format";
 import { ROLE_LABEL, type Role, isGlobalRole, isTeaching } from "@/lib/roles";
+import Link from "next/link";
 import OverrideForm from "./OverrideForm";
+
+/** Metres up to a kilometre, then kilometres — 3200 m means nothing at a glance. */
+function metres(m: number | null) {
+  if (m == null) return "—";
+  return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${m} m`;
+}
 
 const TONE: Record<string, string> = {
   present: "ok", late: "warn", absent: "bad", leave: "mute", holiday: "mute",
@@ -46,6 +53,27 @@ export default async function StaffAttendancePage({
     params,
   );
 
+  // Turned away by the geofence in the last week. Staff refused day after day
+  // at the same distance is the centre's pin being wrong, not the staff.
+  const refused = await query<{
+    name: string; role: Role; center_name: string | null; center_id: number | null;
+    tries: number; last_at: string; far: number | null; near: number | null;
+    radius_m: number | null; no_pin: boolean;
+  }>(
+    `SELECT u.name, u.role, c.name AS center_name, c.id AS center_id,
+            count(*)::int AS tries, max(f.at) AS last_at,
+            max(f.distance_m) AS far, min(f.distance_m) AS near,
+            max(f.radius_m) AS radius_m,
+            bool_or(f.distance_m IS NULL) AS no_pin
+       FROM staff_checkin_refusals f
+       JOIN users u ON u.id = f.user_id
+       LEFT JOIN centers c ON c.id = f.center_id
+      WHERE f.att_date > CURRENT_DATE - 7 ${centerId ? "AND f.center_id = $1" : ""}
+      GROUP BY u.id, u.name, u.role, c.id, c.name
+      ORDER BY max(f.at) DESC`,
+    centerId ? [centerId] : [],
+  );
+
   const staffList = rows.map((r) => ({ id: r.user_id, name: r.name }));
   const present = rows.filter((r) => r.status === "present" || r.status === "late").length;
   const time = (v: string | null) =>
@@ -55,6 +83,63 @@ export default async function StaffAttendancePage({
     <>
       <PageHeader title="Staff attendance"
         subtitle={`${present} of ${rows.length} checked in on ${fmtDate(date)}`} />
+
+      {refused.length > 0 && (
+        <Card className="mb-4" pad={false}>
+          <div className="border-b border-[var(--border)] px-5 py-3">
+            <div className="text-[14px] font-semibold">Turned away by the geofence</div>
+            <p className="mt-0.5 text-[13px] text-[var(--muted)]">
+              Attempts refused in the last seven days. A big distance, repeated, usually
+              means the centre’s saved pin is wrong — stand at the centre and re-pin it
+              from <Link href="/manage/centers" className="text-[var(--brand)] hover:underline">
+              Centres</Link>.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Who</th><th>Centre</th><th>Tries</th><th>How far away</th>
+                  <th>Last try</th><th>What it looks like</th>
+                </tr>
+              </thead>
+              <tbody>
+                {refused.map((f, i) => (
+                  <tr key={i}>
+                    <td>
+                      <div className="font-medium">{f.name}</div>
+                      <div className="text-[12px] text-[var(--muted)]">{ROLE_LABEL[f.role]}</div>
+                    </td>
+                    <td className="text-[var(--muted)]">{f.center_name ?? "—"}</td>
+                    <td className="tabular-nums">{f.tries}</td>
+                    <td className="whitespace-nowrap">
+                      {f.no_pin || f.far == null
+                        ? <span className="text-[13px] text-[var(--faint)]">no distance</span>
+                        : <>{metres(f.near)}{f.far !== f.near ? ` – ${metres(f.far)}` : ""}
+                            <div className="text-[12px] text-[var(--muted)]">
+                              fence is {f.radius_m ?? "—"} m
+                            </div></>}
+                    </td>
+                    <td className="whitespace-nowrap text-[13px] text-[var(--muted)]">
+                      {new Date(f.last_at).toLocaleString("en-IN",
+                        { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </td>
+                    <td>
+                      {f.no_pin || f.far == null
+                        ? <Badge tone="bad">Centre not pinned</Badge>
+                        : f.far > 2000
+                          ? <Badge tone="bad">The centre’s pin is wrong</Badge>
+                          : f.far > 300
+                            ? <Badge tone="warn">Pin looks off, or they were away</Badge>
+                            : <Badge tone="warn">Just outside the fence</Badge>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
 
       <Filters
         centers={isGlobalRole(user.role) ? centers : []}

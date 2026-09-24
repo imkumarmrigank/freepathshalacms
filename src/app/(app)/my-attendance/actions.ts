@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import type { PoolClient } from "pg";
 import { requireUser } from "@/lib/auth";
-import { one, tx } from "@/lib/db";
+import { one, query, tx } from "@/lib/db";
 import { checkGeofence } from "@/lib/geo";
 import { today } from "@/lib/format";
 
@@ -67,7 +67,22 @@ export async function punch(_prev: unknown, form: FormData): Promise<Punch> {
 
   // Checking out is verified the same way as checking in — both must happen at the centre.
   const geo = checkGeofence(center, lat, lng, kind === "out" ? "out" : "in");
-  if (!geo.ok) return { error: geo.reason ?? "You are outside the centre's allowed area." };
+  if (!geo.ok) {
+    // A refusal is the one thing an administrator needs to see: staff turned
+    // away day after day usually means the centre's pin is wrong, not that
+    // they were somewhere else. Logging must never be what breaks a punch.
+    try {
+      await query(
+        `INSERT INTO staff_checkin_refusals
+           (user_id, center_id, kind, latitude, longitude, accuracy_m,
+            distance_m, radius_m, reason)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [user.uid, center.id, kind === "out" ? "out" : "in", lat, lng, accuracy,
+         geo.distance >= 0 ? geo.distance : null, geo.radius, geo.reason ?? null],
+      );
+    } catch { /* the teacher's message matters more than the record of it */ }
+    return { error: geo.reason ?? "You are outside the centre's allowed area." };
+  }
 
   const day = today();
   const now = new Date();
