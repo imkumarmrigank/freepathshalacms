@@ -118,3 +118,43 @@ export async function saveTestConfig(_prev: unknown, form: FormData) {
   revalidatePath("/manage/tests");
   return { ok: "Test settings saved." };
 }
+
+/**
+ * One person's paper, for the office to read: the questions as they were
+ * asked, what they picked and what was right.
+ */
+export async function loadPaper(testId: number) {
+  await requireRole("super_admin", "admin");
+  const test = await one<{
+    id: number; name: string; role: string; center_name: string | null;
+    cycle_month: string; slot: number; status: string; score: number | null;
+    total: number; started_at: string; submitted_at: string | null;
+    duration_minutes: number; minutes: number | null;
+  }>(
+    `SELECT t.id, u.name, u.role, c.name AS center_name,
+            to_char(t.cycle_month, 'YYYY-MM-DD') AS cycle_month, t.slot, t.status,
+            t.score, t.total, t.started_at, t.submitted_at, t.duration_minutes,
+            CASE WHEN t.submitted_at IS NOT NULL
+                 THEN round(extract(epoch FROM t.submitted_at - t.started_at) / 60)
+            END::int AS minutes
+       FROM staff_tests t
+       JOIN users u ON u.id = t.user_id
+       LEFT JOIN centers c ON c.id = t.center_id
+      WHERE t.id = $1`, [testId]);
+  if (!test) return { error: "That paper was not found." };
+
+  const paper = await query<{
+    position: number; question_en: string; question_hi: string; topic: string | null;
+    options_en: string[]; options_hi: string[]; correct_index: number;
+    chosen_index: number | null; is_correct: boolean | null;
+  }>(
+    `SELECT a.position, q.question_en, q.question_hi, q.topic,
+            q.options_en, q.options_hi, q.correct_index,
+            a.chosen_index, a.is_correct
+       FROM staff_test_answers a
+       JOIN staff_test_questions q ON q.id = a.question_id
+      WHERE a.test_id = $1
+      ORDER BY a.position`, [testId]);
+
+  return { test, paper };
+}

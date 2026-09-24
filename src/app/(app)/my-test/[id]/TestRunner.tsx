@@ -67,6 +67,7 @@ export default function TestRunner({ testId, questions, expiresAt }:
   const mark = marks[q.position];
   const over = left === 0;
   const answered = Object.keys(marks).length;
+  const left_to_answer = questions.length - answered;
   const mm = String(Math.floor(left / 60)).padStart(2, "0");
   const ss = String(left % 60).padStart(2, "0");
 
@@ -101,6 +102,11 @@ export default function TestRunner({ testId, questions, expiresAt }:
         <div className="text-[13px] text-[var(--muted)]">
           Question <b className="text-[var(--text)]">{at + 1}</b> of {questions.length}
           <span className="ml-3">{answered} answered</span>
+          {!over && left_to_answer > 0 && (
+            <span className="ml-3 text-[var(--warn)]">
+              {left_to_answer} still to answer
+            </span>
+          )}
         </div>
         <div className={`ml-auto rounded-[8px] px-3 py-1.5 font-mono text-[15px] font-semibold
           ${over ? "bg-[var(--bad-soft)] text-[var(--bad)]"
@@ -172,7 +178,14 @@ export default function TestRunner({ testId, questions, expiresAt }:
           onClick={() => setAt((i) => Math.min(questions.length - 1, i + 1))}>
           Next →
         </button>
-        <button type="button" className="btn btn-primary ml-auto" disabled={pending}
+        {/* The paper is handed in when there is nothing left to answer, or when
+            the clock has taken the choice away. Finishing early, with
+            questions still blank, is not a thing anyone means to do. */}
+        <button type="button" className="btn btn-primary ml-auto"
+          disabled={pending || (!over && left_to_answer > 0)}
+          title={!over && left_to_answer > 0
+            ? `${left_to_answer} question${left_to_answer === 1 ? "" : "s"} still to answer`
+            : undefined}
           onClick={handIn}>
           {over ? "See the result" : "Finish the test"}
         </button>

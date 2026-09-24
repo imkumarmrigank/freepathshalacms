@@ -32,7 +32,8 @@ export default async function TestPage({ params }: { params: Promise<{ id: strin
         <PageHeader title={slotLabel(test.slot, cfg.tests_per_month)}
           subtitle={`${paper.length} questions · answer one at a time · the clock does not stop`}
           back={{ href: "/my-test", label: "My test" }} />
-        <TestRunner testId={test.id} expiresAt={test.expires_at}
+        {/* one paper's answers must never carry into another's */}
+        <TestRunner key={test.id} testId={test.id} expiresAt={test.expires_at}
           questions={paper.map((q) => ({
             position: q.position,
             question_en: q.question_en, question_hi: q.question_hi,

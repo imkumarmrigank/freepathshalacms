@@ -1,26 +1,18 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/auth";
 import { query } from "@/lib/db";
-import { Badge, Card, Empty, PageHeader, StatCard } from "@/components/ui";
+import { Card, Empty, PageHeader, StatCard } from "@/components/ui";
 import Filters from "@/components/Filters";
 import Pager from "@/components/Pager";
+import ResultRows, { type Row as ResultRow } from "./ResultRows";
 import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
 import { centersForUser, resolveCenterId } from "@/lib/queries";
-import { fmtDate } from "@/lib/format";
 import { isGlobalRole, ROLE_LABEL, type Role } from "@/lib/roles";
-import {
-  TESTED_ROLES, TEST_STATUS_LABEL, TEST_STATUS_TONE, pct, slotLabel,
-} from "@/lib/staff-test-meta";
+import { TESTED_ROLES } from "@/lib/staff-test-meta";
 
 export const metadata = { title: "Test results · Pehchaan" };
 
-type Row = {
-  id: number; name: string; role: Role; center_name: string | null;
-  cycle_month: string; slot: number; tests_per_month: number;
-  started_at: string; submitted_at: string | null; status: string;
-  score: number | null; total: number; answered: number; minutes: number | null;
-  duration_minutes: number; total_rows: string;
-};
+type Row = ResultRow & { total_rows: string };
 
 /** Every paper anyone has taken — the office's view of the same tests. */
 export default async function TestResultsPage({
@@ -131,47 +123,7 @@ export default async function TestResultsPage({
                   <th>Score</th><th>Answered</th><th>Time taken</th><th>Outcome</th>
                 </tr>
               </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td>
-                      <div className="font-medium">{r.name}</div>
-                      <div className="text-[12px] text-[var(--muted)]">{ROLE_LABEL[r.role]}</div>
-                    </td>
-                    <td className="text-[var(--muted)]">{r.center_name ?? "—"}</td>
-                    <td className="whitespace-nowrap text-[var(--muted)]">
-                      {new Date(r.cycle_month).toLocaleDateString("en-IN",
-                        { month: "short", year: "numeric" })}
-                      <div className="text-[12px]">{fmtDate(r.started_at)}</div>
-                    </td>
-                    <td className="text-[var(--muted)]">{slotLabel(r.slot, r.tests_per_month)}</td>
-                    <td className="tabular-nums">
-                      {r.status === "in_progress"
-                        ? <span className="text-[13px] text-[var(--faint)]">—</span>
-                        : <>{r.score ?? 0} of {r.total}
-                            <div className="text-[12px] text-[var(--muted)]">
-                              {pct(r.score ?? 0, r.total)}%
-                            </div></>}
-                    </td>
-                    <td className="tabular-nums">
-                      {r.answered} of {r.total}
-                      {r.answered < r.total && r.status !== "in_progress" && (
-                        <div className="text-[12px] text-[var(--warn)]">
-                          {r.total - r.answered} left unanswered
-                        </div>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap text-[var(--muted)]">
-                      {r.minutes == null ? "—" : `${r.minutes} of ${r.duration_minutes} min`}
-                    </td>
-                    <td>
-                      <Badge tone={TEST_STATUS_TONE[r.status]}>
-                        {TEST_STATUS_LABEL[r.status] ?? r.status}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
+              <ResultRows rows={rows} />
             </table>
           </div>
         )}
