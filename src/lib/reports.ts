@@ -671,12 +671,13 @@ async function staffAttendanceDetail(p: ReportParams, period: string): Promise<R
     check_in: string | null; check_out: string | null; worked_minutes: number | null;
     status: string; check_in_distance_m: number | null; within_geofence: boolean;
     override_by_name: string | null; override_reason: string | null;
+    by_hand: boolean | null; away_reason: string | null;
   }>(
     `SELECT a.att_date, u.name, u.role, c.name AS center_name,
             to_char(a.check_in_at AT TIME ZONE 'Asia/Kolkata', 'HH12:MI AM')  AS check_in,
             to_char(a.check_out_at AT TIME ZONE 'Asia/Kolkata', 'HH12:MI AM') AS check_out,
             a.worked_minutes, a.status, a.check_in_distance_m, a.within_geofence,
-            o.name AS override_by_name, a.override_reason
+            o.name AS override_by_name, a.override_reason, a.by_hand, a.away_reason
        FROM staff_attendance a
        JOIN users u ON u.id = a.user_id
        JOIN centers c ON c.id = a.center_id
@@ -706,8 +707,14 @@ async function staffAttendanceDetail(p: ReportParams, period: string): Promise<R
       check_in: r.check_in, check_out: r.check_out,
       hours: r.worked_minutes ? Math.round((r.worked_minutes / 60) * 10) / 10 : 0,
       check_in_distance_m: r.check_in_distance_m,
-      status: r.status, entry: r.override_by_name ? `Manual · ${r.override_by_name}` : "Geofenced",
-      override_reason: r.override_reason,
+      status: r.status,
+      // three ways a day is recorded, and the office reads them differently:
+      // proved at the centre, typed by the person from away, or put in for
+      // them by an administrator
+      entry: r.override_by_name ? `Manual · ${r.override_by_name}`
+        : r.by_hand ? "Manual entry — away from centre"
+        : "Geofenced",
+      override_reason: r.override_reason ?? r.away_reason,
     })),
   };
 }

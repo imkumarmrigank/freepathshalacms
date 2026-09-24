@@ -39,11 +39,12 @@ export default async function StaffAttendancePage({
     check_in_at: string | null; check_out_at: string | null; worked_minutes: number | null;
     status: string | null; check_in_distance_m: number | null;
     within_geofence: boolean | null; override_by_name: string | null; override_reason: string | null;
+    by_hand: boolean | null; away_reason: string | null;
   }>(
     `SELECT u.id AS user_id, u.name, u.role, c.name AS center_name,
             a.check_in_at, a.check_out_at, a.worked_minutes, a.status,
             a.check_in_distance_m, a.within_geofence, o.name AS override_by_name,
-            a.override_reason
+            a.override_reason, a.by_hand, a.away_reason
        FROM users u
        LEFT JOIN centers c ON c.id = u.center_id
        LEFT JOIN staff_attendance a ON a.user_id = u.id AND a.att_date = $1
@@ -189,6 +190,15 @@ export default async function StaffAttendancePage({
                         <td className="text-[13px] text-[var(--muted)]">
                           {r.override_by_name
                             ? <Badge tone="warn">Manual · {r.override_by_name}</Badge>
+                            : r.by_hand
+                            ? <>
+                                <Badge tone="warn">Manual entry</Badge>
+                                <div className="mt-0.5 text-[12px]">
+                                  {r.away_reason ?? "no reason given"}
+                                  {r.check_in_distance_m != null
+                                    && ` · ${metres(r.check_in_distance_m)} away`}
+                                </div>
+                              </>
                             : r.check_in_distance_m == null ? "—"
                             : `${r.check_in_distance_m} m from centre`}
                           {r.override_reason && (

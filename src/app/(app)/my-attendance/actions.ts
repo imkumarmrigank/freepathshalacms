@@ -4,6 +4,7 @@ import type { PoolClient } from "pg";
 import { requireUser } from "@/lib/auth";
 import { one, query, tx } from "@/lib/db";
 import { checkGeofence } from "@/lib/geo";
+import { AWAY_REASONS } from "@/lib/away-meta";
 import { today } from "@/lib/format";
 
 type Punch = { error?: string; ok?: string };
@@ -157,4 +158,114 @@ export async function punch(_prev: unknown, form: FormData): Promise<Punch> {
 
   if (result.ok) revalidatePath("/my-attendance");
   return result;
+}
+
+/**
+ * A punch entered by hand, from away from the centre.
+ *
+ * Only from outside the fence: inside it, the ordinary check-in proves the
+ * person is there and this one would only weaken that. The distance, the
+ * reason and the fact that it was typed rather than proved are all kept, so
+ * the office reads it for what it is.
+ */
+export async function punchByHand(_prev: unknown, form: FormData): Promise<Punch> {
+  const user = await requireUser();
+  if (!user.centerId) return { error: "You are not assigned to a centre." };
+
+  const kind = String(form.get("kind")) === "out" ? "out" : "in";
+  const reason = String(form.get("reason") ?? "").trim();
+  const note = String(form.get("note") ?? "").trim();
+  if (!(AWAY_REASONS as readonly string[]).includes(reason))
+    return { error: "Choose why you are away from the centre." };
+  if (reason.startsWith("Other") && !note)
+    return { error: "Write where you are and why." };
+
+  const lat = Number(form.get("lat"));
+  const lng = Number(form.get("lng"));
+  const accuracy = form.get("accuracy") ? Math.round(Number(form.get("accuracy"))) : null;
+  const hasFix = Number.isFinite(lat) && Number.isFinite(lng);
+
+  const center = await one<{
+    id: number; name: string; latitude: number | null; longitude: number | null;
+    geofence_radius_m: number;
+  }>(
+    "SELECT id, name, latitude, longitude, geofence_radius_m FROM centers WHERE id = $1",
+    [user.centerId],
+  );
+  if (!center) return { error: "Your centre could not be found." };
+
+  // Inside the fence there is nothing to enter by hand.
+  const geo = hasFix ? checkGeofence(center, lat, lng, kind) : null;
+  if (geo?.ok)
+    return { error: `You are ${geo.distance} m from ${center.name} — check in the usual way.` };
+
+  const day = today();
+  const now = new Date();
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const full = note ? `${reason} — ${note}` : reason;
+
+  return tx<Punch>(async (c) => {
+    if (kind === "in") {
+      const { rows: att } = await c.query<{ id: number }>(
+        `INSERT INTO staff_attendance
+           (user_id, center_id, att_date, status, within_geofence, by_hand, away_reason)
+         VALUES ($1,$2,$3,$4, FALSE, TRUE, $5)
+         ON CONFLICT (user_id, att_date) DO UPDATE
+           SET center_id = EXCLUDED.center_id,
+               by_hand = TRUE,
+               away_reason = COALESCE(staff_attendance.away_reason, EXCLUDED.away_reason),
+               status = CASE WHEN staff_attendance.check_in_at IS NULL
+                             THEN EXCLUDED.status ELSE staff_attendance.status END
+         RETURNING id`,
+        [user.uid, center.id, day, minutes > LATE_AFTER_MINUTES ? "late" : "present", full]);
+      const attendanceId = att[0].id;
+
+      const { rows: open } = await c.query(
+        `SELECT 1 FROM staff_punches
+          WHERE user_id = $1 AND att_date = $2 AND check_out_at IS NULL FOR UPDATE`,
+        [user.uid, day]);
+      if (open.length)
+        return { error: "You are already checked in. Check out before checking in again." };
+
+      await c.query(
+        `INSERT INTO staff_punches
+           (attendance_id, user_id, att_date, check_in_at, check_in_lat, check_in_lng,
+            check_in_distance_m, check_in_accuracy_m, by_hand, away_reason)
+         VALUES ($1,$2,$3, now(), $4,$5,$6,$7, TRUE, $8)`,
+        [attendanceId, user.uid, day, hasFix ? lat : null, hasFix ? lng : null,
+         geo && geo.distance >= 0 ? geo.distance : null, accuracy, full]);
+      await rollUpDay(c, attendanceId);
+      revalidatePath("/my-attendance");
+      return {
+        ok: `Checked in by hand${geo && geo.distance >= 0 ? `, ${geo.distance} m from ${center.name}` : ""}`
+          + " — your administrator will see the reason.",
+      };
+    }
+
+    const { rows: spell } = await c.query<{ id: number; attendance_id: number }>(
+      `SELECT id, attendance_id FROM staff_punches
+        WHERE user_id = $1 AND att_date = $2 AND check_out_at IS NULL
+        ORDER BY check_in_at DESC LIMIT 1 FOR UPDATE`,
+      [user.uid, day]);
+    if (!spell.length) return { error: "You are not checked in." };
+
+    await c.query(
+      `UPDATE staff_punches
+          SET check_out_at = now(), check_out_lat = $2, check_out_lng = $3,
+              check_out_distance_m = $4, check_out_accuracy_m = $5,
+              by_hand = TRUE,
+              away_reason = COALESCE(away_reason, $6),
+              worked_minutes = GREATEST(0,
+                round(extract(epoch FROM now() - check_in_at) / 60))
+        WHERE id = $1`,
+      [spell[0].id, hasFix ? lat : null, hasFix ? lng : null,
+       geo && geo.distance >= 0 ? geo.distance : null, accuracy, full]);
+    await c.query(
+      `UPDATE staff_attendance SET by_hand = TRUE,
+              away_reason = COALESCE(away_reason, $2) WHERE id = $1`,
+      [spell[0].attendance_id, full]);
+    await rollUpDay(c, spell[0].attendance_id);
+    revalidatePath("/my-attendance");
+    return { ok: "Checked out by hand — your administrator will see the reason." };
+  });
 }
