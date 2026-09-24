@@ -77,10 +77,10 @@ export default async function MyTestPage() {
                     : state === "missed" ? <span className="text-[var(--faint)]">Not taken</span>
                     : <span className="text-[var(--faint)]">Later this month</span>}
                 </div>
-                {t && (
+                {t?.status === "in_progress" && (
                   <Link href={`/my-test/${t.id}`}
                     className="mt-2 inline-block text-[13px] text-[var(--brand)] hover:underline">
-                    {t.status === "in_progress" ? "Continue" : "See the paper"}
+                    Continue
                   </Link>
                 )}
               </div>
@@ -119,7 +119,7 @@ export default async function MyTestPage() {
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
-                <tr><th>Month</th><th>Test</th><th>Taken on</th><th>Score</th><th>Status</th><th></th></tr>
+                <tr><th>Month</th><th>Test</th><th>Taken on</th><th>Score</th><th>Status</th></tr>
               </thead>
               <tbody>
                 {history.map((t) => (
@@ -138,14 +138,16 @@ export default async function MyTestPage() {
                               {pct(t.score ?? 0, t.total)}%
                             </span></>}
                     </td>
-                    <td><Badge tone={TEST_STATUS_TONE[t.status]}>
-                      {TEST_STATUS_LABEL[t.status] ?? t.status}
-                    </Badge></td>
                     <td>
-                      <Link href={`/my-test/${t.id}`}
-                        className="text-[13px] text-[var(--brand)] hover:underline">
-                        {t.status === "in_progress" ? "Continue" : "Review"}
-                      </Link>
+                      <Badge tone={TEST_STATUS_TONE[t.status]}>
+                        {TEST_STATUS_LABEL[t.status] ?? t.status}
+                      </Badge>
+                      {t.status === "in_progress" && (
+                        <Link href={`/my-test/${t.id}`}
+                          className="ml-2 text-[13px] text-[var(--brand)] hover:underline">
+                          Continue
+                        </Link>
+                      )}
                     </td>
                   </tr>
                 ))}
