@@ -170,7 +170,7 @@ export function ptmInteractionsOn(day: string, centerId: number | null, mentorId
     follow_up_required: boolean; follow_up_date: string | null;
     follow_up_status: string; discussion: string | null;
     parent_name: string | null; phone: string | null;
-    flag_status: string | null; flag_urgency: string | null;
+    flag_status: string | null; flag_urgency: string | null; flag_on: string | null;
     sibling_count: number; sibling_names: string | null;
   }>(
     `SELECT i.id, i.student_id, trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
@@ -179,7 +179,7 @@ export function ptmInteractionsOn(day: string, centerId: number | null, mentorId
             i.follow_up_required, i.follow_up_date, i.follow_up_status, i.discussion,
             ${PARENT_NAME}, ${PHONE},
             cf.status AS flag_status, cf.urgency AS flag_urgency,
-            ${SIBLING_COLS}
+            cf.raised_on AS flag_on, ${SIBLING_COLS}
        FROM ptm_interactions i
        JOIN students s ON s.id = i.student_id
        JOIN centers ce ON ce.id = i.center_id
@@ -255,7 +255,7 @@ export function ptmAbsentees(day: string, centerId: number | null, limit = 200) 
     center_name: string; father_name: string | null; mother_name: string | null;
     guardian_name: string | null; phone: string | null; last_met: string | null;
     met_this_session: number; flag_status: string | null; flag_urgency: string | null;
-    sibling_count: number; sibling_names: string | null;
+    flag_on: string | null; sibling_count: number; sibling_names: string | null;
     total_rows: string;
   }>(
     `${EXPECTED_ON_DAY(centerId)}
@@ -270,7 +270,7 @@ export function ptmAbsentees(day: string, centerId: number | null, limit = 200) 
             to_char(seen.last_met, 'YYYY-MM-DD') AS last_met,
             seen.n_session AS met_this_session,
             cf.status AS flag_status, cf.urgency AS flag_urgency,
-            ${SIBLING_COLS}
+            cf.raised_on AS flag_on, ${SIBLING_COLS}
        FROM expected x
        JOIN students s ON s.id = x.student_id
        JOIN centers ce ON ce.id = x.center_id

@@ -1,5 +1,6 @@
 import { IconFlag } from "./icons";
 import { FLAG_STATUS_LABEL } from "@/lib/counselling-meta";
+import { fmtDate } from "@/lib/format";
 
 /**
  * A small flag beside a child's name: this one has been referred to the mentor
@@ -10,13 +11,16 @@ import { FLAG_STATUS_LABEL } from "@/lib/counselling-meta";
  * person who needs to know, and they should not have to open the profile to
  * find out.
  */
-export default function FlagMark({ status, urgency }:
-  { status?: string | null; urgency?: string | null }) {
+export default function FlagMark({ status, urgency, raisedOn }:
+  { status?: string | null; urgency?: string | null; raisedOn?: string | null }) {
   if (!status || status === "closed") return null;
   const urgent = urgency === "high";
+  // when it was raised matters as much as that it was: a referral from
+  // yesterday reads differently from one that has sat open for a month
+  const when = raisedOn ? ` · flagged ${fmtDate(raisedOn)}` : "";
   return (
     <span
-      title={`Flagged for counselling · ${FLAG_STATUS_LABEL[status] ?? status}${
+      title={`Flagged for counselling${when} · ${FLAG_STATUS_LABEL[status] ?? status}${
         urgent ? " · urgent" : ""}`}
       aria-label={`Flagged for counselling${urgent ? ", urgent" : ""}`}
       className={`ml-1.5 inline-flex h-[20px] w-[20px] flex-none items-center justify-center

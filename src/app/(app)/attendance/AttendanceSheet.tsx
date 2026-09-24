@@ -17,7 +17,7 @@ export type Row = {
   section: string | null;
   status: string | null;
   reason: string | null;
-  flag_status: string | null; flag_urgency: string | null;
+  flag_status: string | null; flag_urgency: string | null; flag_on: string | null;
   sibling_count: number; sibling_names: string | null;
 };
 
@@ -157,7 +157,7 @@ export default function AttendanceSheet({
                         <Link href={`/students/${r.student_id}`}
                           className="block truncate font-medium hover:text-[var(--brand)]">
                           {r.first_name} {r.last_name ?? ""}
-                          <FlagMark status={r.flag_status} urgency={r.flag_urgency} />
+                          <FlagMark status={r.flag_status} urgency={r.flag_urgency} raisedOn={r.flag_on} />
                           <SiblingMark count={r.sibling_count} names={r.sibling_names} />
                         </Link>
                         <div className="font-mono text-[11px] text-[var(--faint)]">

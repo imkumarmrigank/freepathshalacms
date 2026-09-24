@@ -41,7 +41,7 @@ export default async function AttendancePage({
     rows = await query<Row>(
       `SELECT e.id AS enrollment_id, s.id AS student_id, s.enrollment_no,
               s.first_name, s.last_name, e.roll_no, e.section, a.status, a.reason,
-              cf.status AS flag_status, cf.urgency AS flag_urgency,
+              cf.status AS flag_status, cf.urgency AS flag_urgency, cf.raised_on AS flag_on,
               ${SIBLING_COLS}
          FROM enrollments e
          JOIN students s ON s.id = e.student_id

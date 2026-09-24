@@ -135,6 +135,15 @@ const MENU: Node[] = [
     ],
   },
 
+  {
+    label: "Staff training", icon: IconAward, children: [
+      { href: "/my-test", label: "My test",
+        roles: ["teacher", "backup_teacher", "mentor", "sports_teacher", "center_manager"] },
+      { href: "/manage/tests", label: "Question bank", roles: ["super_admin", "admin"] },
+      { href: "/manage/tests/results", label: "Test results", roles: ["super_admin", "admin"] },
+    ],
+  },
+
   // last in the list on purpose: reached when something is unclear, not daily
   { href: "/manual", label: "Training Manual", icon: IconBook },
 ];

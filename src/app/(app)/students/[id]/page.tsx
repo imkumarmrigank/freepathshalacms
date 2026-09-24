@@ -143,7 +143,7 @@ export default async function StudentPage({
 
       <PageHeader
         title={<>{fullName(student)}
-          <FlagMark status={flag?.status} urgency={flag?.urgency} />
+          <FlagMark status={flag?.status} urgency={flag?.urgency} raisedOn={flag?.raised_on} />
           <SiblingMark count={sib.n} names={sib.names} /></>}
         subtitle={`${student.enrollment_no} · ${student.center_name}${
           currentEnr ? ` · ${currentEnr.class_name}` : ""}`}

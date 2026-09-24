@@ -25,7 +25,7 @@ type Row = {
   enrollment_id: number | null;
   admission_date: string; attendance_pct: string | null; enrolled_here: boolean;
   status_changed_on: string | null;
-  flag_status: string | null; flag_urgency: string | null;
+  flag_status: string | null; flag_urgency: string | null; flag_on: string | null;
   sibling_count: number; sibling_names: string | null;
   total_rows: string;
 };
@@ -84,7 +84,7 @@ export default async function StudentsPage({
     `SELECT count(*) OVER () AS total_rows,
             s.id, s.enrollment_no, s.first_name, s.last_name, s.status, s.admission_date,
             cl.name AS class_name, ce.name AS center_name, e.section, e.id AS enrollment_id,
-            cf.status AS flag_status, cf.urgency AS flag_urgency,
+            cf.status AS flag_status, cf.urgency AS flag_urgency, cf.raised_on AS flag_on,
             ${SIBLING_COLS},
             (e.id IS NOT NULL) AS enrolled_here,
             -- The best date there is for the current status: the dropout date for a
@@ -174,7 +174,7 @@ export default async function StudentsPage({
                         <Avatar name={fullName(r)} size={32} />
                         <span className="font-medium">
                           {fullName(r)}
-                          <FlagMark status={r.flag_status} urgency={r.flag_urgency} />
+                          <FlagMark status={r.flag_status} urgency={r.flag_urgency} raisedOn={r.flag_on} />
                           <SiblingMark count={r.sibling_count} names={r.sibling_names} />
                         </span>
                       </Link>

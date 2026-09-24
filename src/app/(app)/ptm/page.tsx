@@ -44,7 +44,7 @@ export default async function PtmPage({
     enrollment_no: string; mentor: string | null; parent_present: string; engagement: string;
     center_name: string; class_name: string | null;
     follow_up_required: boolean; follow_up_status: string;
-    flag_status: string | null; flag_urgency: string | null;
+    flag_status: string | null; flag_urgency: string | null; flag_on: string | null;
     sibling_count: number; sibling_names: string | null; total_rows: string;
   }>(
     `SELECT count(*) OVER () AS total_rows,
@@ -52,7 +52,7 @@ export default async function PtmPage({
             u.name AS mentor, i.parent_present, i.engagement, ce.name AS center_name,
             cl.name AS class_name, i.follow_up_required, i.follow_up_status,
             cf.status AS flag_status, cf.urgency AS flag_urgency,
-            ${SIBLING_COLS}
+            cf.raised_on AS flag_on, ${SIBLING_COLS}
        FROM ptm_interactions i
        JOIN students s ON s.id = i.student_id
        JOIN centers ce ON ce.id = i.center_id
@@ -123,7 +123,7 @@ export default async function PtmPage({
                         <div className="min-w-0">
                           <div className="truncate font-medium">
                             {fullName(r)}
-                            <FlagMark status={r.flag_status} urgency={r.flag_urgency} />
+                            <FlagMark status={r.flag_status} urgency={r.flag_urgency} raisedOn={r.flag_on} />
                             <SiblingMark count={r.sibling_count} names={r.sibling_names} />
                           </div>
                           <div className="font-mono text-[11px] text-[var(--faint)]">{r.enrollment_no}</div>

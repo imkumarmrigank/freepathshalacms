@@ -99,28 +99,34 @@ export async function siblingsOf(studentId: number) {
  */
 export const SIBLING_JOIN = `LEFT JOIN LATERAL (
          SELECT count(*)::int AS n,
-                string_agg(trim(o.first_name || ' ' || COALESCE(o.last_name, '')), ', '
-                           ORDER BY o.first_name) AS names
-           FROM students o
-          WHERE o.id <> s.id AND o.status = 'active'
-            AND (
-              EXISTS (SELECT 1 FROM student_siblings sb
-                       WHERE (sb.student_a = s.id AND sb.student_b = o.id)
-                          OR (sb.student_b = s.id AND sb.student_a = o.id))
-              OR (NULLIF(s.father_aadhaar_number, '') IS NOT NULL
-                  AND o.father_aadhaar_number = s.father_aadhaar_number)
-              OR (NULLIF(s.mother_aadhaar_number, '') IS NOT NULL
-                  AND o.mother_aadhaar_number = s.mother_aadhaar_number)
-              OR (NULLIF(s.guardian_aadhaar_number, '') IS NOT NULL
-                  AND o.guardian_aadhaar_number = s.guardian_aadhaar_number)
-              OR (NULLIF(s.primary_phone, '') IS NOT NULL
-                  AND o.primary_phone = s.primary_phone
-                  AND (
-                    (NULLIF(btrim(s.father_name), '') IS NOT NULL
-                     AND lower(btrim(o.father_name)) = lower(btrim(s.father_name)))
-                    OR (NULLIF(btrim(s.mother_name), '') IS NOT NULL
-                        AND lower(btrim(o.mother_name)) = lower(btrim(s.mother_name)))))
-            )) sib ON TRUE`;
+                string_agg(o.label, ', ' ORDER BY o.label) AS names
+           FROM (
+             SELECT trim(x.first_name || ' ' || COALESCE(x.last_name, ''))
+                    || COALESCE(' · ' || cl2.name, '') AS label
+               FROM students x
+               LEFT JOIN enrollments e2 ON e2.student_id = x.id AND e2.status = 'active'
+                    AND e2.session_id = (SELECT id FROM academic_sessions
+                                          WHERE is_current LIMIT 1)
+               LEFT JOIN class_levels cl2 ON cl2.id = e2.class_level_id
+              WHERE x.id <> s.id AND x.status = 'active'
+                AND (
+                  EXISTS (SELECT 1 FROM student_siblings sb
+                           WHERE (sb.student_a = s.id AND sb.student_b = x.id)
+                              OR (sb.student_b = s.id AND sb.student_a = x.id))
+                  OR (NULLIF(s.father_aadhaar_number, '') IS NOT NULL
+                      AND x.father_aadhaar_number = s.father_aadhaar_number)
+                  OR (NULLIF(s.mother_aadhaar_number, '') IS NOT NULL
+                      AND x.mother_aadhaar_number = s.mother_aadhaar_number)
+                  OR (NULLIF(s.guardian_aadhaar_number, '') IS NOT NULL
+                      AND x.guardian_aadhaar_number = s.guardian_aadhaar_number)
+                  OR (NULLIF(s.primary_phone, '') IS NOT NULL
+                      AND x.primary_phone = s.primary_phone
+                      AND (
+                        (NULLIF(btrim(s.father_name), '') IS NOT NULL
+                         AND lower(btrim(x.father_name)) = lower(btrim(s.father_name)))
+                        OR (NULLIF(btrim(s.mother_name), '') IS NOT NULL
+                            AND lower(btrim(x.mother_name)) = lower(btrim(s.mother_name)))))
+                )) o) sib ON TRUE`;
 
 /** The two columns that go with {@link SIBLING_JOIN}. */
 export const SIBLING_COLS = `COALESCE(sib.n, 0) AS sibling_count, sib.names AS sibling_names`;

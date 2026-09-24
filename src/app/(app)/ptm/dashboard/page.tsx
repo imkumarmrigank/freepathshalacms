@@ -376,7 +376,7 @@ export default async function PtmDashboardPage({
                   <tr key={r.id}>
                     <td>
                       <Link href={`/ptm/${r.id}`} className="font-medium hover:underline">{r.student}</Link>
-                      <FlagMark status={r.flag_status} urgency={r.flag_urgency} />
+                      <FlagMark status={r.flag_status} urgency={r.flag_urgency} raisedOn={r.flag_on} />
                       <SiblingMark count={r.sibling_count} names={r.sibling_names} />
                       <div className="font-mono text-[11px] text-[var(--faint)]">{r.enrollment_no}</div>
                     </td>
@@ -440,7 +440,7 @@ export default async function PtmDashboardPage({
                     <td>
                       <Link href={`/students/${r.student_id}`}
                         className="font-medium hover:text-[var(--brand)]">{r.student}</Link>
-                      <FlagMark status={r.flag_status} urgency={r.flag_urgency} />
+                      <FlagMark status={r.flag_status} urgency={r.flag_urgency} raisedOn={r.flag_on} />
                       <SiblingMark count={r.sibling_count} names={r.sibling_names} />
                       <div className="font-mono text-[11px] text-[var(--faint)]">{r.enrollment_no}</div>
                     </td>
