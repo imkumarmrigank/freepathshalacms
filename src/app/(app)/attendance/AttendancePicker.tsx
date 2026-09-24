@@ -19,7 +19,11 @@ export default function AttendancePicker({
   const set = (key: string, value: string) => {
     const next = new URLSearchParams(params.toString());
     if (value) next.set(key, value); else next.delete(key);
-    start(() => router.replace(`${path}?${next.toString()}`));
+    // the register must be the server's, never a payload fetched earlier
+    start(() => {
+      router.replace(`${path}?${next.toString()}`);
+      router.refresh();
+    });
   };
 
   return (

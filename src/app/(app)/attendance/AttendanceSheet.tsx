@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { saveAttendance } from "./actions";
 import { Avatar } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
@@ -34,17 +34,32 @@ export default function AttendanceSheet({
   showSection?: boolean;
 }) {
   const [state, action] = useActionState(saveAttendance, null);
-  const [marks, setMarks] = useState<Record<number, string>>(
+
+  // The register on the screen is the register the server sent, with whatever
+  // the teacher has pressed since laid over it. Holding the marks in state
+  // alone meant that picking another class kept the last class's marks, and
+  // the new class looked unmarked until the page was reloaded by hand.
+  const fromServer: Record<number, string> = useMemo(
     () => Object.fromEntries(
       rows.map((r) => [r.enrollment_id, r.status ?? (isPast ? "absent" : "present")]),
     ),
+    [rows, isPast],
   );
+  const reasonsFromServer: Record<number, string> = useMemo(
+    () => Object.fromEntries(rows.map((r) => [r.enrollment_id, r.reason ?? ""])),
+    [rows],
+  );
+  const [pressed, setPressed] = useState<Record<number, string>>({});
+  const [typed, setTyped] = useState<Record<number, string>>({});
+  const marks: Record<number, string> = { ...fromServer, ...pressed };
+  const reasons: Record<number, string> = { ...reasonsFromServer, ...typed };
+  const setMarks = (f: (m: Record<number, string>) => Record<number, string>) =>
+    setPressed((p) => f({ ...fromServer, ...p }));
+  const setReasons = (f: (m: Record<number, string>) => Record<number, string>) =>
+    setTyped((t) => f({ ...reasonsFromServer, ...t }));
 
   // what was saved, so a record left untouched is not asked for a reason again
   const saved = Object.fromEntries(rows.map((r) => [r.enrollment_id, r]));
-  const [reasons, setReasons] = useState<Record<number, string>>(
-    () => Object.fromEntries(rows.map((r) => [r.enrollment_id, r.reason ?? ""])),
-  );
 
   // A mark the register already holds stays settable, even on a closed day:
   // pressing it changes nothing, and disabling it would strand the row.

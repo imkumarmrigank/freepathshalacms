@@ -28,7 +28,11 @@ export default function Filters({
     if (value) next.set(key, value); else next.delete(key);
     // a new filter always starts at the first page, on every list of the page
     for (const k of [...next.keys()]) if (k === "page" || k.endsWith("page")) next.delete(k);
-    start(() => router.replace(`${path}?${next.toString()}`));
+    // a filtered list is read for what it says now, so ask the server again
+    start(() => {
+      router.replace(`${path}?${next.toString()}`);
+      router.refresh();
+    });
   };
 
   return (

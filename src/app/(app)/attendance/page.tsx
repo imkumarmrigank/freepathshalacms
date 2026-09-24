@@ -120,7 +120,12 @@ export default async function AttendancePage({
             hint="Nobody is enrolled in this class for the selected centre and session." />
         </Card>
       ) : (
+        // The sheet holds the marks in its own state, keyed by enrolment. A
+        // different centre, class, section or date is a different register, so
+        // the key starts it again rather than letting it carry the last one's
+        // marks — which is what made a freshly picked class look unmarked.
         <AttendanceSheet
+          key={`${centerId}-${classId}-${section ?? "all"}-${attDate}`}
           rows={rows} attDate={attDate} sessionId={session.id}
           classLevelId={classId} centerId={centerId}
           locked={future || Boolean(holiday) || readOnly}

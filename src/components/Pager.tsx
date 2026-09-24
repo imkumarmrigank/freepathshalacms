@@ -22,7 +22,11 @@ export default function Pager({
   const go = (n: number) => {
     const next = new URLSearchParams(params.toString());
     if (n <= 1) next.delete(param); else next.set(param, String(n));
-    start(() => router.replace(`${path}?${next.toString()}`, { scroll: false }));
+    // the next page is fetched fresh, not from what the router still holds
+    start(() => {
+      router.replace(`${path}?${next.toString()}`, { scroll: false });
+      router.refresh();
+    });
   };
 
   if (total === 0) return null;
