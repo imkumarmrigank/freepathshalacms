@@ -32,7 +32,8 @@ export const ABSENT_REASONS = [
   "Distance issue",
   "Parents allowed it",
   "Siblings responsibility",
-  "No idea",
+  "Visiting Hometown",
+  "Need Followup",
   "Parents not aware",
   "Drop",
 ] as const;
@@ -55,7 +56,7 @@ export function reasonsFor(status: string): readonly string[] {
  * The first day a reason is compulsory. Attendance before it was taken without
  * reasons and stays as it was — correcting an old day does not demand one — so
  * the records that do carry a reason are all ones a teacher actually gave, and
- * a count of "No idea" means what it says.
+ * a count of "Need Followup" means what it says.
  */
 export const REASONS_REQUIRED_FROM = "2026-09-17";
 

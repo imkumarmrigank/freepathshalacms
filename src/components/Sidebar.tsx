@@ -50,6 +50,7 @@ const MENU: Node[] = [
 
   {
     label: "Attendance", icon: IconCheck, children: [
+      { href: "/attendance/dashboard", label: "Attendance dashboard", feature: "attendance" },
       { href: "/attendance", label: "Student register", feature: "attendance" },
       { href: "/my-attendance", label: "My check-in", feature: "ownCheckIn" },
       { href: "/leave", label: "My leave", feature: "leave" },
