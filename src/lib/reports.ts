@@ -1289,7 +1289,11 @@ async function ptmSummary(p: ReportParams, period: string): Promise<ReportResult
             array_to_string(i.concern_tags, ', ') AS concern_tags,
             array_to_string(i.commitment_tags, ', ') AS commitment_tags,
             i.follow_up_priority, i.follow_up_owner, i.confidence, i.support_needed,
-            asg.name AS assigned_to
+            asg.name AS assigned_to,
+            -- the day the meeting was typed in, and how long after it happened:
+            -- a week-old write-up is a different kind of record from a same-day one
+            to_char(i.created_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') AS written_on,
+            ((i.created_at AT TIME ZONE 'Asia/Kolkata')::date - i.interaction_date) AS days_later
        FROM ptm_interactions i
        JOIN students st ON st.id = i.student_id
        JOIN centers ce ON ce.id = i.center_id
@@ -1305,7 +1309,9 @@ async function ptmSummary(p: ReportParams, period: string): Promise<ReportResult
     title: "PTM and follow-ups",
     subtitle: period,
     columns: [
-      { key: "interaction_date", label: "Date", width: 13 },
+      { key: "interaction_date", label: "Meeting on", width: 13 },
+      { key: "written_on", label: "Written up on", width: 14 },
+      { key: "days_later", label: "Days later", numeric: true, width: 11 },
       { key: "center_name", label: "Centre", width: 18 },
       { key: "class_name", label: "Class", width: 12 },
       { key: "enrollment_no", label: "Enrolment No", width: 16 },
@@ -2139,6 +2145,7 @@ async function ptmDaily(p: ReportParams, period: string): Promise<ReportResult> 
     ptm_day: string; center_name: string; held: string; children: string; both: string;
     mother: string; father: string; guardian: string; attentive: string; neutral: string;
     resistant: string; follow_ups: string; support: string; concerns: string[] | null;
+    days_later: string | null; written_on: string | null;
   }>(
     `SELECT to_char(i.interaction_date, 'YYYY-MM-DD') AS ptm_day, ce.name AS center_name,
             count(*) AS held, count(DISTINCT i.student_id) AS children,
@@ -2151,6 +2158,9 @@ async function ptmDaily(p: ReportParams, period: string): Promise<ReportResult> 
             count(*) FILTER (WHERE i.engagement = 'resistant')    AS resistant,
             count(*) FILTER (WHERE i.follow_up_required)          AS follow_ups,
             count(*) FILTER (WHERE i.support_needed IS NOT NULL)  AS support,
+            round(avg((i.created_at AT TIME ZONE 'Asia/Kolkata')::date
+                      - i.interaction_date), 1)                  AS days_later,
+            to_char(max(i.created_at AT TIME ZONE 'Asia/Kolkata'), 'YYYY-MM-DD') AS written_on,
             (SELECT array_agg(x.t || ' (' || x.n || ')' ORDER BY x.n DESC, x.t)
                FROM (SELECT t, count(*) AS n
                        FROM ptm_interactions j, unnest(j.concern_tags) t
@@ -2170,7 +2180,9 @@ async function ptmDaily(p: ReportParams, period: string): Promise<ReportResult> 
     title: "PTM day by day, centre by centre",
     subtitle: `${period} · ${total} meeting${total === 1 ? "" : "s"} over ${rows.length} centre-day${rows.length === 1 ? "" : "s"}`,
     columns: [
-      { key: "day", label: "Date", width: 12 },
+      { key: "day", label: "Meeting date", width: 13 },
+      { key: "written_on", label: "Written up on", width: 14 },
+      { key: "days_later", label: "Days later", numeric: true, width: 11 },
       { key: "center_name", label: "Centre", width: 16 },
       { key: "held", label: "Meetings", numeric: true },
       { key: "children", label: "Children", numeric: true },
@@ -2186,7 +2198,10 @@ async function ptmDaily(p: ReportParams, period: string): Promise<ReportResult> 
       { key: "concerns", label: "Concerns raised most", width: 46 },
     ],
     rows: rows.map((r) => ({
-      day: r.ptm_day, center_name: r.center_name, held: Number(r.held),
+      day: r.ptm_day,
+      written_on: r.written_on ?? "",
+      days_later: r.days_later == null ? "" : Number(r.days_later),
+      center_name: r.center_name, held: Number(r.held),
       children: Number(r.children), both: Number(r.both), mother: Number(r.mother),
       father: Number(r.father), guardian: Number(r.guardian), attentive: Number(r.attentive),
       neutral: Number(r.neutral), resistant: Number(r.resistant),

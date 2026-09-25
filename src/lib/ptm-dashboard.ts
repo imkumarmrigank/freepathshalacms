@@ -157,6 +157,19 @@ export const FAMILY_PHONE = `COALESCE(
          NULLIF(s.mother_mobile, ''), NULLIF(s.father_mobile, ''),
          NULLIF(s.alt_phone, '')) AS phone`;
 
+/**
+ * The day a meeting was written up, and how long after the meeting itself.
+ *
+ * A record is filed under the day the parents were seen, which is right — but
+ * it means a mentor's own working day leaves no mark anywhere, and a week of
+ * write-ups entered on a Friday makes that Friday look empty. Both dates now
+ * travel together.
+ */
+export const WRITTEN_ON =
+  `to_char(i.created_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') AS written_on`;
+export const DAYS_LATER =
+  `((i.created_at AT TIME ZONE 'Asia/Kolkata')::date - i.interaction_date) AS days_later`;
+
 /** The meetings themselves on a day — who was seen, and what was said. */
 export function ptmInteractionsOn(day: string, centerId: number | null, mentorId: number | null) {
   const args: unknown[] = [day];
@@ -172,6 +185,7 @@ export function ptmInteractionsOn(day: string, centerId: number | null, mentorId
     parent_name: string | null; phone: string | null;
     flag_status: string | null; flag_urgency: string | null; flag_on: string | null;
     sibling_count: number; sibling_names: string | null;
+    written_on: string; days_later: number;
   }>(
     `SELECT i.id, i.student_id, trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
             s.enrollment_no, cl.name AS class_name, ce.name AS center_name,
@@ -179,7 +193,8 @@ export function ptmInteractionsOn(day: string, centerId: number | null, mentorId
             i.follow_up_required, i.follow_up_date, i.follow_up_status, i.discussion,
             ${PARENT_NAME}, ${PHONE},
             cf.status AS flag_status, cf.urgency AS flag_urgency,
-            cf.raised_on AS flag_on, ${SIBLING_COLS}
+            cf.raised_on AS flag_on, ${SIBLING_COLS},
+            ${WRITTEN_ON}, ${DAYS_LATER}
        FROM ptm_interactions i
        JOIN students s ON s.id = i.student_id
        JOIN centers ce ON ce.id = i.center_id
@@ -325,6 +340,37 @@ export function ptmMissedDays(from: string, to: string, centerId: number | null)
            WHERE i.center_id = m.center_id AND i.interaction_date = m.meeting_date
              AND (m.class_level_id IS NULL OR i.class_level_id = m.class_level_id))
       ORDER BY m.meeting_date DESC, ce.code`,
+    args);
+}
+
+/**
+ * The other way of reading a day: not the meetings held on it, but the
+ * meetings written up on it. This is the mentor's own working day, and
+ * without it an afternoon spent entering a fortnight of visits shows up
+ * nowhere at all — which is exactly how a day of work came to look empty.
+ */
+export function ptmWrittenOn(day: string, centerId: number | null, mentorId: number | null) {
+  const args: unknown[] = [day];
+  if (centerId) args.push(centerId);
+  const c = `${centerId ? `AND i.center_id = $${args.length}` : ""}`
+    + (mentorId ? ` AND i.mentor_id = $${args.push(mentorId)}` : "");
+  return query<{
+    id: number; student: string; enrollment_no: string; center_name: string;
+    class_name: string | null; mentor: string | null; parent_present: string;
+    interaction_date: string; days_later: number;
+  }>(
+    `SELECT i.id, trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
+            s.enrollment_no, ce.name AS center_name, cl.name AS class_name,
+            u.name AS mentor, i.parent_present,
+            to_char(i.interaction_date, 'YYYY-MM-DD') AS interaction_date,
+            ${DAYS_LATER}
+       FROM ptm_interactions i
+       JOIN students s ON s.id = i.student_id
+       JOIN centers ce ON ce.id = i.center_id
+       LEFT JOIN class_levels cl ON cl.id = i.class_level_id
+       LEFT JOIN users u ON u.id = i.mentor_id
+      WHERE (i.created_at AT TIME ZONE 'Asia/Kolkata')::date = $1 ${c}
+      ORDER BY i.interaction_date, ce.code, student`,
     args);
 }
 

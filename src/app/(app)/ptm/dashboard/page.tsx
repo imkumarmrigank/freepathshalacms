@@ -12,7 +12,7 @@ import { isGlobalRole, ROLE_LABEL, type Role } from "@/lib/roles";
 import { engagementLabel, modeLabel, parentLabel } from "@/lib/ptm-meta";
 import {
   ptmAbsentees, ptmByCentre, ptmCommitments, ptmConcerns, ptmDay, ptmDayCoverage,
-  ptmInteractionsOn, ptmMissedDays, ptmPeople, ptmPerDay, ptmScheduled,
+  ptmInteractionsOn, ptmMissedDays, ptmPeople, ptmPerDay, ptmScheduled, ptmWrittenOn,
 } from "@/lib/ptm-dashboard";
 
 export const metadata = { title: "PTM dashboard · Pehchaan" };
@@ -34,6 +34,18 @@ const WHO_CAME = [
   { key: "both", label: "Both parents", color: SERIES[2] },
   { key: "guardian", label: "Guardian", color: SERIES[3] },
 ];
+
+/**
+ * How long after the meeting it was written up. A day or two is ordinary; a
+ * fortnight means the record is being reconstructed from memory, and the
+ * office should know that when it reads it.
+ */
+function lateness(days: number) {
+  if (days <= 0) return { label: "same day", tone: "text-[12px] text-[var(--faint)]" };
+  if (days === 1) return { label: "next day", tone: "text-[12px] text-[var(--faint)]" };
+  if (days <= 3) return { label: `${days} days later`, tone: "text-[12px] text-[var(--muted)]" };
+  return { label: `${days} days later`, tone: "text-[12px] font-medium text-[var(--warn)]" };
+}
 
 const ENGAGEMENT_TONE: Record<string, string> = {
   attentive: "ok", neutral: "warn", resistant: "bad",
@@ -65,7 +77,7 @@ export default async function PtmDashboardPage({
   const chosen = people.find((p) => p.id === who);
 
   const [centers, summary, byCentre, concerns, commitments, perDay, rows, scheduled, scheduledDay,
-    coverage, missed, notWrittenUp] =
+    coverage, missed, notWrittenUp, writtenToday] =
     await Promise.all([
       centersForUser(user),
       ptmDay(day, centerId, who),
@@ -81,6 +93,7 @@ export default async function PtmDashboardPage({
       ptmDayCoverage(day, centerId),
       ptmAbsentees(day, centerId),
       ptmMissedDays(from, now, centerId),
+      ptmWrittenOn(day, centerId, who),
     ]);
 
   /** Every link keeps the filters already chosen. */
@@ -369,6 +382,7 @@ export default async function PtmDashboardPage({
                   <th>Student</th><th>Centre</th><th>Class</th>
                   <th>Who came, and on what number</th>
                   <th>How it went</th><th>Concerns</th><th>Follow-up</th>
+                  <th>Written up</th>
                 </tr>
               </thead>
               <tbody>
@@ -398,6 +412,66 @@ export default async function PtmDashboardPage({
                       {r.follow_up_required
                         ? <>{fmtDate(r.follow_up_date)}{r.follow_up_status !== "pending" && ` · ${titleCase(r.follow_up_status)}`}</>
                         : <span className="text-[var(--faint)]">not needed</span>}
+                    </td>
+                    <td className="whitespace-nowrap text-[12.5px]">
+                      {fmtDate(r.written_on)}
+                      <div className={lateness(r.days_later).tone}>
+                        {lateness(r.days_later).label}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {/* --------------------------------- the mentor's own day at the keyboard */}
+      <div className="label-cap mb-2.5 mt-6 flex flex-wrap items-center gap-2">
+        <span>Written up on {fmtDate(day)}</span>
+        <span className="text-[12px] font-normal normal-case text-[var(--muted)]">
+          {writtenToday.length === 0
+            ? "nothing was entered on this day"
+            : `${writtenToday.length} meeting${writtenToday.length === 1 ? "" : "s"} entered `
+              + `on this day, covering ${new Set(writtenToday.map((r) => r.interaction_date)).size} `
+              + `meeting date${new Set(writtenToday.map((r) => r.interaction_date)).size === 1 ? "" : "s"}`}
+        </span>
+      </div>
+      <Card pad={false}>
+        {writtenToday.length === 0 ? (
+          <Empty title="Nothing was entered on this day"
+            hint="This is the day's work at the keyboard, not the meetings held that day — a mentor who wrote nothing up appears here as empty." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Student</th><th>Centre</th><th>Class</th>
+                  <th>Who came</th><th>Written up by</th><th>Meeting was on</th>
+                </tr>
+              </thead>
+              <tbody>
+                {writtenToday.map((r) => (
+                  <tr key={r.id}>
+                    <td>
+                      <Link href={`/ptm/${r.id}`} className="font-medium hover:underline">
+                        {r.student}
+                      </Link>
+                      <div className="font-mono text-[11px] text-[var(--faint)]">{r.enrollment_no}</div>
+                    </td>
+                    <td className="text-[var(--muted)]">{r.center_name}</td>
+                    <td className="text-[var(--muted)]">{r.class_name ?? "—"}</td>
+                    <td className="text-[var(--muted)]">{parentLabel(r.parent_present)}</td>
+                    <td className="text-[var(--muted)]">{r.mentor ?? "—"}</td>
+                    <td className="whitespace-nowrap">
+                      <Link href={link({ day: r.interaction_date })}
+                        className="hover:text-[var(--brand)]">
+                        {fmtDate(r.interaction_date)}
+                      </Link>
+                      <div className={lateness(r.days_later).tone}>
+                        {lateness(r.days_later).label}
+                      </div>
                     </td>
                   </tr>
                 ))}
