@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireFeature } from "@/lib/auth";
 import Filters from "@/components/Filters";
 import { centersForUser } from "@/lib/queries";
+import { query } from "@/lib/db";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { seesAllAudits } from "@/lib/roles";
@@ -30,16 +31,26 @@ export default async function SuggestionsPage({
   // A centre may be asked for by an administrator; a centre's own staff are
   // held to theirs whatever the URL says.
   const centerId = all ? (sp.center ? Number(sp.center) : null) : user.centerId;
-  const [rows, board, centers] = await Promise.all([
+  // "who asked for this" is a question an administrator asks of the list; a
+  // centre reads everything asked of it, whoever asked.
+  const raisedBy = all && sp.by ? Number(sp.by) : null;
+  const [rows, board, centers, auditors] = await Promise.all([
     listSuggestions(user, {
       centerId,
       open: !showClosed,
       from: sp.from ?? null,
       to: sp.to ?? null,
+      raisedBy,
       limit: 200,
     }),
     standings(all ? null : user.centerId),
     centersForUser(user),
+    all
+      ? query<{ id: number; name: string }>(
+          `SELECT DISTINCT u.id, u.name
+             FROM audit_suggestions s JOIN users u ON u.id = s.raised_by
+            ORDER BY u.name`)
+      : Promise.resolve([]),
   ]);
 
   const overdue = rows.filter((r) => r.overdue).length;
@@ -65,9 +76,15 @@ export default async function SuggestionsPage({
           centers={all ? centers : []}
           current={sp}
           dates
-          extra={[{ name: "show", label: "Only outstanding", options: [
-            { value: "all", label: "Include closed" },
-          ] }]}
+          extra={[
+            { name: "show", label: "Only outstanding", options: [
+              { value: "all", label: "Include closed" },
+            ] },
+            ...(auditors.length > 0
+              ? [{ name: "by", label: "Raised by anyone",
+                  options: auditors.map((a) => ({ value: a.id, label: a.name })) }]
+              : []),
+          ]}
         />
         <p className="mt-1.5 text-[12px] text-[var(--faint)]">
           The dates are the days the suggestions were raised.
