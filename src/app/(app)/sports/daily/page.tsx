@@ -6,10 +6,10 @@ import Filters from "@/components/Filters";
 import { fmtDate, today } from "@/lib/format";
 import { centersForUser, resolveCenterId } from "@/lib/queries";
 import { isGlobalRole } from "@/lib/roles";
-import { dayBookPeople, mentorDays } from "@/lib/day-book";
-import MentorRows from "./MentorRows";
+import { dayBookPeople, sportsDays } from "@/lib/day-book";
+import SportsRows from "./SportsRows";
 
-export const metadata = { title: "Mentor day book · Pehchaan" };
+export const metadata = { title: "Sports day book · Pehchaan" };
 
 const RANGES = [
   { value: "7", label: "Last 7 days" },
@@ -24,16 +24,16 @@ function addDays(iso: string, n: number) {
 }
 
 /**
- * What each mentor did, day by day: meetings written up and which dates they
- * belong to, children referred, counselling steps taken, centre feedback
- * left. Read by the day the work was entered — the day the mentor actually
- * sat down — with the meeting dates shown beside it.
+ * What each sports teacher did, day by day: centres visited, attendance
+ * marked, tests set and marked, remarks written on children. The visit is
+ * dated by the day it was made; everything else by the day it was entered.
  */
-export default async function MentorDayBookPage({
+export default async function SportsDayBookPage({
   searchParams,
 }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const user = await requireFeature("ptm");
-  if (!isGlobalRole(user.role) && user.role !== "center_manager") redirect("/ptm");
+  const user = await requireFeature("sports");
+  // the sports teacher's own screen is the centre they are standing in
+  if (!isGlobalRole(user.role) || user.role === "sports_teacher") redirect("/sports");
   const sp = await searchParams;
 
   const days = RANGES.some((r) => r.value === sp.days) ? Number(sp.days) : 30;
@@ -43,27 +43,27 @@ export default async function MentorDayBookPage({
   const centerId = resolveCenterId(user, sp.center);
 
   const [centers, people] = await Promise.all([
-    centersForUser(user), dayBookPeople("mentor"),
+    centersForUser(user), dayBookPeople("sports_teacher"),
   ]);
   const who = people.some((p) => String(p.id) === sp.who) ? Number(sp.who) : null;
-  const rows = await mentorDays(from, to, centerId, who);
+  const rows = await sportsDays(from, to, centerId, who);
 
   const totals = rows.reduce((t, r) => ({
-    written: t.written + r.written_up,
-    flags: t.flags + r.flags_raised,
-    steps: t.steps + r.counselling_steps,
-    feedback: t.feedback + r.feedback,
-  }), { written: 0, flags: 0, steps: 0, feedback: 0 });
+    visits: t.visits + r.visits,
+    children: t.children + r.children_seen,
+    sessions: t.sessions + r.sessions,
+    unfiled: t.unfiled + (r.visits - r.reports_filed),
+  }), { visits: 0, children: 0, sessions: 0, unfiled: 0 });
   const workingDays = new Set(rows.map((r) => r.day)).size;
 
   return (
     <>
-      <PageHeader title="Mentor day book"
-        subtitle={`${fmtDate(from)} to ${fmtDate(to)} · what each mentor did, day by day`}
+      <PageHeader title="Sports day book"
+        subtitle={`${fmtDate(from)} to ${fmtDate(to)} · what each sports teacher did, day by day`}
         right={
           <>
-            <Link href="/ptm/dashboard" className="btn btn-ghost btn-sm">PTM dashboard</Link>
-            <Link href="/reports?report=mentor-daily" className="btn btn-ghost btn-sm">
+            <Link href="/sports/dashboard" className="btn btn-ghost btn-sm">Dashboard</Link>
+            <Link href="/reports?report=sports-daily" className="btn btn-ghost btn-sm">
               Download
             </Link>
           </>
@@ -75,37 +75,38 @@ export default async function MentorDayBookPage({
         dates
         extra={[
           { name: "days", label: "Last 30 days", options: RANGES },
-          { name: "who", label: "Every mentor",
+          { name: "who", label: "Every sports teacher",
             options: people.map((p) => ({
               value: p.id, label: p.is_active ? p.name : `${p.name} (inactive)` })) },
         ]}
       />
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Meetings written up" value={totals.written}
+        <StatCard label="Centre visits" value={totals.visits}
           hint={`over ${workingDays} day${workingDays === 1 ? "" : "s"} of work`} />
-        <StatCard label="Children referred" value={totals.flags}
-          tone={totals.flags > 0 ? "warn" : "default"} />
-        <StatCard label="Counselling steps" value={totals.steps}
-          hint="picked up, followed up or closed" />
-        <StatCard label="Centre feedback" value={totals.feedback} />
+        <StatCard label="Children seen" value={totals.children} />
+        <StatCard label="Sessions marked" value={totals.sessions}
+          hint="a sport's register for a day" />
+        <StatCard label="Visits with no report" value={totals.unfiled}
+          tone={totals.unfiled > 0 ? "warn" : "ok"} />
       </div>
 
       <Card className="mt-5" pad={false}>
         {rows.length === 0 ? (
-          <Empty title="No mentor work in this period"
-            hint="Nothing was written up, referred or followed up between these dates." />
+          <Empty title="No sports work in this period"
+            hint="No visit, register, test or remark was entered between these dates." />
         ) : (
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>Day</th><th>Mentor</th><th>Written up</th><th>Meetings belong to</th>
-                  <th>Centres</th><th>Children</th><th>Follow-ups promised</th>
-                  <th>Referrals</th><th>Counselling steps</th><th>Feedback</th>
+                  <th>Day</th><th>Sports teacher</th><th>Visits</th><th>Centres</th>
+                  <th>Children seen</th><th>Time at centres</th>
+                  <th>Sessions marked</th><th>Tests set</th><th>Marks entered</th>
+                  <th>Remarks</th>
                 </tr>
               </thead>
-              <MentorRows rows={rows} centerId={centerId} />
+              <SportsRows rows={rows} centerId={centerId} />
             </table>
           </div>
         )}

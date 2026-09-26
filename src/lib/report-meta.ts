@@ -333,6 +333,17 @@ export const REPORTS: ReportMeta[] = [
     roles: ["super_admin", "admin", "auditor"],
   },
   {
+    key: "sports-daily",
+    label: "Sports day book",
+    group: "Sports",
+    description:
+      "What each sports teacher did on each working day: centres visited and whether the "
+      + "report was filed, children seen, time at the centres, registers marked, tests set "
+      + "and marked, and remarks written on children.",
+    filters: ["dates", "center"],
+    roles: ["super_admin", "admin"],
+  },
+  {
     key: "auditor-daily",
     label: "Auditor day book",
     group: "Centre audits",

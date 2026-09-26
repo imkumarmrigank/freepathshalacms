@@ -4,7 +4,7 @@ import { groupByOf, reportByKey, type GroupBy } from "./report-meta";
 import { titleCase } from "./format";
 import type { SessionUser } from "./auth";
 import { isGlobalRole, ROLE_LABEL, type Role } from "./roles";
-import { auditorDays, mentorDays } from "./day-book";
+import { auditorDays, mentorDays, sportsDays } from "./day-book";
 import { FAMILY_PHONE, PARENT_NAME, PHONE } from "./ptm-dashboard";
 
 export type ReportColumn = { key: string; label: string; width?: number; numeric?: boolean };
@@ -99,6 +99,7 @@ export async function runReport(
     case "ptm-attendance":               return ptmAttendance(scoped, period);
     case "mentor-daily":                 return mentorDaily(scoped, period);
     case "auditor-daily":                return auditorDaily(scoped, period);
+    case "sports-daily":                 return sportsDaily(scoped, period);
     case "ptm-concerns":                 return ptmConcernsReport(scoped, period);
     case "teaching-plan-progress":       return teachingPlanProgress(scoped);
     case "timetable":                    return timetableReport(scoped);
@@ -2170,6 +2171,37 @@ async function mentorDaily(p: ReportParams, period: string): Promise<ReportResul
       children: r.children, centres: r.centres ?? "",
       follow_ups_promised: r.follow_ups_promised, flags_raised: r.flags_raised,
       counselling_steps: r.counselling_steps, feedback: r.feedback,
+    })),
+  };
+}
+
+/** A sports teacher's working day, in a sheet. */
+async function sportsDaily(p: ReportParams, period: string): Promise<ReportResult> {
+  const rows = await sportsDays(p.from, p.to, p.centerId, null);
+  const visits = rows.reduce((n, r) => n + r.visits, 0);
+  return {
+    title: "Sports day book",
+    subtitle: `${period} · ${visits} centre visit${visits === 1 ? "" : "s"} `
+      + `over ${new Set(rows.map((r) => r.day)).size} working days`,
+    columns: [
+      { key: "day", label: "Day of work", width: 13 },
+      { key: "teacher", label: "Sports teacher", width: 22 },
+      { key: "visits", label: "Centre visits", numeric: true, width: 13 },
+      { key: "reports_filed", label: "Reports filed", numeric: true, width: 13 },
+      { key: "centres", label: "Centres", width: 28 },
+      { key: "children_seen", label: "Children seen", numeric: true, width: 14 },
+      { key: "minutes", label: "Minutes at centres", numeric: true, width: 17 },
+      { key: "sessions", label: "Sessions marked", numeric: true, width: 15 },
+      { key: "attendance_marked", label: "Children marked", numeric: true, width: 15 },
+      { key: "tests", label: "Tests set", numeric: true, width: 10 },
+      { key: "marks", label: "Marks entered", numeric: true, width: 13 },
+      { key: "remarks", label: "Remarks written", numeric: true, width: 15 },
+    ],
+    rows: rows.map((r) => ({
+      day: r.day, teacher: r.teacher, visits: r.visits, reports_filed: r.reports_filed,
+      centres: r.centres ?? "", children_seen: r.children_seen, minutes: r.minutes,
+      sessions: r.sessions, attendance_marked: r.attendance_marked,
+      tests: r.tests, marks: r.marks, remarks: r.remarks,
     })),
   };
 }

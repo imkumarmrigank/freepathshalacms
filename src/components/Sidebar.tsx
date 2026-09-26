@@ -101,6 +101,8 @@ const MENU: Node[] = [
 
   {
     label: "Sports", icon: IconBall, feature: "sports", children: [
+      { href: "/sports/daily", label: "Sports day book",
+        roles: ["super_admin", "admin"] },
       { href: "/sports/dashboard", label: "Sports dashboard", roles: ["super_admin", "admin"] },
       { href: "/sports", label: "Sports by centre", feature: "sports" },
     ],

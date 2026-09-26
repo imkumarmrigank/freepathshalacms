@@ -7,6 +7,7 @@ import { fmtDate, today } from "@/lib/format";
 import { centersForUser, resolveCenterId } from "@/lib/queries";
 import { canScheduleVisits, isGlobalRole } from "@/lib/roles";
 import { auditorDays, dayBookPeople } from "@/lib/day-book";
+import AuditorRows from "./AuditorRows";
 
 export const metadata = { title: "Auditor day book · Pehchaan" };
 
@@ -103,33 +104,7 @@ export default async function AuditorDayBookPage({
                   <th>Suggestions</th><th>Replies</th><th>Verified</th><th>Visits booked</th>
                 </tr>
               </thead>
-              <tbody>
-                {rows.map((r, i) => (
-                  <tr key={`${r.day}-${r.auditor_id}-${i}`}>
-                    <td className="whitespace-nowrap font-medium">{fmtDate(r.day)}</td>
-                    <td>{r.auditor}</td>
-                    <td className="tabular-nums">
-                      {r.visits_filed}
-                      {r.visits_made > 0 && r.visits_made !== r.visits_filed && (
-                        <div className="text-[12px] text-[var(--muted)]">
-                          {r.visits_made} visited that day
-                        </div>
-                      )}
-                    </td>
-                    <td className="max-w-[220px] text-[13px] text-[var(--muted)]">
-                      {r.centres ?? "—"}
-                    </td>
-                    <td className="tabular-nums text-[var(--muted)]">{r.children_seen || "—"}</td>
-                    <td className="tabular-nums">
-                      {r.avg_score == null ? "—" : `${r.avg_score}%`}
-                    </td>
-                    <td className="tabular-nums">{r.suggestions || "—"}</td>
-                    <td className="tabular-nums">{r.replies || "—"}</td>
-                    <td className="tabular-nums">{r.verified || "—"}</td>
-                    <td className="tabular-nums text-[var(--muted)]">{r.scheduled || "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
+              <AuditorRows rows={rows} centerId={centerId} />
             </table>
           </div>
         )}

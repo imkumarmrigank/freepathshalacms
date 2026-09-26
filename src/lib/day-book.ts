@@ -181,8 +181,288 @@ export function mentorDays(
 }
 
 /** The people who appear in a day book, for its picker. */
-export function dayBookPeople(role: "auditor" | "mentor") {
+export function dayBookPeople(role: "auditor" | "mentor" | "sports_teacher") {
   return query<{ id: number; name: string; is_active: boolean }>(
     `SELECT id, name, is_active FROM users WHERE role = $1
       ORDER BY is_active DESC, name`, [role]);
+}
+
+/** One item of work, whatever kind it was — the day book's detail. */
+export type DayItem = {
+  kind: string; at: string | null; title: string; centre: string | null;
+  detail: string | null; extra: string | null; href: string | null;
+};
+
+/**
+ * Everything one auditor did on one day, item by item.
+ *
+ * The day book counts; this says what the counts were made of — which visit,
+ * which centre, what was asked for. Read by the day the work was entered, as
+ * the counts are, so the two always agree.
+ */
+export function auditorDayDetail(day: string, personId: number, centerId: number | null) {
+  const args: unknown[] = [day, personId];
+  const centre = centerId ? args.push(centerId) : 0;
+  return query<DayItem>(
+    `SELECT 'Visit filed' AS kind,
+            to_char(v.created_at ${IST}, 'HH24:MI') AS at,
+            c.name AS title, c.name AS centre,
+            CASE WHEN v.visited_on = (v.created_at ${IST})::date
+                 THEN 'Visited and filed the same day'
+                 ELSE 'Visit of ' || to_char(v.visited_on, 'DD Mon') END AS detail,
+            COALESCE(round(v.score_pct)::text || '% · ' || v.overall, v.status) AS extra,
+            '/audits/' || v.id AS href
+       FROM audit_visits v
+       JOIN centers c ON c.id = v.center_id
+      WHERE v.auditor_id = $2 AND (v.created_at ${IST})::date = $1
+        ${centre ? `AND v.center_id = $${centre}` : ""}
+     UNION ALL
+     SELECT 'Suggestion raised',
+            to_char(s.created_at ${IST}, 'HH24:MI'),
+            s.title, c.name, s.detail,
+            initcap(s.priority) || CASE WHEN s.due_on IS NOT NULL
+                 THEN ' · due ' || to_char(s.due_on, 'DD Mon') ELSE '' END,
+            '/audits/suggestions/' || s.id
+       FROM audit_suggestions s
+       JOIN centers c ON c.id = s.center_id
+      WHERE s.raised_by = $2 AND (s.created_at ${IST})::date = $1
+        ${centre ? `AND s.center_id = $${centre}` : ""}
+     UNION ALL
+     SELECT 'Reply written',
+            to_char(r.created_at ${IST}, 'HH24:MI'),
+            s.title, c.name, r.body,
+            CASE WHEN r.set_status IS NOT NULL THEN 'Moved to ' || r.set_status END,
+            '/audits/suggestions/' || s.id
+       FROM audit_replies r
+       JOIN audit_suggestions s ON s.id = r.suggestion_id
+       JOIN centers c ON c.id = s.center_id
+      WHERE r.author_id = $2 AND (r.created_at ${IST})::date = $1
+        ${centre ? `AND s.center_id = $${centre}` : ""}
+     UNION ALL
+     SELECT 'Claim verified', NULL, s.title, c.name, s.detail,
+            COALESCE(initcap(s.verdict), 'verified'),
+            '/audits/suggestions/' || s.id
+       FROM audit_suggestions s
+       JOIN centers c ON c.id = s.center_id
+      WHERE s.verified_by = $2 AND s.verified_on = $1
+        ${centre ? `AND s.center_id = $${centre}` : ""}
+     ORDER BY 2 NULLS LAST, 1`,
+    args);
+}
+
+/** Everything one mentor did on one day, item by item. */
+export function mentorDayDetail(day: string, personId: number, centerId: number | null) {
+  const args: unknown[] = [day, personId];
+  const centre = centerId ? args.push(centerId) : 0;
+  return query<DayItem>(
+    `SELECT 'Meeting written up' AS kind,
+            to_char(i.created_at ${IST}, 'HH24:MI') AS at,
+            trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS title,
+            c.name AS centre,
+            CASE WHEN i.interaction_date = (i.created_at ${IST})::date
+                 THEN 'Met the same day'
+                 ELSE 'Meeting of ' || to_char(i.interaction_date, 'DD Mon') END AS detail,
+            initcap(i.parent_present) || ' · ' || initcap(i.engagement)
+              || CASE WHEN i.follow_up_required THEN ' · follow-up promised' ELSE '' END AS extra,
+            '/ptm/' || i.id AS href
+       FROM ptm_interactions i
+       JOIN students s ON s.id = i.student_id
+       JOIN centers c ON c.id = i.center_id
+      WHERE i.mentor_id = $2 AND (i.created_at ${IST})::date = $1
+        ${centre ? `AND i.center_id = $${centre}` : ""}
+     UNION ALL
+     SELECT 'Counselling step', NULL,
+            trim(s.first_name || ' ' || COALESCE(s.last_name, '')),
+            c.name, a.note,
+            CASE a.kind WHEN 'picked_up' THEN 'Picked up'
+                        WHEN 'note' THEN 'Followed up'
+                        WHEN 'closed' THEN 'Closed'
+                        ELSE 'Reopened' END,
+            '/students/' || s.id
+       FROM counselling_actions a
+       JOIN counselling_flags f ON f.id = a.flag_id
+       JOIN students s ON s.id = f.student_id
+       JOIN centers c ON c.id = f.center_id
+      WHERE a.acted_by = $2 AND a.acted_on = $1
+        ${centre ? `AND f.center_id = $${centre}` : ""}
+     UNION ALL
+     SELECT 'Child referred', NULL,
+            trim(s.first_name || ' ' || COALESCE(s.last_name, '')),
+            c.name, f.note, array_to_string(f.reasons, ', '),
+            '/students/' || s.id
+       FROM counselling_flags f
+       JOIN students s ON s.id = f.student_id
+       JOIN centers c ON c.id = f.center_id
+      WHERE f.raised_by = $2 AND f.raised_on = $1
+        ${centre ? `AND f.center_id = $${centre}` : ""}
+     UNION ALL
+     SELECT 'Centre feedback',
+            to_char(fb.created_at ${IST}, 'HH24:MI'),
+            c.name, c.name, fb.working_well,
+            'Rated ' || fb.rating || ' of 5'
+              || CASE WHEN fb.urgent THEN ' · urgent' ELSE '' END,
+            '/centre-feedback'
+       FROM centre_feedback fb
+       JOIN centers c ON c.id = fb.center_id
+      WHERE fb.mentor_id = $2 AND (fb.created_at ${IST})::date = $1
+        ${centre ? `AND fb.center_id = $${centre}` : ""}
+     ORDER BY 2 NULLS LAST, 1`,
+    args);
+}
+
+export type SportsDay = {
+  day: string; teacher_id: number; teacher: string;
+  visits: number; centres: string | null; children_seen: number; minutes: number;
+  attendance_marked: number; sessions: number;
+  tests: number; marks: number; remarks: number; reports_filed: number;
+};
+
+/** What each sports teacher did, day by day. */
+export function sportsDays(
+  from: string, to: string, centerId: number | null, teacherId: number | null,
+) {
+  const args: unknown[] = [from, to];
+  const centre = centerId ? args.push(centerId) : 0;
+  const who = teacherId ? ` AND u.id = $${args.push(teacherId)}` : "";
+  const atCentre = centre ? `AND v.center_id = $${centre}` : "";
+  const sportAtCentre = centre ? `AND sp.center_id = $${centre}` : "";
+  return query<SportsDay>(
+    `WITH visits AS (
+       SELECT v.visit_date AS day, v.user_id AS person, count(*)::int AS n,
+              string_agg(DISTINCT c.name, ', ') AS centres,
+              sum(COALESCE(v.children_count, 0))::int AS children,
+              sum(COALESCE(v.worked_minutes, 0))::int AS minutes,
+              count(*) FILTER (WHERE v.report_submitted_at IS NOT NULL)::int AS filed
+         FROM sports_visits v
+         JOIN centers c ON c.id = v.center_id
+        WHERE v.visit_date BETWEEN $1 AND $2 ${atCentre}
+        GROUP BY 1, 2
+     ),
+     att AS (
+       SELECT (a.marked_at ${IST})::date AS day, a.marked_by AS person,
+              count(*)::int AS n, count(DISTINCT (a.sport_id, a.att_date))::int AS sessions
+         FROM sport_attendance a
+         JOIN sports sp ON sp.id = a.sport_id
+        WHERE (a.marked_at ${IST})::date BETWEEN $1 AND $2 ${sportAtCentre}
+        GROUP BY 1, 2
+     ),
+     tests AS (
+       SELECT (t.created_at ${IST})::date AS day, t.created_by AS person, count(*)::int AS n
+         FROM sport_tests t
+         JOIN sports sp ON sp.id = t.sport_id
+        WHERE (t.created_at ${IST})::date BETWEEN $1 AND $2 ${sportAtCentre}
+        GROUP BY 1, 2
+     ),
+     marks AS (
+       SELECT (m.marked_at ${IST})::date AS day, m.marked_by AS person, count(*)::int AS n
+         FROM sport_marks m
+         JOIN sport_tests t ON t.id = m.test_id
+         JOIN sports sp ON sp.id = t.sport_id
+        WHERE (m.marked_at ${IST})::date BETWEEN $1 AND $2 ${sportAtCentre}
+        GROUP BY 1, 2
+     ),
+     notes AS (
+       SELECT (ss.remarks_updated_at ${IST})::date AS day, ss.remarks_by AS person,
+              count(*)::int AS n
+         FROM sport_students ss
+         JOIN sports sp ON sp.id = ss.sport_id
+        WHERE ss.remarks_updated_at IS NOT NULL
+          AND (ss.remarks_updated_at ${IST})::date BETWEEN $1 AND $2 ${sportAtCentre}
+        GROUP BY 1, 2
+     ),
+     days AS (
+       SELECT day, person FROM visits
+       UNION SELECT day, person FROM att
+       UNION SELECT day, person FROM tests
+       UNION SELECT day, person FROM marks
+       UNION SELECT day, person FROM notes
+     )
+     SELECT to_char(d.day, 'YYYY-MM-DD') AS day, u.id AS teacher_id, u.name AS teacher,
+            COALESCE(v.n, 0) AS visits, v.centres,
+            COALESCE(v.children, 0) AS children_seen, COALESCE(v.minutes, 0) AS minutes,
+            COALESCE(a.n, 0) AS attendance_marked, COALESCE(a.sessions, 0) AS sessions,
+            COALESCE(t.n, 0) AS tests, COALESCE(m.n, 0) AS marks,
+            COALESCE(nt.n, 0) AS remarks, COALESCE(v.filed, 0) AS reports_filed
+       FROM days d
+       JOIN users u ON u.id = d.person
+       LEFT JOIN visits v ON v.day = d.day AND v.person = d.person
+       LEFT JOIN att a    ON a.day = d.day AND a.person = d.person
+       LEFT JOIN tests t  ON t.day = d.day AND t.person = d.person
+       LEFT JOIN marks m  ON m.day = d.day AND m.person = d.person
+       LEFT JOIN notes nt ON nt.day = d.day AND nt.person = d.person
+      WHERE u.role = 'sports_teacher' ${who}
+      ORDER BY d.day DESC, u.name`,
+    args);
+}
+
+/** Everything one sports teacher did on one day, item by item. */
+export function sportsDayDetail(day: string, personId: number, centerId: number | null) {
+  const args: unknown[] = [day, personId];
+  const centre = centerId ? args.push(centerId) : 0;
+  return query<DayItem>(
+    `SELECT 'Centre visit' AS kind,
+            to_char(v.check_in_at ${IST}, 'HH24:MI') AS at,
+            c.name AS title, c.name AS centre,
+            COALESCE(v.highlights, v.activities) AS detail,
+            COALESCE(v.children_count, 0) || ' children'
+              || CASE WHEN v.worked_minutes IS NOT NULL
+                      THEN ' · ' || v.worked_minutes || ' min' ELSE '' END
+              || CASE WHEN v.report_submitted_at IS NOT NULL
+                      THEN ' · report filed' ELSE ' · report not filed' END AS extra,
+            '/sports' AS href
+       FROM sports_visits v
+       JOIN centers c ON c.id = v.center_id
+      WHERE v.user_id = $2 AND v.visit_date = $1
+        ${centre ? `AND v.center_id = $${centre}` : ""}
+     UNION ALL
+     SELECT 'Attendance marked',
+            to_char(min(a.marked_at) ${IST}, 'HH24:MI'),
+            sp.name, c.name,
+            'For ' || to_char(a.att_date, 'DD Mon'),
+            count(*) || ' children · '
+              || count(*) FILTER (WHERE a.status = 'present') || ' present',
+            '/sports/' || sp.id
+       FROM sport_attendance a
+       JOIN sports sp ON sp.id = a.sport_id
+       JOIN centers c ON c.id = sp.center_id
+      WHERE a.marked_by = $2 AND (a.marked_at ${IST})::date = $1
+        ${centre ? `AND sp.center_id = $${centre}` : ""}
+      GROUP BY sp.id, sp.name, c.name, a.att_date
+     UNION ALL
+     SELECT 'Test set',
+            to_char(t.created_at ${IST}, 'HH24:MI'),
+            t.title, c.name, sp.name,
+            'Out of ' || t.max_marks || ' · ' || to_char(t.test_date, 'DD Mon'),
+            '/sports/' || sp.id || '/tests/' || t.id
+       FROM sport_tests t
+       JOIN sports sp ON sp.id = t.sport_id
+       JOIN centers c ON c.id = sp.center_id
+      WHERE t.created_by = $2 AND (t.created_at ${IST})::date = $1
+        ${centre ? `AND sp.center_id = $${centre}` : ""}
+     UNION ALL
+     SELECT 'Marks entered',
+            to_char(min(m.marked_at) ${IST}, 'HH24:MI'),
+            t.title, c.name, sp.name,
+            count(*) || ' children marked',
+            '/sports/' || sp.id || '/tests/' || t.id
+       FROM sport_marks m
+       JOIN sport_tests t ON t.id = m.test_id
+       JOIN sports sp ON sp.id = t.sport_id
+       JOIN centers c ON c.id = sp.center_id
+      WHERE m.marked_by = $2 AND (m.marked_at ${IST})::date = $1
+        ${centre ? `AND sp.center_id = $${centre}` : ""}
+      GROUP BY t.id, t.title, c.name, sp.id, sp.name
+     UNION ALL
+     SELECT 'Remark on a child',
+            to_char(ss.remarks_updated_at ${IST}, 'HH24:MI'),
+            trim(s.first_name || ' ' || COALESCE(s.last_name, '')), c.name,
+            ss.remarks, sp.name, '/students/' || s.id
+       FROM sport_students ss
+       JOIN sports sp ON sp.id = ss.sport_id
+       JOIN students s ON s.id = ss.student_id
+       JOIN centers c ON c.id = sp.center_id
+      WHERE ss.remarks_by = $2 AND (ss.remarks_updated_at ${IST})::date = $1
+        ${centre ? `AND sp.center_id = $${centre}` : ""}
+     ORDER BY 2 NULLS LAST, 1`,
+    args);
 }
