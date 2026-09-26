@@ -4,7 +4,7 @@ import { groupByOf, reportByKey, type GroupBy } from "./report-meta";
 import { titleCase } from "./format";
 import type { SessionUser } from "./auth";
 import { isGlobalRole, ROLE_LABEL, type Role } from "./roles";
-import { auditorDays, mentorDays, sportsDays } from "./day-book";
+import { auditorDays, mentorDays, sportsDays, teacherDays } from "./day-book";
 import { FAMILY_PHONE, PARENT_NAME, PHONE } from "./ptm-dashboard";
 
 export type ReportColumn = { key: string; label: string; width?: number; numeric?: boolean };
@@ -100,6 +100,7 @@ export async function runReport(
     case "mentor-daily":                 return mentorDaily(scoped, period);
     case "auditor-daily":                return auditorDaily(scoped, period);
     case "sports-daily":                 return sportsDaily(scoped, period);
+    case "teacher-daily":                return teacherDaily(scoped, period);
     case "ptm-concerns":                 return ptmConcernsReport(scoped, period);
     case "teaching-plan-progress":       return teachingPlanProgress(scoped);
     case "timetable":                    return timetableReport(scoped);
@@ -2171,6 +2172,45 @@ async function mentorDaily(p: ReportParams, period: string): Promise<ReportResul
       children: r.children, centres: r.centres ?? "",
       follow_ups_promised: r.follow_ups_promised, flags_raised: r.flags_raised,
       counselling_steps: r.counselling_steps, feedback: r.feedback,
+    })),
+  };
+}
+
+/**
+ * A teacher's working day, in a sheet: the punch, the register, and whether
+ * the lesson was written up — with what was taught and set, so the sheet can
+ * be read without opening the system.
+ */
+async function teacherDaily(p: ReportParams, period: string): Promise<ReportResult> {
+  const rows = await teacherDays(p.from, p.to, p.centerId, null);
+  const written = rows.filter((r) => r.notes_written > 0).length;
+  return {
+    title: "Teacher day book",
+    subtitle: `${period} · ${rows.length} teacher-day${rows.length === 1 ? "" : "s"}, `
+      + `${written} written up`,
+    columns: [
+      { key: "day", label: "Day", width: 13 },
+      { key: "teacher", label: "Teacher", width: 22 },
+      { key: "center_name", label: "Centre", width: 16 },
+      { key: "check_in", label: "In", width: 8 },
+      { key: "check_out", label: "Out", width: 8 },
+      { key: "hours", label: "Hours", numeric: true },
+      { key: "entry", label: "Check-in", width: 16 },
+      { key: "classes_marked", label: "Classes marked", numeric: true, width: 14 },
+      { key: "present", label: "Present", numeric: true },
+      { key: "absent", label: "Absent", numeric: true },
+      { key: "written", label: "Lesson written up", width: 16 },
+      { key: "chapters", label: "What was taught", width: 44 },
+    ],
+    rows: rows.map((r) => ({
+      day: r.day, teacher: r.teacher, center_name: r.center_name ?? "",
+      check_in: r.check_in ?? "", check_out: r.check_out ?? "",
+      hours: r.minutes == null ? "" : Math.round((r.minutes / 60) * 10) / 10,
+      entry: !r.check_in ? "not checked in"
+        : r.by_hand ? "manual entry" : "geofenced",
+      classes_marked: r.classes_marked, present: r.present, absent: r.absent,
+      written: r.notes_written > 0 ? "Yes" : "No",
+      chapters: r.chapters ?? "",
     })),
   };
 }

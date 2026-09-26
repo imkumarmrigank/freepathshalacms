@@ -466,3 +466,143 @@ export function sportsDayDetail(day: string, personId: number, centerId: number 
      ORDER BY 2 NULLS LAST, 1`,
     args);
 }
+
+export type TeacherDay = {
+  day: string; teacher_id: number; teacher: string; center_name: string | null;
+  check_in: string | null; check_out: string | null; minutes: number | null;
+  by_hand: boolean | null; away_reason: string | null; distance_m: number | null;
+  classes_marked: number; present: number; absent: number; children: number;
+  notes_written: number; chapters: string | null;
+};
+
+/**
+ * A teacher's day: when they were at the centre, what the register came to,
+ * and whether they wrote up the lesson. The three things a centre manager
+ * asks about a day, in one row.
+ */
+export function teacherDays(
+  from: string, to: string, centerId: number | null, teacherId: number | null,
+) {
+  const args: unknown[] = [from, to];
+  const centre = centerId ? args.push(centerId) : 0;
+  const who = teacherId ? ` AND u.id = $${args.push(teacherId)}` : "";
+  return query<TeacherDay>(
+    `WITH punch AS (
+       SELECT a.att_date AS day, a.user_id AS person,
+              to_char(a.check_in_at ${IST}, 'HH24:MI') AS check_in,
+              to_char(a.check_out_at ${IST}, 'HH24:MI') AS check_out,
+              a.worked_minutes AS minutes, a.by_hand, a.away_reason,
+              a.check_in_distance_m AS distance_m
+         FROM staff_attendance a
+        WHERE a.att_date BETWEEN $1 AND $2
+          ${centre ? `AND a.center_id = $${centre}` : ""}
+     ),
+     reg AS (
+       SELECT (s.marked_at ${IST})::date AS day, s.marked_by AS person,
+              count(DISTINCT s.class_level_id)::int AS classes,
+              count(*) FILTER (WHERE s.status = 'present')::int AS present,
+              count(*) FILTER (WHERE s.status = 'absent')::int AS absent,
+              count(*)::int AS children
+         FROM student_attendance s
+        WHERE (s.marked_at ${IST})::date BETWEEN $1 AND $2 AND s.marked_by IS NOT NULL
+          ${centre ? `AND s.center_id = $${centre}` : ""}
+        GROUP BY 1, 2
+     ),
+     notes AS (
+       SELECT n.on_date AS day, n.user_id AS person, count(*)::int AS n,
+              string_agg(DISTINCT NULLIF(n.chapter, ''), '; ') AS chapters
+         FROM teacher_day_notes n
+        WHERE n.on_date BETWEEN $1 AND $2
+          ${centre ? `AND n.center_id = $${centre}` : ""}
+        GROUP BY 1, 2
+     ),
+     days AS (
+       SELECT day, person FROM punch
+       UNION SELECT day, person FROM reg
+       UNION SELECT day, person FROM notes
+     )
+     SELECT to_char(d.day, 'YYYY-MM-DD') AS day, u.id AS teacher_id, u.name AS teacher,
+            c.name AS center_name,
+            p.check_in, p.check_out, p.minutes, p.by_hand, p.away_reason, p.distance_m,
+            COALESCE(r.classes, 0) AS classes_marked,
+            COALESCE(r.present, 0) AS present, COALESCE(r.absent, 0) AS absent,
+            COALESCE(r.children, 0) AS children,
+            COALESCE(n.n, 0) AS notes_written, n.chapters
+       FROM days d
+       JOIN users u ON u.id = d.person
+       LEFT JOIN centers c ON c.id = u.center_id
+       LEFT JOIN punch p ON p.day = d.day AND p.person = d.person
+       LEFT JOIN reg r   ON r.day = d.day AND r.person = d.person
+       LEFT JOIN notes n ON n.day = d.day AND n.person = d.person
+      WHERE u.role IN ('teacher', 'backup_teacher') ${who}
+      ORDER BY d.day DESC, u.name`,
+    args);
+}
+
+export type TeacherNote = {
+  id: number; class_name: string | null; subject: string | null;
+  chapter: string | null; chapter_detail: string | null;
+  homework: string | null; homework_detail: string | null;
+  equipment: string | null; equipment_result: string | null;
+  other_work: string | null; support_needed: string | null;
+  extra_activity: string | null; extra_detail: string | null; updated_at: string;
+};
+
+/** One teacher's day in full: the punch, the register, and what they wrote. */
+export async function teacherDayDetail(day: string, personId: number) {
+  const [punch, byClass, reasons, notes] = await Promise.all([
+    query<{
+      check_in: string | null; check_out: string | null; minutes: number | null;
+      status: string | null; by_hand: boolean | null; away_reason: string | null;
+      distance_m: number | null; center_name: string | null;
+      spells: { in: string; out: string | null; minutes: number | null }[] | null;
+    }>(
+      `SELECT to_char(a.check_in_at ${IST}, 'HH24:MI') AS check_in,
+              to_char(a.check_out_at ${IST}, 'HH24:MI') AS check_out,
+              a.worked_minutes AS minutes, a.status, a.by_hand, a.away_reason,
+              a.check_in_distance_m AS distance_m, c.name AS center_name,
+              (SELECT json_agg(json_build_object(
+                        'in', to_char(p.check_in_at ${IST}, 'HH24:MI'),
+                        'out', to_char(p.check_out_at ${IST}, 'HH24:MI'),
+                        'minutes', p.worked_minutes) ORDER BY p.check_in_at)
+                 FROM staff_punches p
+                WHERE p.user_id = a.user_id AND p.att_date = a.att_date) AS spells
+         FROM staff_attendance a
+         LEFT JOIN centers c ON c.id = a.center_id
+        WHERE a.user_id = $2 AND a.att_date = $1`, [day, personId]),
+    query<{
+      class_name: string; section: string | null; present: number; absent: number;
+      roll: number; marked_at: string | null;
+    }>(
+      `SELECT cl.name AS class_name,
+              string_agg(DISTINCT e.section, '/') AS section,
+              count(*) FILTER (WHERE s.status = 'present')::int AS present,
+              count(*) FILTER (WHERE s.status = 'absent')::int  AS absent,
+              count(*)::int AS roll,
+              to_char(min(s.marked_at) ${IST}, 'HH24:MI') AS marked_at
+         FROM student_attendance s
+         JOIN class_levels cl ON cl.id = s.class_level_id
+         LEFT JOIN enrollments e ON e.student_id = s.student_id
+                               AND e.session_id = s.session_id
+        WHERE s.marked_by = $2 AND s.att_date = $1
+        GROUP BY cl.id, cl.sequence, cl.name ORDER BY cl.sequence`, [day, personId]),
+    query<{ reason: string; n: number; children: string | null }>(
+      `SELECT COALESCE(s.reason, 'No reason given') AS reason, count(*)::int AS n,
+              string_agg(trim(st.first_name || ' ' || COALESCE(st.last_name, '')), ', '
+                         ORDER BY st.first_name) AS children
+         FROM student_attendance s
+         JOIN students st ON st.id = s.student_id
+        WHERE s.marked_by = $2 AND s.att_date = $1 AND s.status IN ('absent', 'leave')
+        GROUP BY 1 ORDER BY 2 DESC`, [day, personId]),
+    query<TeacherNote>(
+      `SELECT n.id, cl.name AS class_name, n.subject, n.chapter, n.chapter_detail,
+              n.homework, n.homework_detail, n.equipment, n.equipment_result,
+              n.other_work, n.support_needed, n.extra_activity, n.extra_detail,
+              to_char(n.updated_at ${IST}, 'HH24:MI') AS updated_at
+         FROM teacher_day_notes n
+         LEFT JOIN class_levels cl ON cl.id = n.class_level_id
+        WHERE n.user_id = $2 AND n.on_date = $1
+        ORDER BY cl.sequence NULLS FIRST`, [day, personId]),
+  ]);
+  return { punch: punch[0] ?? null, byClass, reasons, notes };
+}
