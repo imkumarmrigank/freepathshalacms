@@ -5,8 +5,13 @@ import { Badge, Card, Empty, PageHeader, StatCard } from "@/components/ui";
 import { fmtDate, today } from "@/lib/format";
 import { listClasses } from "@/lib/queries";
 import { isTeaching } from "@/lib/roles";
-import { teacherDayDetail, teacherDays } from "@/lib/day-book";
+import {
+  auditorDays, mentorDays, sportsDays, staffNoteOn, teacherDayDetail, teacherDays,
+} from "@/lib/day-book";
+import { NOTE_FIELDS } from "@/lib/day-note-meta";
+import StaffNoteView from "@/components/StaffNoteView";
 import DayNoteForm from "./DayNoteForm";
+import StaffNoteForm from "./StaffNoteForm";
 
 export const metadata = { title: "My day book · Pehchaan" };
 
@@ -25,11 +30,17 @@ export default async function MyDayPage({
   searchParams,
 }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const user = await requireUser();
-  if (!isTeaching(user.role) && user.role !== "center_manager") redirect("/dashboard");
+  const keepsOtherBook = Boolean(NOTE_FIELDS[user.role]);
+  if (!isTeaching(user.role) && user.role !== "center_manager" && !keepsOtherBook)
+    redirect("/dashboard");
   const sp = await searchParams;
 
   const now = today();
   const day = sp.day && sp.day <= now ? sp.day : now;
+
+  // A mentor, an auditor or a coach reads their own day from their own work,
+  // and writes it up against their own questions.
+  if (keepsOtherBook) return OtherRolesDay({ user, day, now });
   const [detail, classes, recent] = await Promise.all([
     teacherDayDetail(day, user.uid),
     listClasses(),
@@ -181,6 +192,81 @@ export default async function MyDayPage({
           </div>
         )}
       </Card>
+    </>
+  );
+}
+
+/**
+ * The day book for the roles whose work is not a class: the mentor, the
+ * auditor, the sports teacher. What the system already recorded of their day
+ * sits above the questions their role is asked.
+ */
+async function OtherRolesDay({ user, day, now }: {
+  user: { uid: number; role: string; name: string }; day: string; now: string;
+}) {
+  const [note, mine] = await Promise.all([
+    staffNoteOn(day, user.uid),
+    user.role === "mentor" ? mentorDays(day, day, null, user.uid)
+      : user.role === "auditor" ? auditorDays(day, day, null, user.uid)
+      : sportsDays(day, day, null, user.uid),
+  ]);
+  const row = mine[0] as Record<string, number | string | null> | undefined;
+
+  /** The two or three numbers that mean something for this role. */
+  const counts: { label: string; value: number; hint?: string }[] =
+    user.role === "mentor" ? [
+      { label: "Meetings written up", value: Number(row?.written_up ?? 0) },
+      { label: "Children referred", value: Number(row?.flags_raised ?? 0) },
+      { label: "Counselling steps", value: Number(row?.counselling_steps ?? 0) },
+    ] : user.role === "auditor" ? [
+      { label: "Visits filed", value: Number(row?.visits_filed ?? 0) },
+      { label: "Suggestions raised", value: Number(row?.suggestions ?? 0) },
+      { label: "Replies written", value: Number(row?.replies ?? 0) },
+    ] : [
+      { label: "Centre visits", value: Number(row?.visits ?? 0) },
+      { label: "Children seen", value: Number(row?.children_seen ?? 0) },
+      { label: "Registers marked", value: Number(row?.sessions ?? 0) },
+    ];
+
+  return (
+    <>
+      <PageHeader title="My day book"
+        subtitle={`${fmtDate(day)} · what you did today, in your own words`}
+        back={day === now ? undefined : { href: "/my-day", label: "Today" }}
+        right={
+          <>
+            <Link href={`/my-day?day=${addDays(day, -1)}`} className="btn btn-ghost btn-sm">
+              ← Day before
+            </Link>
+            {day < now && (
+              <Link href={`/my-day?day=${addDays(day, 1)}`} className="btn btn-ghost btn-sm">
+                Day after →
+              </Link>
+            )}
+          </>
+        } />
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        {counts.map((c) => (
+          <StatCard key={c.label} label={c.label} value={c.value} hint={c.hint}
+            tone={c.value > 0 ? "ok" : "default"} />
+        ))}
+      </div>
+      <p className="mt-2 text-[13px] text-[var(--muted)]">
+        That is what the system recorded of your day. The rest is yours to write.
+      </p>
+
+      {note && (
+        <>
+          <div className="label-cap mb-2.5 mt-6">What you wrote</div>
+          <div className="mb-4"><StaffNoteView note={note} /></div>
+        </>
+      )}
+
+      <div className="label-cap mb-2.5 mt-6">
+        {note ? "Change it" : "Write up the day"}
+      </div>
+      <StaffNoteForm role={user.role} date={day} note={note} />
     </>
   );
 }

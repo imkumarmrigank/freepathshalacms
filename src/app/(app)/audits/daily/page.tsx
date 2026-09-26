@@ -5,6 +5,7 @@ import { Card, Empty, PageHeader, StatCard } from "@/components/ui";
 import Filters from "@/components/Filters";
 import Pager from "@/components/Pager";
 import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
+import { staffNoteDays } from "@/lib/day-book";
 import { fmtDate, today } from "@/lib/format";
 import { centersForUser, resolveCenterId } from "@/lib/queries";
 import { canScheduleVisits, isGlobalRole } from "@/lib/roles";
@@ -57,6 +58,10 @@ export default async function AuditorDayBookPage({
   ]);
   const who = people.some((p) => String(p.id) === sp.who) ? Number(sp.who) : null;
   const rows = await auditorDays(from, to, centerId, who, focus, pg);
+
+  // which of these days the person wrote up, for the column
+  const written = await staffNoteDays(from, to, [...new Set(rows.map((r) => r.auditor_id))]);
+  const notes = new Set(written.map((w) => `${w.day}|${w.user_id}`));
 
   const total = totalOf(rows);
   const win = pageWindow(pg, rows.length, total);
@@ -115,10 +120,10 @@ export default async function AuditorDayBookPage({
                 <tr>
                   <th>Day</th><th>Auditor</th><th>Visits filed</th><th>Centres</th>
                   <th>Children seen</th><th>Average score</th>
-                  <th>Suggestions</th><th>Replies</th><th>Verified</th><th>Visits booked</th>
+                  <th>Suggestions</th><th>Replies</th><th>Verified</th><th>Visits booked</th><th>Wrote up</th>
                 </tr>
               </thead>
-              <AuditorRows rows={rows} centerId={centerId} />
+              <AuditorRows rows={rows} centerId={centerId} notes={notes} />
             </table>
           </div>
         )}

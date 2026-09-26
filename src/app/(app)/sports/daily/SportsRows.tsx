@@ -1,13 +1,14 @@
 "use client";
 import { useCallback, useState } from "react";
 import DayDetail from "@/components/DayDetail";
+import { Badge } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { loadSportsDay } from "./actions";
 import type { SportsDay } from "@/lib/day-book";
 
 /** A row is a day's work in numbers; opening it shows the work itself. */
-export default function SportsRows({ rows, centerId }:
-  { rows: SportsDay[]; centerId: number | null }) {
+export default function SportsRows({ rows, centerId, notes }:
+  { notes: Set<string>; rows: SportsDay[]; centerId: number | null }) {
   const [open, setOpen] = useState<{ day: string; id: number; name: string } | null>(null);
   const load = useCallback(
     () => loadSportsDay(open!.day, open!.id, centerId), [open, centerId]);
@@ -47,6 +48,11 @@ export default function SportsRows({ rows, centerId }:
             <td className="tabular-nums">{r.tests || "—"}</td>
             <td className="tabular-nums">{r.marks || "—"}</td>
             <td className="tabular-nums text-[var(--muted)]">{r.remarks || "—"}</td>
+                      <td>
+              {notes.has(`${r.day}|${r.teacher_id}`)
+                ? <Badge tone="ok">Written up</Badge>
+                : <span className="text-[13px] text-[var(--faint)]">not written</span>}
+            </td>
           </tr>
         ))}
       </tbody>

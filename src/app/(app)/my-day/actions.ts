@@ -5,6 +5,7 @@ import { one, query } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
 import { today } from "@/lib/format";
 import { isTeaching } from "@/lib/roles";
+import { NOTE_FIELDS } from "@/lib/day-note-meta";
 
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
@@ -69,4 +70,46 @@ export async function deleteDayNote(_prev: unknown, form: FormData) {
   await query("DELETE FROM teacher_day_notes WHERE id = $1", [id]);
   revalidatePath("/my-day");
   return { ok: "Note removed." };
+}
+
+/**
+ * The mentor's, auditor's or coach's account of the day.
+ *
+ * Each role is asked its own questions — the fields are declared once in
+ * day-note-meta and read from there here, so a question added to the form is
+ * saved without touching this.
+ */
+export async function saveStaffDayNote(_prev: unknown, form: FormData) {
+  const user = await requireUser();
+  const fields = NOTE_FIELDS[user.role];
+  if (!fields) return { error: "There is no day book for your role yet." };
+
+  const onDate = String(form.get("on_date") ?? today()).slice(0, 10);
+  if (onDate > today()) return { error: "You cannot write up a day that has not happened." };
+
+  const values: Record<string, string | number | null> = {};
+  for (const f of fields) {
+    const raw = String(form.get(f.name) ?? "").trim();
+    values[f.name] = raw === "" ? null : f.numeric ? Number(raw) || null : raw;
+  }
+  if (!values.summary && !Object.values(values).some(Boolean))
+    return { error: "Write at least what you did today." };
+
+  const session = await currentSession();
+  const cols = Object.keys(values);
+  // EXCLUDED carries the values through to the update, so the parameters are
+  // numbered once and the two halves cannot drift apart.
+  await query(
+    `INSERT INTO staff_day_notes
+       (user_id, role, center_id, session_id, on_date, ${cols.join(", ")})
+     VALUES ($1, $2, $3, $4, $5, ${cols.map((_, i) => `$${i + 6}`).join(", ")})
+     ON CONFLICT (user_id, on_date) DO UPDATE
+        SET ${cols.map((c) => `${c} = EXCLUDED.${c}`).join(", ")},
+            role = EXCLUDED.role, updated_at = now()`,
+    [user.uid, user.role, user.centerId, session?.id ?? null, onDate,
+     ...cols.map((c) => values[c])],
+  );
+
+  revalidatePath("/my-day");
+  return { ok: "Saved. Your administrator can read it." };
 }

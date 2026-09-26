@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useState } from "react";
 import DayDetail from "@/components/DayDetail";
+import { Badge } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { loadAuditorDay } from "./actions";
 import type { AuditorDay } from "@/lib/day-book";
@@ -9,8 +10,8 @@ import type { AuditorDay } from "@/lib/day-book";
  * The day book's rows. A row is a day's work in numbers; opening it shows the
  * work itself — which visit, which centre, what was asked for.
  */
-export default function AuditorRows({ rows, centerId }:
-  { rows: AuditorDay[]; centerId: number | null }) {
+export default function AuditorRows({ rows, centerId, notes }:
+  { notes: Set<string>; rows: AuditorDay[]; centerId: number | null }) {
   const [open, setOpen] = useState<{ day: string; id: number; name: string } | null>(null);
   const load = useCallback(
     () => loadAuditorDay(open!.day, open!.id, centerId), [open, centerId]);
@@ -46,7 +47,12 @@ export default function AuditorRows({ rows, centerId }:
                     <td className="tabular-nums">{r.replies || "—"}</td>
                     <td className="tabular-nums">{r.verified || "—"}</td>
                     <td className="tabular-nums text-[var(--muted)]">{r.scheduled || "—"}</td>
-                  </tr>
+                              <td>
+              {notes.has(`${r.day}|${r.auditor_id}`)
+                ? <Badge tone="ok">Written up</Badge>
+                : <span className="text-[13px] text-[var(--faint)]">not written</span>}
+            </td>
+          </tr>
                 ))}
       </tbody>
       {open && (

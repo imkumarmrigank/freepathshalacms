@@ -10,8 +10,8 @@ import type { MentorDay } from "@/lib/day-book";
  * The day book's rows. A row is a day's work in numbers; opening it shows the
  * work itself — which child, which meeting, what was written.
  */
-export default function MentorRows({ rows, centerId }:
-  { rows: MentorDay[]; centerId: number | null }) {
+export default function MentorRows({ rows, centerId, notes }:
+  { notes: Set<string>; rows: MentorDay[]; centerId: number | null }) {
   const [open, setOpen] = useState<{ day: string; id: number; name: string } | null>(null);
   const load = useCallback(
     () => loadMentorDay(open!.day, open!.id, centerId), [open, centerId]);
@@ -59,7 +59,12 @@ export default function MentorRows({ rows, centerId }:
                     <td className="tabular-nums">{r.flags_raised || "—"}</td>
                     <td className="tabular-nums">{r.counselling_steps || "—"}</td>
                     <td className="tabular-nums text-[var(--muted)]">{r.feedback || "—"}</td>
-                  </tr>
+                              <td>
+              {notes.has(`${r.day}|${r.mentor_id}`)
+                ? <Badge tone="ok">Written up</Badge>
+                : <span className="text-[13px] text-[var(--faint)]">not written</span>}
+            </td>
+          </tr>
                 ))}
       </tbody>
       {open && (

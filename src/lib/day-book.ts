@@ -1,5 +1,6 @@
 import "server-only";
-import { query } from "./db";
+import { one, query } from "./db";
+import { NOTE_COLUMNS, type StaffNote } from "./day-note-meta";
 
 /** What a day book is narrowed to, beyond the dates and the person. */
 export type Focus = string | null;
@@ -87,6 +88,8 @@ export function auditorDays(
        UNION SELECT day, person FROM replies
        UNION SELECT day, person FROM verified
        UNION SELECT day, person FROM booked
+       UNION SELECT n.on_date, n.user_id
+               FROM staff_day_notes n WHERE n.on_date BETWEEN $1 AND $2
      )
      SELECT count(*) OVER () AS total_rows,
             to_char(d.day, 'YYYY-MM-DD') AS day, u.id AS auditor_id, u.name AS auditor,
@@ -175,6 +178,8 @@ export function mentorDays(
        UNION SELECT day, person FROM flags
        UNION SELECT day, person FROM steps
        UNION SELECT day, person FROM feedback
+       UNION SELECT n.on_date, n.user_id
+               FROM staff_day_notes n WHERE n.on_date BETWEEN $1 AND $2
      )
      SELECT count(*) OVER () AS total_rows,
             to_char(d.day, 'YYYY-MM-DD') AS day, u.id AS mentor_id, u.name AS mentor,
@@ -398,6 +403,8 @@ export function sportsDays(
        UNION SELECT day, person FROM tests
        UNION SELECT day, person FROM marks
        UNION SELECT day, person FROM notes
+       UNION SELECT n.on_date, n.user_id
+               FROM staff_day_notes n WHERE n.on_date BETWEEN $1 AND $2
      )
      SELECT count(*) OVER () AS total_rows,
             to_char(d.day, 'YYYY-MM-DD') AS day, u.id AS teacher_id, u.name AS teacher,
@@ -641,4 +648,24 @@ export async function teacherDayDetail(day: string, personId: number) {
         ORDER BY cl.sequence NULLS FIRST`, [day, personId]),
   ]);
   return { punch: punch[0] ?? null, byClass, reasons, notes };
+}
+
+/** One person's own account of a day, whatever their role asks them. */
+export function staffNoteOn(day: string, personId: number) {
+  return one<StaffNote>(
+    `SELECT id, role, to_char(on_date, 'YYYY-MM-DD') AS on_date,
+            to_char(updated_at ${IST}, 'HH24:MI') AS updated_at,
+            ${NOTE_COLUMNS.join(", ")}
+       FROM staff_day_notes WHERE user_id = $2 AND on_date = $1`,
+    [day, personId]);
+}
+
+/** Which days in a period a person wrote up, for the day book's own column. */
+export function staffNoteDays(from: string, to: string, personIds?: number[]) {
+  const args: unknown[] = [from, to];
+  const who = personIds?.length ? ` AND user_id = ANY($${args.push(personIds)})` : "";
+  return query<{ day: string; user_id: number; summary: string | null }>(
+    `SELECT to_char(on_date, 'YYYY-MM-DD') AS day, user_id, summary
+       FROM staff_day_notes
+      WHERE on_date BETWEEN $1 AND $2 ${who}`, args);
 }

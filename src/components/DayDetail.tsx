@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Badge } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import type { DayItem } from "@/lib/day-book";
+import type { StaffNote } from "@/lib/day-note-meta";
+import StaffNoteView from "@/components/StaffNoteView";
 
 const TONE: Record<string, string> = {
   "Visit filed": "ok", "Suggestion raised": "warn", "Reply written": "info",
@@ -20,10 +22,11 @@ const TONE: Record<string, string> = {
  */
 export default function DayDetail({ day, person, load, onClose }: {
   day: string; person: string;
-  load: () => Promise<{ items?: DayItem[]; error?: string }>;
+  load: () => Promise<{ items?: DayItem[]; note?: StaffNote | null; error?: string }>;
   onClose: () => void;
 }) {
-  const [data, setData] = useState<{ items?: DayItem[]; error?: string } | null>(null);
+  const [data, setData] =
+    useState<{ items?: DayItem[]; note?: StaffNote | null; error?: string } | null>(null);
   const [, start] = useTransition();
 
   useEffect(() => { start(async () => setData(await load())); }, [load]);
@@ -69,12 +72,22 @@ export default function DayDetail({ day, person, load, onClose }: {
             <p className="text-[13px] text-[var(--muted)]">Fetching the day…</p>
           ) : data.error ? (
             <p className="text-[13px] text-[var(--bad)]">{data.error}</p>
-          ) : items.length === 0 ? (
+          ) : items.length === 0 && !data.note ? (
             <p className="text-[13px] text-[var(--muted)]">
-              Nothing was entered on this day.
+              Nothing was entered on this day, and nothing was written up.
             </p>
           ) : (
             <div className="space-y-5">
+              {/* what the person said about the day comes before what the
+                  system counted of it: the account, then the evidence */}
+              {data.note && (
+                <div>
+                  <div className="mb-2 text-[12px] uppercase tracking-[0.06em] text-[var(--faint)]">
+                    In their own words
+                  </div>
+                  <StaffNoteView note={data.note} />
+                </div>
+              )}
               {Object.entries(groups).map(([kind, list]) => (
                 <div key={kind}>
                   <div className="mb-2 flex items-center gap-2">

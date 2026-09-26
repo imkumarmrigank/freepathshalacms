@@ -5,6 +5,7 @@ import { Card, Empty, PageHeader, StatCard } from "@/components/ui";
 import Filters from "@/components/Filters";
 import Pager from "@/components/Pager";
 import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
+import { staffNoteDays } from "@/lib/day-book";
 import { fmtDate, today } from "@/lib/format";
 import { centersForUser, resolveCenterId } from "@/lib/queries";
 import { isGlobalRole } from "@/lib/roles";
@@ -57,6 +58,10 @@ export default async function MentorDayBookPage({
   ]);
   const who = people.some((p) => String(p.id) === sp.who) ? Number(sp.who) : null;
   const rows = await mentorDays(from, to, centerId, who, focus, pg);
+
+  // which of these days the person wrote up, for the column
+  const written = await staffNoteDays(from, to, [...new Set(rows.map((r) => r.mentor_id))]);
+  const notes = new Set(written.map((w) => `${w.day}|${w.user_id}`));
 
   const total = totalOf(rows);
   const win = pageWindow(pg, rows.length, total);
@@ -116,10 +121,10 @@ export default async function MentorDayBookPage({
                 <tr>
                   <th>Day</th><th>Mentor</th><th>Written up</th><th>Meetings belong to</th>
                   <th>Centres</th><th>Children</th><th>Follow-ups promised</th>
-                  <th>Referrals</th><th>Counselling steps</th><th>Feedback</th>
+                  <th>Referrals</th><th>Counselling steps</th><th>Feedback</th><th>Wrote up</th>
                 </tr>
               </thead>
-              <MentorRows rows={rows} centerId={centerId} />
+              <MentorRows rows={rows} centerId={centerId} notes={notes} />
             </table>
           </div>
         )}

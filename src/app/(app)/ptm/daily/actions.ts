@@ -1,7 +1,7 @@
 "use server";
 import { requireUser } from "@/lib/auth";
 import { isGlobalRole } from "@/lib/roles";
-import { mentorDayDetail } from "@/lib/day-book";
+import { mentorDayDetail, staffNoteOn } from "@/lib/day-book";
 
 /** One mentor's day, item by item, for the panel that opens on a row. */
 export async function loadMentorDay(day: string, personId: number, centerId: number | null) {
@@ -10,5 +10,9 @@ export async function loadMentorDay(day: string, personId: number, centerId: num
     return { error: "Not your day book." };
   // a centre manager reads their own centre's mentors, nobody else's
   const scope = isGlobalRole(user.role) ? centerId : user.centerId;
-  return { items: await mentorDayDetail(day, personId, scope) };
+  const [items, note] = await Promise.all([
+    mentorDayDetail(day, personId, scope),
+    staffNoteOn(day, personId),
+  ]);
+  return { items, note };
 }
