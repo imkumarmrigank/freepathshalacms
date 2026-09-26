@@ -1,11 +1,31 @@
 /**
  * Staff check-in has to prove presence at the centre, so the circle is small.
  * The 20 m floor is deliberate: a phone reports its position to about ±10–20 m,
- * and a tighter fence would start refusing people who are genuinely standing there.
+ * and a tighter fence would start refusing people who are genuinely standing
+ * there. The 70 m ceiling is the width of a centre and its yard, and no more:
+ * past it a punch stops being proof of having arrived.
  */
+/**
+ * How far away a punch may be entered by hand.
+ *
+ * Inside the fence the ordinary check-in proves the case. Just outside it —
+ * across the lane, in the yard next door — the answer is to walk the last few
+ * steps, not to type. Only past this distance is somebody genuinely elsewhere,
+ * and only then is the by-hand form offered.
+ */
+export const BY_HAND_FROM_M = 100;
+
+/**
+ * And how far away it stops being offered at all. Past a kilometre nobody is
+ * "just outside the centre": they are at home, in the market, in another
+ * town. A day's work away from the centre is for the office to enter, with a
+ * reason, not for the phone to assert.
+ */
+export const BY_HAND_UPTO_M = 1000;
+
 export const GEOFENCE_MIN_M = 20;
-export const GEOFENCE_MAX_M = 50;
-export const GEOFENCE_DEFAULT_M = 50;
+export const GEOFENCE_MAX_M = 70;
+export const GEOFENCE_DEFAULT_M = 70;
 
 /** Great-circle distance in metres between two WGS-84 points. */
 export function haversineMeters(

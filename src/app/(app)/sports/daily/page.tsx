@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { requireFeature } from "@/lib/auth";
 import { Card, Empty, PageHeader, StatCard } from "@/components/ui";
 import Filters from "@/components/Filters";
+import Pager from "@/components/Pager";
+import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
 import { fmtDate, today } from "@/lib/format";
 import { centersForUser, resolveCenterId } from "@/lib/queries";
 import { isGlobalRole } from "@/lib/roles";
@@ -10,6 +12,12 @@ import { dayBookPeople, sportsDays } from "@/lib/day-book";
 import SportsRows from "./SportsRows";
 
 export const metadata = { title: "Sports day book · Pehchaan" };
+
+const FOCUS = [
+  { value: "visits", label: "Only days a centre was visited" },
+  { value: "noreport", label: "Only visits with no report" },
+  { value: "marked", label: "Only days a register was marked" },
+];
 
 const RANGES = [
   { value: "7", label: "Last 7 days" },
@@ -41,12 +49,17 @@ export default async function SportsDayBookPage({
   const from = sp.from || addDays(now, -(days - 1));
   const to = sp.to || now;
   const centerId = resolveCenterId(user, sp.center);
+  const focus = FOCUS.some((f) => f.value === sp.focus) ? (sp.focus as string) : null;
+  const pg = pageFrom(sp, 50);
 
   const [centers, people] = await Promise.all([
     centersForUser(user), dayBookPeople("sports_teacher"),
   ]);
   const who = people.some((p) => String(p.id) === sp.who) ? Number(sp.who) : null;
-  const rows = await sportsDays(from, to, centerId, who);
+  const rows = await sportsDays(from, to, centerId, who, focus, pg);
+
+  const total = totalOf(rows);
+  const win = pageWindow(pg, rows.length, total);
 
   const totals = rows.reduce((t, r) => ({
     visits: t.visits + r.visits,
@@ -75,6 +88,7 @@ export default async function SportsDayBookPage({
         dates
         extra={[
           { name: "days", label: "Last 30 days", options: RANGES },
+          { name: "focus", label: "Every day", options: FOCUS },
           { name: "who", label: "Every sports teacher",
             options: people.map((p) => ({
               value: p.id, label: p.is_active ? p.name : `${p.name} (inactive)` })) },
@@ -110,6 +124,8 @@ export default async function SportsDayBookPage({
             </table>
           </div>
         )}
+        <Pager page={pg.page} pages={win.pages} first={win.first} last={win.last}
+          total={total} unit="day of sports work" />
       </Card>
     </>
   );

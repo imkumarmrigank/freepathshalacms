@@ -4,6 +4,7 @@ import { punch, punchByHand } from "./actions";
 import { FormMessage, Submit } from "@/components/form";
 import { Alert, Field } from "@/components/ui";
 import { AWAY_REASONS } from "@/lib/away-meta";
+import { BY_HAND_FROM_M, BY_HAND_UPTO_M } from "@/lib/geo";
 
 type Today = {
   check_in_at: string | null; check_out_at: string | null;
@@ -28,13 +29,21 @@ export default function PunchCard({
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [reason, setReason] = useState<string>(AWAY_REASONS[0]);
 
-  // Only being out of range opens the by-hand form. A blocked location or an
-  // unpinned centre is a different problem, and typing past it would hide the
-  // problem rather than fix it.
+  // Where the punch was refused from decides what is offered. A few steps
+  // outside the fence, the answer is to walk them; genuinely elsewhere, the
+  // by-hand form; a kilometre away, nothing at all — a day that far from the
+  // centre is the office's to enter, not the phone's to assert. A blocked
+  // location or an unpinned centre is a different problem again, and typing
+  // past either would hide it rather than fix it.
+  const refusedAt = state?.distance;
+  const nearlyThere = refusedAt != null && refusedAt <= BY_HAND_FROM_M;
+  const tooFar = refusedAt != null && refusedAt > BY_HAND_UPTO_M;
   const outOfRange = Boolean(state?.error
     && /from the centre|allowed area|location looks wrong/i.test(state.error));
   // Once the punch is in by hand, the panel has done its job and goes away.
-  const byHand = outOfRange && dismissed !== state?.error && !byHandState?.ok;
+  const byHand = outOfRange && !nearlyThere && !tooFar
+    && dismissed !== state?.error && !byHandState?.ok;
+  const readable = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${m} m`);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
   const lastError = useRef<string | undefined>(undefined);
@@ -106,6 +115,20 @@ export default function PunchCard({
       )}
       {geoError && <div className="mb-4"><Alert kind="bad">{geoError}</Alert></div>}
 
+      {/* however it ends, say plainly how far away they were */}
+      {refusedAt != null && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-[10px]
+          border border-[var(--border)] bg-[#f7f7fb] px-3.5 py-2.5">
+          <span className="text-[13px] text-[var(--muted)]">You are</span>
+          <span className="font-mono text-[17px] font-semibold text-[var(--bad)]">
+            {readable(refusedAt)}
+          </span>
+          <span className="text-[13px] text-[var(--muted)]">
+            from {centerName} · check-in works within {radius} m
+          </span>
+        </div>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-3">
         <div>
           <div className="label-cap">Checked in</div>
@@ -169,6 +192,22 @@ export default function PunchCard({
             : `Both check-in and check-out must be done within ${radius} m of ${centerName}.`}
         </span>
       </form>
+
+      {nearlyThere && (
+        <div className="mt-5 rounded-[10px] border border-[var(--warn)] bg-[var(--warn-soft)]
+          px-4 py-3 text-[13px] text-[#b45309]">
+          You are {readable(refusedAt!)} from {centerName} — almost there. Walk up to the
+          centre and check in; the circle is {radius} m wide.
+        </div>
+      )}
+
+      {tooFar && (
+        <div className="mt-5 rounded-[10px] border border-[var(--border)] bg-[#f7f7fb]
+          px-4 py-3 text-[13px] text-[var(--muted)]">
+          You are {readable(refusedAt!)} from {centerName}. A day this far from the centre
+          is marked by your centre manager, with the reason, not from here.
+        </div>
+      )}
 
       {/* ------------------------------------------------- away from the centre */}
       {byHand && (

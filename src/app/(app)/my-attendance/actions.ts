@@ -3,11 +3,11 @@ import { revalidatePath } from "next/cache";
 import type { PoolClient } from "pg";
 import { requireUser } from "@/lib/auth";
 import { one, query, tx } from "@/lib/db";
-import { checkGeofence } from "@/lib/geo";
+import { BY_HAND_FROM_M, BY_HAND_UPTO_M, checkGeofence } from "@/lib/geo";
 import { AWAY_REASONS } from "@/lib/away-meta";
 import { today } from "@/lib/format";
 
-type Punch = { error?: string; ok?: string };
+type Punch = { error?: string; ok?: string; distance?: number; radius?: number };
 
 /** Late if the teacher checks in after this hour:minute (centre-agnostic for now). */
 const LATE_AFTER_MINUTES = 10 * 60 + 15; // 10:15 local
@@ -82,7 +82,11 @@ export async function punch(_prev: unknown, form: FormData): Promise<Punch> {
          geo.distance >= 0 ? geo.distance : null, geo.radius, geo.reason ?? null],
       );
     } catch { /* the teacher's message matters more than the record of it */ }
-    return { error: geo.reason ?? "You are outside the centre's allowed area." };
+    return {
+      error: geo.reason ?? "You are outside the centre's allowed area.",
+      distance: geo.distance >= 0 ? geo.distance : undefined,
+      radius: geo.radius,
+    };
   }
 
   const day = today();
@@ -194,10 +198,28 @@ export async function punchByHand(_prev: unknown, form: FormData): Promise<Punch
   );
   if (!center) return { error: "Your centre could not be found." };
 
-  // Inside the fence there is nothing to enter by hand.
+  // Inside the fence there is nothing to enter by hand, and just outside it
+  // the answer is to walk the last few steps rather than to type.
   const geo = hasFix ? checkGeofence(center, lat, lng, kind) : null;
   if (geo?.ok)
     return { error: `You are ${geo.distance} m from ${center.name} — check in the usual way.` };
+  if (geo && geo.distance >= 0 && geo.distance <= BY_HAND_FROM_M)
+    return {
+      error: `You are only ${geo.distance} m from ${center.name}. Walk up to the centre `
+        + "and check in the usual way.",
+      distance: geo.distance,
+    };
+  // Past a kilometre this is not a punch at all. The office can still mark the
+  // day by hand, with a reason, from the staff register.
+  if (!hasFix || !geo || geo.distance < 0 || geo.distance > BY_HAND_UPTO_M)
+    return {
+      error: hasFix && geo && geo.distance >= 0
+        ? `You are ${geo.distance >= 1000 ? `${(geo.distance / 1000).toFixed(1)} km`
+            : `${geo.distance} m`} from ${center.name} — too far to mark the day here. `
+          + "Ask your centre manager to mark it for you."
+        : "Your location could not be read, so the day cannot be entered by hand.",
+      distance: geo && geo.distance >= 0 ? geo.distance : undefined,
+    };
 
   const day = today();
   const now = new Date();

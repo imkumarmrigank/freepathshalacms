@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { Card, Empty, PageHeader, StatCard } from "@/components/ui";
 import Filters from "@/components/Filters";
+import Pager from "@/components/Pager";
+import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
 import { fmtDate, today } from "@/lib/format";
 import { centersForUser, resolveCenterId } from "@/lib/queries";
 import { canScheduleVisits, isGlobalRole } from "@/lib/roles";
@@ -10,6 +12,12 @@ import { auditorDays, dayBookPeople } from "@/lib/day-book";
 import AuditorRows from "./AuditorRows";
 
 export const metadata = { title: "Auditor day book · Pehchaan" };
+
+const FOCUS = [
+  { value: "visits", label: "Only days a visit was filed" },
+  { value: "suggestions", label: "Only days a suggestion was raised" },
+  { value: "late", label: "Only visits filed after the day" },
+];
 
 const RANGES = [
   { value: "7", label: "Last 7 days" },
@@ -41,12 +49,17 @@ export default async function AuditorDayBookPage({
   const from = sp.from || addDays(now, -(days - 1));
   const to = sp.to || now;
   const centerId = resolveCenterId(user, sp.center);
+  const focus = FOCUS.some((f) => f.value === sp.focus) ? (sp.focus as string) : null;
+  const pg = pageFrom(sp, 50);
 
   const [centers, people] = await Promise.all([
     centersForUser(user), dayBookPeople("auditor"),
   ]);
   const who = people.some((p) => String(p.id) === sp.who) ? Number(sp.who) : null;
-  const rows = await auditorDays(from, to, centerId, who);
+  const rows = await auditorDays(from, to, centerId, who, focus, pg);
+
+  const total = totalOf(rows);
+  const win = pageWindow(pg, rows.length, total);
 
   const totals = rows.reduce((t, r) => ({
     visits: t.visits + r.visits_filed,
@@ -75,6 +88,7 @@ export default async function AuditorDayBookPage({
         dates
         extra={[
           { name: "days", label: "Last 30 days", options: RANGES },
+          { name: "focus", label: "Every day", options: FOCUS },
           { name: "who", label: "Every auditor",
             options: people.map((p) => ({
               value: p.id, label: p.is_active ? p.name : `${p.name} (inactive)` })) },
@@ -108,6 +122,8 @@ export default async function AuditorDayBookPage({
             </table>
           </div>
         )}
+        <Pager page={pg.page} pages={win.pages} first={win.first} last={win.last}
+          total={total} unit="day of auditor work" />
       </Card>
     </>
   );

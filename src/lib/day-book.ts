@@ -1,6 +1,12 @@
 import "server-only";
 import { query } from "./db";
 
+/** What a day book is narrowed to, beyond the dates and the person. */
+export type Focus = string | null;
+
+/** A page of a day book — the shape {@link pageFrom} already returns. */
+export type Page = { size: number; offset: number };
+
 /**
  * A day's work, person by person.
  *
@@ -14,6 +20,7 @@ import { query } from "./db";
 const IST = "AT TIME ZONE 'Asia/Kolkata'";
 
 export type AuditorDay = {
+  total_rows: string;
   day: string; auditor_id: number; auditor: string;
   visits_filed: number; visits_made: number; centres: string | null;
   children_seen: number; avg_score: number | null;
@@ -23,6 +30,7 @@ export type AuditorDay = {
 /** What each auditor did, day by day. */
 export function auditorDays(
   from: string, to: string, centerId: number | null, auditorId: number | null,
+  focus: Focus = null, page?: Page,
 ) {
   const args: unknown[] = [from, to];
   const centre = centerId ? ` AND v.center_id = $${args.push(centerId)}` : "";
@@ -80,7 +88,8 @@ export function auditorDays(
        UNION SELECT day, person FROM verified
        UNION SELECT day, person FROM booked
      )
-     SELECT to_char(d.day, 'YYYY-MM-DD') AS day, u.id AS auditor_id, u.name AS auditor,
+     SELECT count(*) OVER () AS total_rows,
+            to_char(d.day, 'YYYY-MM-DD') AS day, u.id AS auditor_id, u.name AS auditor,
             COALESCE(v.filed, 0) AS visits_filed, COALESCE(m.n, 0) AS visits_made,
             v.centres, COALESCE(v.children, 0) AS children_seen, v.avg_score,
             COALESCE(s.n, 0) AS suggestions, COALESCE(r.n, 0) AS replies,
@@ -94,11 +103,16 @@ export function auditorDays(
        LEFT JOIN verified ve ON ve.day = d.day AND ve.person = d.person
        LEFT JOIN booked b   ON b.day = d.day AND b.person = d.person
       WHERE u.role = 'auditor' ${who}
-      ORDER BY d.day DESC, u.name`,
+        ${focus === "visits" ? "AND COALESCE(v.filed, 0) > 0" : ""}
+        ${focus === "suggestions" ? "AND COALESCE(s.n, 0) > 0" : ""}
+        ${focus === "late" ? "AND COALESCE(m.n, 0) = 0 AND COALESCE(v.filed, 0) > 0" : ""}
+      ORDER BY d.day DESC, u.name
+      ${page ? `LIMIT $${args.push(page.size)} OFFSET $${args.push(page.offset)}` : ""}`,
     args);
 }
 
 export type MentorDay = {
+  total_rows: string;
   day: string; mentor_id: number; mentor: string;
   written_up: number; meeting_dates: number; oldest_meeting: string | null;
   met_today: number; children: number; centres: string | null;
@@ -109,6 +123,7 @@ export type MentorDay = {
 /** What each mentor did, day by day. */
 export function mentorDays(
   from: string, to: string, centerId: number | null, mentorId: number | null,
+  focus: Focus = null, page?: Page,
 ) {
   const args: unknown[] = [from, to];
   const centre = centerId ? ` AND i.center_id = $${args.push(centerId)}` : "";
@@ -161,7 +176,8 @@ export function mentorDays(
        UNION SELECT day, person FROM steps
        UNION SELECT day, person FROM feedback
      )
-     SELECT to_char(d.day, 'YYYY-MM-DD') AS day, u.id AS mentor_id, u.name AS mentor,
+     SELECT count(*) OVER () AS total_rows,
+            to_char(d.day, 'YYYY-MM-DD') AS day, u.id AS mentor_id, u.name AS mentor,
             COALESCE(w.n, 0) AS written_up, COALESCE(w.dates, 0) AS meeting_dates,
             w.oldest AS oldest_meeting, COALESCE(h.n, 0) AS met_today,
             COALESCE(w.children, 0) AS children, w.centres,
@@ -176,7 +192,11 @@ export function mentorDays(
        LEFT JOIN steps st   ON st.day = d.day AND st.person = d.person
        LEFT JOIN feedback fb ON fb.day = d.day AND fb.person = d.person
       WHERE u.role = 'mentor' ${who}
-      ORDER BY d.day DESC, u.name`,
+        ${focus === "written" ? "AND COALESCE(w.n, 0) > 0" : ""}
+        ${focus === "backdated" ? "AND w.oldest IS NOT NULL AND w.oldest < to_char(d.day, 'YYYY-MM-DD')" : ""}
+        ${focus === "counselling" ? "AND (COALESCE(fl.n, 0) > 0 OR COALESCE(st.n, 0) > 0)" : ""}
+      ORDER BY d.day DESC, u.name
+      ${page ? `LIMIT $${args.push(page.size)} OFFSET $${args.push(page.offset)}` : ""}`,
     args);
 }
 
@@ -311,6 +331,7 @@ export function mentorDayDetail(day: string, personId: number, centerId: number 
 }
 
 export type SportsDay = {
+  total_rows: string;
   day: string; teacher_id: number; teacher: string;
   visits: number; centres: string | null; children_seen: number; minutes: number;
   attendance_marked: number; sessions: number;
@@ -320,6 +341,7 @@ export type SportsDay = {
 /** What each sports teacher did, day by day. */
 export function sportsDays(
   from: string, to: string, centerId: number | null, teacherId: number | null,
+  focus: Focus = null, page?: Page,
 ) {
   const args: unknown[] = [from, to];
   const centre = centerId ? args.push(centerId) : 0;
@@ -377,7 +399,8 @@ export function sportsDays(
        UNION SELECT day, person FROM marks
        UNION SELECT day, person FROM notes
      )
-     SELECT to_char(d.day, 'YYYY-MM-DD') AS day, u.id AS teacher_id, u.name AS teacher,
+     SELECT count(*) OVER () AS total_rows,
+            to_char(d.day, 'YYYY-MM-DD') AS day, u.id AS teacher_id, u.name AS teacher,
             COALESCE(v.n, 0) AS visits, v.centres,
             COALESCE(v.children, 0) AS children_seen, COALESCE(v.minutes, 0) AS minutes,
             COALESCE(a.n, 0) AS attendance_marked, COALESCE(a.sessions, 0) AS sessions,
@@ -391,7 +414,11 @@ export function sportsDays(
        LEFT JOIN marks m  ON m.day = d.day AND m.person = d.person
        LEFT JOIN notes nt ON nt.day = d.day AND nt.person = d.person
       WHERE u.role = 'sports_teacher' ${who}
-      ORDER BY d.day DESC, u.name`,
+        ${focus === "visits" ? "AND COALESCE(v.n, 0) > 0" : ""}
+        ${focus === "noreport" ? "AND COALESCE(v.n, 0) > COALESCE(v.filed, 0)" : ""}
+        ${focus === "marked" ? "AND COALESCE(a.n, 0) > 0" : ""}
+      ORDER BY d.day DESC, u.name
+      ${page ? `LIMIT $${args.push(page.size)} OFFSET $${args.push(page.offset)}` : ""}`,
     args);
 }
 
@@ -468,6 +495,7 @@ export function sportsDayDetail(day: string, personId: number, centerId: number 
 }
 
 export type TeacherDay = {
+  total_rows: string;
   day: string; teacher_id: number; teacher: string; center_name: string | null;
   check_in: string | null; check_out: string | null; minutes: number | null;
   by_hand: boolean | null; away_reason: string | null; distance_m: number | null;
@@ -482,6 +510,7 @@ export type TeacherDay = {
  */
 export function teacherDays(
   from: string, to: string, centerId: number | null, teacherId: number | null,
+  focus: Focus = null, page?: Page,
 ) {
   const args: unknown[] = [from, to];
   const centre = centerId ? args.push(centerId) : 0;
@@ -521,7 +550,8 @@ export function teacherDays(
        UNION SELECT day, person FROM reg
        UNION SELECT day, person FROM notes
      )
-     SELECT to_char(d.day, 'YYYY-MM-DD') AS day, u.id AS teacher_id, u.name AS teacher,
+     SELECT count(*) OVER () AS total_rows,
+            to_char(d.day, 'YYYY-MM-DD') AS day, u.id AS teacher_id, u.name AS teacher,
             c.name AS center_name,
             p.check_in, p.check_out, p.minutes, p.by_hand, p.away_reason, p.distance_m,
             COALESCE(r.classes, 0) AS classes_marked,
@@ -535,7 +565,13 @@ export function teacherDays(
        LEFT JOIN reg r   ON r.day = d.day AND r.person = d.person
        LEFT JOIN notes n ON n.day = d.day AND n.person = d.person
       WHERE u.role IN ('teacher', 'backup_teacher') ${who}
-      ORDER BY d.day DESC, u.name`,
+        ${focus === "unwritten" ? "AND COALESCE(n.n, 0) = 0" : ""}
+        ${focus === "written" ? "AND COALESCE(n.n, 0) > 0" : ""}
+        ${focus === "nocheckin" ? "AND p.check_in IS NULL" : ""}
+        ${focus === "byhand" ? "AND p.by_hand" : ""}
+        ${focus === "unmarked" ? "AND COALESCE(r.classes, 0) = 0" : ""}
+      ORDER BY d.day DESC, u.name
+      ${page ? `LIMIT $${args.push(page.size)} OFFSET $${args.push(page.offset)}` : ""}`,
     args);
 }
 

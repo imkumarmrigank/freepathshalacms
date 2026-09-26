@@ -3,6 +3,8 @@ import { requireRole } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { Card, Empty, PageHeader, StatCard } from "@/components/ui";
 import Filters from "@/components/Filters";
+import Pager from "@/components/Pager";
+import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
 import { fmtDate, today } from "@/lib/format";
 import { centersForUser, resolveCenterId } from "@/lib/queries";
 import { isGlobalRole } from "@/lib/roles";
@@ -10,6 +12,13 @@ import { teacherDays } from "@/lib/day-book";
 import TeacherRows from "./TeacherRows";
 
 export const metadata = { title: "Teacher day book · Pehchaan" };
+
+const FOCUS = [
+  { value: "unwritten", label: "Only days not written up" },
+  { value: "written", label: "Only days written up" },
+  { value: "nocheckin", label: "Only days with no check-in" },
+  { value: "byhand", label: "Only manual check-ins" },
+];
 
 const RANGES = [
   { value: "7", label: "Last 7 days" },
@@ -40,6 +49,8 @@ export default async function TeacherDayBookPage({
   const from = sp.from || addDays(now, -(days - 1));
   const to = sp.to || now;
   const centerId = resolveCenterId(user, sp.center);
+  const focus = FOCUS.some((f) => f.value === sp.focus) ? (sp.focus as string) : null;
+  const pg = pageFrom(sp, 50);
 
   const [centers, teachers] = await Promise.all([
     centersForUser(user),
@@ -50,7 +61,10 @@ export default async function TeacherDayBookPage({
         ORDER BY is_active DESC, name`, centerId ? [centerId] : []),
   ]);
   const who = teachers.some((t) => String(t.id) === sp.who) ? Number(sp.who) : null;
-  const rows = await teacherDays(from, to, centerId, who);
+  const rows = await teacherDays(from, to, centerId, who, focus, pg);
+
+  const total = totalOf(rows);
+  const win = pageWindow(pg, rows.length, total);
 
   const written = rows.filter((r) => r.notes_written > 0).length;
   const checkedIn = rows.filter((r) => r.check_in).length;
@@ -71,6 +85,7 @@ export default async function TeacherDayBookPage({
         dates
         extra={[
           { name: "days", label: "Last 7 days", options: RANGES },
+          { name: "focus", label: "Every day", options: FOCUS },
           { name: "who", label: "Every teacher",
             options: teachers.map((t) => ({
               value: t.id, label: t.is_active ? t.name : `${t.name} (inactive)` })) },
@@ -107,6 +122,8 @@ export default async function TeacherDayBookPage({
             </table>
           </div>
         )}
+        <Pager page={pg.page} pages={win.pages} first={win.first} last={win.last}
+          total={total} unit="teacher-day" />
       </Card>
     </>
   );
