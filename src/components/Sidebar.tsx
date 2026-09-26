@@ -74,6 +74,8 @@ const MENU: Node[] = [
     label: "Parents & support", icon: IconChat, children: [
       { href: "/ptm/dashboard", label: "PTM dashboard", feature: "ptm" },
       { href: "/ptm", label: "PTM interactions", feature: "ptm" },
+      { href: "/ptm/daily", label: "Mentor day book",
+        roles: ["super_admin", "admin", "center_manager"] },
       { href: "/follow-ups", label: "Follow-ups", feature: "followUps" },
       { href: "/counselling", label: "Counselling", feature: "counselling" },
       { href: "/counselling/flagged", label: "Flagged students", feature: "counselling" },
@@ -87,6 +89,8 @@ const MENU: Node[] = [
       { href: "/audits/dashboard", label: "Auditor dashboard",
         roles: ["super_admin", "admin"] },
       { href: "/audits", label: "Visits & standing", feature: "auditReports" },
+      { href: "/audits/daily", label: "Auditor day book",
+        roles: ["super_admin", "admin"] },
       { href: "/audits/suggestions", label: "Suggestions", icon: IconFlag,
         feature: "auditReports" },
       { href: "/audits/board", label: "Best centre", feature: "auditReports" },

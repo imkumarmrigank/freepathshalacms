@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { requireFeature } from "@/lib/auth";
+import Filters from "@/components/Filters";
+import { centersForUser } from "@/lib/queries";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { seesAllAudits } from "@/lib/roles";
@@ -25,13 +27,19 @@ export default async function SuggestionsPage({
   const all = seesAllAudits(user.role);
 
   const showClosed = sp.show === "all";
-  const [rows, board] = await Promise.all([
+  // A centre may be asked for by an administrator; a centre's own staff are
+  // held to theirs whatever the URL says.
+  const centerId = all ? (sp.center ? Number(sp.center) : null) : user.centerId;
+  const [rows, board, centers] = await Promise.all([
     listSuggestions(user, {
-      centerId: sp.center ? Number(sp.center) : (all ? null : user.centerId),
+      centerId,
       open: !showClosed,
+      from: sp.from ?? null,
+      to: sp.to ?? null,
       limit: 200,
     }),
     standings(all ? null : user.centerId),
+    centersForUser(user),
   ]);
 
   const overdue = rows.filter((r) => r.overdue).length;
@@ -51,6 +59,20 @@ export default async function SuggestionsPage({
           </Link>
         }
       />
+
+      <div className="mt-4">
+        <Filters
+          centers={all ? centers : []}
+          current={sp}
+          dates
+          extra={[{ name: "show", label: "Only outstanding", options: [
+            { value: "all", label: "Include closed" },
+          ] }]}
+        />
+        <p className="mt-1.5 text-[12px] text-[var(--faint)]">
+          The dates are the days the suggestions were raised.
+        </p>
+      </div>
 
       {mine && (
         <Card className="mt-4">

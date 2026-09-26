@@ -4,6 +4,7 @@ import { groupByOf, reportByKey, type GroupBy } from "./report-meta";
 import { titleCase } from "./format";
 import type { SessionUser } from "./auth";
 import { isGlobalRole, ROLE_LABEL, type Role } from "./roles";
+import { auditorDays, mentorDays } from "./day-book";
 import { FAMILY_PHONE, PARENT_NAME, PHONE } from "./ptm-dashboard";
 
 export type ReportColumn = { key: string; label: string; width?: number; numeric?: boolean };
@@ -96,6 +97,8 @@ export async function runReport(
     case "ptm-summary":                  return ptmSummary(scoped, period);
     case "ptm-daily":                    return ptmDaily(scoped, period);
     case "ptm-attendance":               return ptmAttendance(scoped, period);
+    case "mentor-daily":                 return mentorDaily(scoped, period);
+    case "auditor-daily":                return auditorDaily(scoped, period);
     case "ptm-concerns":                 return ptmConcernsReport(scoped, period);
     case "teaching-plan-progress":       return teachingPlanProgress(scoped);
     case "timetable":                    return timetableReport(scoped);
@@ -2134,6 +2137,74 @@ async function ptmAttendance(p: ReportParams, period: string): Promise<ReportRes
     })),
   };
 }
+
+
+/**
+ * A mentor's working day, in a sheet. The same reading as the day book on the
+ * screen: what was entered on each day, and which meeting dates it covered.
+ */
+async function mentorDaily(p: ReportParams, period: string): Promise<ReportResult> {
+  const rows = await mentorDays(p.from, p.to, p.centerId, null);
+  const written = rows.reduce((n, r) => n + r.written_up, 0);
+  return {
+    title: "Mentor day book",
+    subtitle: `${period} · ${written} meeting${written === 1 ? "" : "s"} written up `
+      + `over ${new Set(rows.map((r) => r.day)).size} working days`,
+    columns: [
+      { key: "day", label: "Day of work", width: 13 },
+      { key: "mentor", label: "Mentor", width: 22 },
+      { key: "written_up", label: "Meetings written up", numeric: true, width: 18 },
+      { key: "met_today", label: "Meetings held that day", numeric: true, width: 20 },
+      { key: "meeting_dates", label: "Meeting dates covered", numeric: true, width: 19 },
+      { key: "oldest_meeting", label: "Oldest meeting", width: 14 },
+      { key: "children", label: "Children", numeric: true },
+      { key: "centres", label: "Centres", width: 28 },
+      { key: "follow_ups_promised", label: "Follow-ups promised", numeric: true, width: 18 },
+      { key: "flags_raised", label: "Children referred", numeric: true, width: 16 },
+      { key: "counselling_steps", label: "Counselling steps", numeric: true, width: 16 },
+      { key: "feedback", label: "Centre feedback", numeric: true, width: 14 },
+    ],
+    rows: rows.map((r) => ({
+      day: r.day, mentor: r.mentor, written_up: r.written_up, met_today: r.met_today,
+      meeting_dates: r.meeting_dates, oldest_meeting: r.oldest_meeting ?? "",
+      children: r.children, centres: r.centres ?? "",
+      follow_ups_promised: r.follow_ups_promised, flags_raised: r.flags_raised,
+      counselling_steps: r.counselling_steps, feedback: r.feedback,
+    })),
+  };
+}
+
+/** An auditor's working day, in a sheet. */
+async function auditorDaily(p: ReportParams, period: string): Promise<ReportResult> {
+  const rows = await auditorDays(p.from, p.to, p.centerId, null);
+  const visits = rows.reduce((n, r) => n + r.visits_filed, 0);
+  return {
+    title: "Auditor day book",
+    subtitle: `${period} · ${visits} visit${visits === 1 ? "" : "s"} filed `
+      + `over ${new Set(rows.map((r) => r.day)).size} working days`,
+    columns: [
+      { key: "day", label: "Day of work", width: 13 },
+      { key: "auditor", label: "Auditor", width: 22 },
+      { key: "visits_filed", label: "Visits filed", numeric: true, width: 12 },
+      { key: "visits_made", label: "Visits made that day", numeric: true, width: 18 },
+      { key: "centres", label: "Centres", width: 28 },
+      { key: "children_seen", label: "Children counted", numeric: true, width: 16 },
+      { key: "avg_score", label: "Average score %", numeric: true, width: 15 },
+      { key: "suggestions", label: "Suggestions raised", numeric: true, width: 17 },
+      { key: "replies", label: "Replies written", numeric: true, width: 14 },
+      { key: "verified", label: "Claims verified", numeric: true, width: 14 },
+      { key: "scheduled", label: "Visits booked", numeric: true, width: 13 },
+    ],
+    rows: rows.map((r) => ({
+      day: r.day, auditor: r.auditor, visits_filed: r.visits_filed,
+      visits_made: r.visits_made, centres: r.centres ?? "",
+      children_seen: r.children_seen, avg_score: r.avg_score ?? "",
+      suggestions: r.suggestions, replies: r.replies, verified: r.verified,
+      scheduled: r.scheduled,
+    })),
+  };
+}
+
 
 /** A day at a centre, as the parent meetings left it. */
 async function ptmDaily(p: ReportParams, period: string): Promise<ReportResult> {

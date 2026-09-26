@@ -157,6 +157,8 @@ const SUGG_COLS = `
 
 export async function listSuggestions(user: SessionUser, opts: {
   centerId?: number | null; visitId?: number | null; open?: boolean;
+  /** Raised on or after / before, by the day the auditor wrote it. */
+  from?: string | null; to?: string | null; raisedBy?: number | null;
   limit?: number; offset?: number;
 } = {}) {
   const params: unknown[] = [];
@@ -164,6 +166,15 @@ export async function listSuggestions(user: SessionUser, opts: {
   if (opts.centerId) { params.push(opts.centerId); where += ` AND s.center_id = $${params.length}`; }
   if (opts.visitId) { params.push(opts.visitId); where += ` AND s.visit_id = $${params.length}`; }
   if (opts.open) where += ` AND s.status IN ('open','in_progress','done')`;
+  if (opts.from) {
+    params.push(opts.from);
+    where += ` AND (s.created_at AT TIME ZONE 'Asia/Kolkata')::date >= $${params.length}`;
+  }
+  if (opts.to) {
+    params.push(opts.to);
+    where += ` AND (s.created_at AT TIME ZONE 'Asia/Kolkata')::date <= $${params.length}`;
+  }
+  if (opts.raisedBy) { params.push(opts.raisedBy); where += ` AND s.raised_by = $${params.length}`; }
 
   // A suggestion belongs to the centre, so it is readable there even though the
   // surprise visit that produced it is not — but only once that visit is filed.

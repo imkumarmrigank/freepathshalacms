@@ -280,6 +280,17 @@ export const REPORTS: ReportMeta[] = [
     filters: ["dates", "center", "class"],
   },
   {
+    key: "mentor-daily",
+    label: "Mentor day book",
+    group: "PTM",
+    description:
+      "What each mentor did on each working day: meetings written up and which meeting dates "
+      + "they covered, children referred to counselling, steps taken on referrals and centre "
+      + "feedback left. Read by the day the work was entered, not the day of the meeting.",
+    filters: ["dates", "center"],
+    roles: ["super_admin", "admin"],
+  },
+  {
     key: "ptm-concerns",
     label: "What parents raise",
     group: "PTM",
@@ -320,6 +331,16 @@ export const REPORTS: ReportMeta[] = [
       + "its score, the roll seen on the day, and the suggestions raised.",
     filters: ["dates", "center"],
     roles: ["super_admin", "admin", "auditor"],
+  },
+  {
+    key: "auditor-daily",
+    label: "Auditor day book",
+    group: "Centre audits",
+    description:
+      "What each auditor did on each working day: visits filed and the centres they cover, "
+      + "children counted, suggestions raised, replies written and claims verified.",
+    filters: ["dates", "center"],
+    roles: ["super_admin", "admin"],
   },
   {
     key: "audit-suggestions",
