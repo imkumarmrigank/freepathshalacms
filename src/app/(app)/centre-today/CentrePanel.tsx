@@ -76,6 +76,7 @@ export default function CentrePanel({ centre, on, onClose }:
                   <span className="ml-2 text-[12px] text-[var(--muted)]">
                     {ROLE_LABEL[p.role as Role] ?? p.role}
                   </span>
+                  <Confidence rows={p.meetings} />
                 </div>
                 <div className="text-[12.5px] text-[var(--muted)]">
                   {p.check_in
@@ -215,6 +216,30 @@ function Audit({ a }: { a: AuditDetail }) {
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * How the mentor left the day: the confidence they put on each child,
+ * averaged. One child at 2 and one at 5 is a different day from two at 3,
+ * so the spread is named too.
+ */
+function Confidence({ rows }: { rows: MeetingDetail[] }) {
+  const scored = rows.filter((r) => r.confidence != null).map((r) => r.confidence as number);
+  if (scored.length === 0) return null;
+  const avg = scored.reduce((n, c) => n + c, 0) / scored.length;
+  const low = Math.min(...scored);
+  const high = Math.max(...scored);
+  const tone = avg >= 4 ? "bg-[#eef7ee] text-[var(--ok)]"
+    : avg >= 3 ? "bg-[var(--brand-soft)] text-[var(--brand)]"
+    : "bg-[#fdf6e3] text-[#7a5a12]";
+  return (
+    <span className={`ml-2 rounded-full px-2 py-[2px] text-[11.5px] ${tone}`}
+      title={`The mentor's confidence in each child, averaged over `
+        + `${scored.length} of ${rows.length} meetings`}>
+      confidence {avg.toFixed(1)}/5
+      {low !== high && <span className="opacity-70"> · {low}–{high}</span>}
+    </span>
   );
 }
 
