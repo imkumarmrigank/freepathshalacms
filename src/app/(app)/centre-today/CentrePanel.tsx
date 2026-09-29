@@ -134,6 +134,9 @@ export default function CentrePanel({ centre, on, onClose }:
 
 const BAND_TONE: Record<number, string> = { 2: "text-[#7a5a12]", 1: "text-[var(--bad)]" };
 
+/** At or below this, the mentor is worried about the child. */
+const LOW_CONFIDENCE = 2;
+
 /**
  * The visit as the auditor filled it: how each section came out, every check
  * they marked weak or poor with the reason they gave, and what they asked the
@@ -233,7 +236,9 @@ function Confidence({ rows }: { rows: MeetingDetail[] }) {
   const tone = avg >= 4 ? "bg-[#eef7ee] text-[var(--ok)]"
     : avg >= 3 ? "bg-[var(--brand-soft)] text-[var(--brand)]"
     : "bg-[#fdf6e3] text-[#7a5a12]";
+  const worrying = scored.filter((c) => c <= LOW_CONFIDENCE).length;
   return (
+    <>
     <span className={`ml-2 rounded-full px-2 py-[2px] text-[11.5px] ${tone}`}
       title={`The mentor scored their confidence in each child out of 5. `
         + `Averaged over ${scored.length} of ${rows.length} meeting`
@@ -246,6 +251,15 @@ function Confidence({ rows }: { rows: MeetingDetail[] }) {
         <span className="opacity-70"> · lowest {low}, highest {high}</span>
       )}
     </span>
+    {worrying > 0 && (
+      <span className="ml-1.5 rounded-full bg-[#fdeeee] px-2 py-[2px] text-[11.5px]
+        font-medium text-[#8a2b2b]"
+        title={`The mentor scored ${worrying === 1 ? "this child" : "these children"} `
+          + `at ${LOW_CONFIDENCE} or below out of 5.`}>
+        {worrying} child{worrying === 1 ? "" : "ren"} at {LOW_CONFIDENCE} or below
+      </span>
+    )}
+    </>
   );
 }
 
@@ -259,8 +273,15 @@ function Meetings({ rows }: { rows: MeetingDetail[] }) {
         The meetings, child by child
       </div>
       <ul className="space-y-2">
-        {rows.map((m) => (
-          <li key={m.id} className="text-[12.5px] leading-[1.5]">
+        {rows.map((m) => {
+          // A child the mentor scored at 2 or below is the reason to read the
+          // day at all, so they do not sit in the same colour as the rest.
+          const low = m.confidence != null && m.confidence <= LOW_CONFIDENCE;
+          return (
+          <li key={m.id}
+            className={`text-[12.5px] leading-[1.5] ${low
+              ? "rounded-[7px] border-l-[3px] border-[#d98b8b] bg-[#fdeeee] px-2.5 py-1.5"
+              : ""}`}>
             <b>{m.student}</b>
             <span className="text-[var(--muted)]">
               {m.class_name && ` · ${m.class_name}`}
@@ -269,7 +290,13 @@ function Meetings({ rows }: { rows: MeetingDetail[] }) {
                 : parentLabel(m.parent_present)}`}
               {m.mode && ` · ${modeLabel(m.mode)}`}
               {m.engagement && ` · ${engagementLabel(m.engagement)}`}
-              {m.confidence != null && ` · confidence ${m.confidence}/5`}
+            </span>
+            {m.confidence != null && (
+              <span className={low ? "font-semibold text-[#8a2b2b]" : "text-[var(--muted)]"}>
+                {` · confidence ${m.confidence}/5`}
+              </span>
+            )}
+            <span className="text-[var(--muted)]">
               {m.attendance_pct != null && ` · ${Math.round(Number(m.attendance_pct))}% attendance`}
               {m.marks_pct != null && ` · ${Math.round(Number(m.marks_pct))}% marks`}
             </span>
@@ -307,7 +334,8 @@ function Meetings({ rows }: { rows: MeetingDetail[] }) {
               </span>
             )}
           </li>
-        ))}
+          );
+        })}
       </ul>
     </div>
   );
