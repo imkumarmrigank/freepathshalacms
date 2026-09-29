@@ -323,6 +323,17 @@ export const REPORTS: ReportMeta[] = [
     filters: ["center", "class", "session"],
   },
   {
+    key: "audit-reports",
+    label: "Filed audit reports",
+    group: "Centre audits",
+    description:
+      "What the auditor filed against the visit form, day by day: how the centre was found, "
+      + "its score, the roll and staff seen, the checks marked weak or poor, and the auditor's "
+      + "own words. A centre gets its own reports; drafts never appear.",
+    filters: ["dates", "center"],
+    roles: ["super_admin", "admin", "auditor", "mentor", "teacher", "backup_teacher"],
+  },
+  {
     key: "audit-visits",
     label: "Centre audit visits",
     group: "Centre audits",

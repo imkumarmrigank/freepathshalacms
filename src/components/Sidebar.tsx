@@ -7,7 +7,9 @@ import {
   IconBuilding, IconLayers, IconCheck, IconBook, IconBox, IconChevron, IconReport, IconClipboard, IconFlag,
   IconBall,
 } from "./icons";
-import { can, canAdmitStudents, type Feature, type Role } from "@/lib/roles";
+import {
+  can, canAdmitStudents, readsAllAuditReports, type Feature, type Role,
+} from "@/lib/roles";
 
 type Icon = (p: { className?: string }) => ReactNode;
 
@@ -92,6 +94,8 @@ const MENU: Node[] = [
     label: "Centre audits", icon: IconClipboard, feature: "auditReports", children: [
       { href: "/audits/dashboard", label: "Auditor dashboard",
         roles: ["super_admin", "admin"] },
+      { href: "/audits/reports", label: "Audit reports",
+        when: (role) => readsAllAuditReports(role) || can(role, "auditReports") },
       { href: "/audits", label: "Visits & standing", feature: "auditReports" },
       { href: "/audits/daily", label: "Auditor day book",
         roles: ["super_admin", "admin"] },
@@ -105,6 +109,8 @@ const MENU: Node[] = [
 
   {
     label: "Sports", icon: IconBall, feature: "sports", children: [
+      { href: "/sports/reports", label: "Sports reports",
+        roles: ["super_admin", "admin"] },
       { href: "/sports/daily", label: "Sports day book",
         roles: ["super_admin", "admin"] },
       { href: "/sports/dashboard", label: "Sports dashboard", roles: ["super_admin", "admin"] },

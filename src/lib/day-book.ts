@@ -669,3 +669,52 @@ export function staffNoteDays(from: string, to: string, personIds?: number[]) {
        FROM staff_day_notes
       WHERE on_date BETWEEN $1 AND $2 ${who}`, args);
 }
+
+export type SportsReport = {
+  id: number; visit_date: string; center_name: string; teacher: string | null;
+  check_in: string | null; check_out: string | null; worked_minutes: number | null;
+  children_count: number | null; sports_covered: string | null;
+  activities: string | null; highlights: string | null; issues: string | null;
+  report_submitted_at: string | null; closed_late: boolean | null;
+  note_summary: string | null; note_equipment: string | null;
+  note_talent: string | null; note_injuries: string | null;
+  total_rows: string;
+};
+
+/**
+ * The visit reports a sports teacher has filed, day by day, with their own
+ * day-book entry beside each one.
+ *
+ * Two records of the same afternoon: the visit form, which the app asks for,
+ * and what they wrote at the end of the day. Read together they say what
+ * happened; read apart, neither quite does.
+ */
+export function sportsReports(opts: {
+  from: string; to: string; centerId?: number | null; teacherId?: number | null;
+  limit?: number; offset?: number;
+}) {
+  const args: unknown[] = [opts.from, opts.to];
+  const centre = opts.centerId ? ` AND v.center_id = $${args.push(opts.centerId)}` : "";
+  const who = opts.teacherId ? ` AND v.user_id = $${args.push(opts.teacherId)}` : "";
+  args.push(opts.limit ?? 25, opts.offset ?? 0);
+  return query<SportsReport>(
+    `SELECT count(*) OVER () AS total_rows,
+            v.id, to_char(v.visit_date, 'YYYY-MM-DD') AS visit_date,
+            c.name AS center_name, u.name AS teacher,
+            to_char(v.check_in_at ${IST}, 'HH24:MI') AS check_in,
+            to_char(v.check_out_at ${IST}, 'HH24:MI') AS check_out,
+            v.worked_minutes, v.children_count, v.sports_covered,
+            v.activities, v.highlights, v.issues,
+            to_char(v.report_submitted_at ${IST}, 'HH24:MI') AS report_submitted_at,
+            v.closed_late,
+            n.summary AS note_summary, n.equipment_need AS note_equipment,
+            n.talent_spotted AS note_talent, n.injuries AS note_injuries
+       FROM sports_visits v
+       JOIN centers c ON c.id = v.center_id
+       LEFT JOIN users u ON u.id = v.user_id
+       LEFT JOIN staff_day_notes n ON n.user_id = v.user_id AND n.on_date = v.visit_date
+      WHERE v.visit_date BETWEEN $1 AND $2 ${centre} ${who}
+      ORDER BY v.visit_date DESC, c.code
+      LIMIT $${args.length - 1} OFFSET $${args.length}`,
+    args);
+}

@@ -107,6 +107,7 @@ export async function runReport(
     case "audit-visits":                 return auditVisitsReport(scoped, period);
     case "audit-suggestions":            return auditSuggestionsReport(scoped, period);
     case "audit-ratings":                return auditRatingsReport(scoped, period);
+    case "audit-reports":                return auditReportsFiled(scoped, period);
     case "sports-visits":                return sportsVisits(scoped, period);
     case "sports-teacher-days":          return sportsTeacherDays(scoped, period);
     case "sports-players":               return sportsPlayers(scoped);
@@ -2569,6 +2570,66 @@ async function auditRatingsReport(p: ReportParams, period: string): Promise<Repo
       section: r.section, criterion_title: r.criterion_title,
       band_label: BAND[r.band] ?? String(r.band), band: r.band, weight: r.weight,
       reason: r.reason ?? "", note: r.note ?? "",
+    })),
+  };
+}
+
+/**
+ * The filed audit reports, as a sheet — the same ground the Audit reports page
+ * covers, for a centre to keep or a mentor to read offline. Drafts never
+ * appear: a visit still being written is the auditor's working copy.
+ */
+async function auditReportsFiled(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND v.center_id = $${params.length}`; }
+
+  const rows = await query<{
+    visited_on: string; center_name: string; auditor: string | null; kind: string;
+    overall: string | null; score_pct: string | null;
+    children_present: number | null; children_on_roll: number | null;
+    staff_present: number | null; staff_on_roll: number | null;
+    summary: string | null; weakest: string | null; suggestions: number;
+  }>(
+    `SELECT to_char(v.visited_on, 'YYYY-MM-DD') AS visited_on,
+            c.name AS center_name, u.name AS auditor, v.kind, v.overall, v.score_pct,
+            v.children_present, v.children_on_roll, v.staff_present, v.staff_on_roll, v.summary,
+            (SELECT string_agg(x.criterion_title, '; ' ORDER BY x.band, x.criterion_title)
+               FROM (SELECT r.criterion_title, r.band FROM audit_ratings r
+                      WHERE r.visit_id = v.id AND r.band BETWEEN 1 AND 2) x)        AS weakest,
+            (SELECT count(*) FROM audit_suggestions s WHERE s.visit_id = v.id)::int AS suggestions
+       FROM audit_visits v
+       JOIN centers c ON c.id = v.center_id
+       LEFT JOIN users u ON u.id = v.auditor_id
+      WHERE v.status = 'submitted' AND v.visited_on BETWEEN $1 AND $2 ${where}
+      ORDER BY v.visited_on DESC, c.code`,
+    params,
+  );
+
+  return {
+    title: "Filed audit reports",
+    subtitle: `${period} · ${rows.length} report${rows.length === 1 ? "" : "s"}`,
+    columns: [
+      { key: "visited_on", label: "Visited on", width: 12 },
+      { key: "center_name", label: "Centre", width: 16 },
+      { key: "auditor", label: "Auditor", width: 18 },
+      { key: "kind", label: "Kind of visit", width: 14 },
+      { key: "overall", label: "How the centre was found", width: 22 },
+      { key: "score_pct", label: "Score %", numeric: true },
+      { key: "children", label: "Children present", width: 15 },
+      { key: "staff", label: "Staff present", width: 13 },
+      { key: "weakest", label: "Checks marked weak or poor", width: 40 },
+      { key: "suggestions", label: "Asks raised", numeric: true },
+      { key: "summary", label: "What the auditor wrote", width: 44 },
+    ],
+    rows: rows.map((r) => ({
+      visited_on: r.visited_on, center_name: r.center_name, auditor: r.auditor ?? "",
+      kind: titleCase(r.kind.replace(/_/g, " ")),
+      overall: r.overall ? OVERALL_WORDS[r.overall] ?? r.overall : "",
+      score_pct: r.score_pct == null ? null : Number(r.score_pct),
+      children: r.children_present == null ? "" : `${r.children_present} of ${r.children_on_roll ?? "—"}`,
+      staff: r.staff_present == null ? "" : `${r.staff_present} of ${r.staff_on_roll ?? "—"}`,
+      weakest: r.weakest ?? "", suggestions: r.suggestions, summary: r.summary ?? "",
     })),
   };
 }

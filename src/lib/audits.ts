@@ -1,7 +1,7 @@
 import "server-only";
 import { one, query } from "./db";
 import type { SessionUser } from "./auth";
-import { seesAllAudits } from "./roles";
+import { readsAllAuditReports, seesAllAudits } from "./roles";
 import {
   DEFAULT_SCORE_SETTINGS, centrePriority, combinedScore, ratingScore,
   suggestionPoints,
@@ -447,4 +447,99 @@ export async function rollFor(centerId: number, on: string) {
       [centerId, on]),
   ]);
   return { children: Number(kids?.n ?? 0), staff: Number(staff?.n ?? 0) };
+}
+
+/* ------------------------------------------------------- filed reports */
+
+export type FiledVisit = {
+  id: number; center_id: number; center_name: string; center_code: string;
+  auditor_name: string | null; kind: string; visited_on: string;
+  overall: string | null; score_pct: string | null; summary: string | null;
+  children_present: number | null; children_on_roll: number | null;
+  staff_present: number | null; staff_on_roll: number | null;
+  submitted_at: string | null; suggestions: number; weakest: string | null;
+  total_rows: string;
+};
+
+/**
+ * The reports an auditor has filed, newest day first.
+ *
+ * Only submitted visits: a half-written one is the auditor's working copy,
+ * and a centre reading its own verdict before it is finished would be reading
+ * a draft. A mentor and the office see every centre; a centre sees its own.
+ */
+export async function filedReports(user: SessionUser, opts: {
+  centerId?: number | null; from?: string | null; to?: string | null;
+  auditorId?: number | null; limit?: number; offset?: number;
+} = {}) {
+  const params: unknown[] = [];
+  let where = "WHERE v.status = 'submitted'";
+  if (opts.centerId) { params.push(opts.centerId); where += ` AND v.center_id = $${params.length}`; }
+  if (opts.from) { params.push(opts.from); where += ` AND v.visited_on >= $${params.length}`; }
+  if (opts.to) { params.push(opts.to); where += ` AND v.visited_on <= $${params.length}`; }
+  if (opts.auditorId) { params.push(opts.auditorId); where += ` AND v.auditor_id = $${params.length}`; }
+  if (!readsAllAuditReports(user.role)) {
+    const ids = user.role === "backup_teacher"
+      ? user.centerIds
+      : user.centerId == null ? [] : [user.centerId];
+    params.push(ids.length ? ids : [-1]);
+    where += ` AND v.center_id = ANY($${params.length})`;
+  }
+
+  params.push(opts.limit ?? 25, opts.offset ?? 0);
+  return query<FiledVisit>(
+    `SELECT count(*) OVER () AS total_rows,
+            v.id, v.center_id, c.name AS center_name, c.code AS center_code,
+            u.name AS auditor_name, v.kind, to_char(v.visited_on, 'YYYY-MM-DD') AS visited_on,
+            v.overall, v.score_pct, v.summary,
+            v.children_present, v.children_on_roll, v.staff_present, v.staff_on_roll,
+            to_char(v.submitted_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD HH24:MI') AS submitted_at,
+            (SELECT count(*) FROM audit_suggestions s WHERE s.visit_id = v.id)::int AS suggestions,
+            -- the checks that came out worst, so a row says what went wrong
+            (SELECT string_agg(r.criterion_title, ', ' ORDER BY r.band, r.id)
+               FROM (SELECT criterion_title, band, id FROM audit_ratings
+                      WHERE visit_id = v.id AND band BETWEEN 1 AND 2
+                      ORDER BY band, id LIMIT 3) r) AS weakest
+       FROM audit_visits v
+       JOIN centers c ON c.id = v.center_id
+       LEFT JOIN users u ON u.id = v.auditor_id
+      ${where}
+      ORDER BY v.visited_on DESC, c.code
+      LIMIT $${params.length - 1} OFFSET $${params.length}`,
+    params);
+}
+
+/** One filed report in full, for the panel that opens on a row. */
+export async function filedReport(user: SessionUser, visitId: number) {
+  const params: unknown[] = [visitId];
+  let where = "WHERE v.id = $1 AND v.status = 'submitted'";
+  if (!readsAllAuditReports(user.role)) {
+    const ids = user.role === "backup_teacher"
+      ? user.centerIds
+      : user.centerId == null ? [] : [user.centerId];
+    params.push(ids.length ? ids : [-1]);
+    where += ` AND v.center_id = ANY($${params.length})`;
+  }
+  const visit = await one<FiledVisit>(
+    `SELECT '0' AS total_rows, v.id, v.center_id, c.name AS center_name, c.code AS center_code,
+            u.name AS auditor_name, v.kind, to_char(v.visited_on, 'YYYY-MM-DD') AS visited_on,
+            v.overall, v.score_pct, v.summary,
+            v.children_present, v.children_on_roll, v.staff_present, v.staff_on_roll,
+            to_char(v.submitted_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD HH24:MI') AS submitted_at,
+            0 AS suggestions, NULL AS weakest
+       FROM audit_visits v
+       JOIN centers c ON c.id = v.center_id
+       LEFT JOIN users u ON u.id = v.auditor_id
+      ${where}`, params);
+  if (!visit) return null;
+
+  const [ratings, suggestions] = await Promise.all([
+    ratingsFor(visitId),
+    query<{ id: number; title: string; detail: string | null; priority: string; status: string }>(
+      `SELECT id, title, detail, priority, status FROM audit_suggestions
+        WHERE visit_id = $1 ORDER BY
+          CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1
+                        WHEN 'medium' THEN 2 ELSE 3 END, id`, [visitId]),
+  ]);
+  return { visit, ratings, suggestions };
 }

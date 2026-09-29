@@ -279,6 +279,17 @@ export function seesAllAudits(role: Role) {
   return role === "super_admin" || role === "admin" || role === "auditor";
 }
 
+/**
+ * Who may read a filed audit report for any centre.
+ *
+ * Wider than {@link seesAllAudits} by one role: a mentor works across every
+ * centre and needs to know what an auditor found at each, but has no business
+ * in a visit that is still being written — this reads filed reports only.
+ */
+export function readsAllAuditReports(role: Role) {
+  return seesAllAudits(role) || role === "mentor";
+}
+
 /* -------------------------------------------------------------- syllabus */
 
 /**
