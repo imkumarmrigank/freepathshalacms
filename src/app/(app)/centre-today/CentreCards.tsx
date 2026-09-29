@@ -37,7 +37,11 @@ export default function CentreCards({ rows, on }: { rows: CentreCard[]; on: stri
                   hint={r.first_in ? `from ${r.first_in}` : undefined} />
                 <Cell top={r.classes_expected
                   ? `${r.classes_marked}/${r.classes_expected}`
-                  : String(r.classes_marked)} label="registers" />
+                  : String(r.classes_marked)}
+                  label="classes marked"
+                  hint={r.classes_expected && r.classes_marked < r.classes_expected
+                    ? `${r.classes_expected - r.classes_marked} not marked`
+                    : undefined} />
               </div>
 
               <div className="mt-3 flex flex-wrap gap-1.5">
@@ -61,9 +65,16 @@ export default function CentreCards({ rows, on }: { rows: CentreCard[]; on: stri
   );
 }
 
+const CELL_TITLE: Record<string, string> = {
+  children: "Children marked present, against the children whose register was filled",
+  "staff in": "The centre's own staff who checked in, against the staff on its books",
+  "classes marked": "Classes whose attendance register was filled, "
+    + "against the classes the centre runs",
+};
+
 function Cell({ top, label, hint }: { top: string; label: string; hint?: string }) {
   return (
-    <div className="rounded-[9px] bg-[#f7f7fb] px-2 py-2">
+    <div className="rounded-[9px] bg-[#f7f7fb] px-2 py-2" title={CELL_TITLE[label]}>
       <div className="text-[15px] font-semibold tabular-nums">{top}</div>
       <div className="text-[11.5px] text-[var(--muted)]">{label}</div>
       {hint && <div className="text-[11px] text-[var(--faint)]">{hint}</div>}

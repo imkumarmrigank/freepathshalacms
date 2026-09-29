@@ -115,6 +115,60 @@ export function centreCards(on: string) {
 
 /* ------------------------------------------------------------- the detail */
 
+/** A visit the auditor filed, with the form behind it. */
+export type AuditDetail = {
+  visit_id: number;
+  kind: string;
+  status: string;
+  overall: string | null;
+  score_pct: string | null;
+  summary: string | null;
+  children_present: number | null;
+  children_on_roll: number | null;
+  staff_present: number | null;
+  staff_on_roll: number | null;
+  sections: { section: string; good: number; fair: number; weak: number; na: number }[];
+  weak: { section: string; title: string; band: number; reason: string | null; note: string | null }[];
+  asks: {
+    id: number; title: string; detail: string | null; priority: string;
+    status: string; due_on: string | null;
+  }[];
+};
+
+/** One parent meeting, as the mentor recorded it. */
+export type MeetingDetail = {
+  id: number;
+  student: string;
+  class_name: string | null;
+  mode: string | null;
+  parent_present: string | null;
+  engagement: string | null;
+  confidence: number | null;
+  attendance_pct: string | null;
+  marks_pct: string | null;
+  discussion: string | null;
+  concerns: string | null;
+  concern_tags: string[] | null;
+  commitment_tags: string[] | null;
+  action_items: string | null;
+  support_needed: string | null;
+  follow_up_required: boolean;
+  follow_up_date: string | null;
+  follow_up_priority: string | null;
+  follow_up_owner: string | null;
+  follow_up_assignee: string | null;
+};
+
+/** A child the mentor put up for counselling. */
+export type FlagDetail = {
+  id: number;
+  student: string;
+  class_name: string | null;
+  reasons: string[] | null;
+  urgency: string;
+  note: string | null;
+};
+
 export type PersonDay = {
   user_id: number;
   name: string;
@@ -128,13 +182,20 @@ export type PersonDay = {
   did: string[];
   /** What they wrote up themselves, in their own words. */
   wrote: { label: string; text: string }[];
+  /** The visits behind an auditor's line, check by check. */
+  audits: AuditDetail[];
+  /** The meetings behind a mentor's line, child by child. */
+  meetings: MeetingDetail[];
+  /** Children the mentor flagged that day. */
+  flagged: FlagDetail[];
 };
 
 type Row = { user_id: number; name: string; role: string };
 
 /** Everyone who worked at one centre on one day, and what each of them did. */
 export async function centreDay(centerId: number, on: string) {
-  const [centre, punches, byClass, reasons, tNotes, ptms, flags, visits, sports, sNotes] =
+  const [centre, punches, byClass, reasons, tNotes, ptms, flags, visits, sports, sNotes,
+         bands, weakChecks, asks, meetings, flagged] =
     await Promise.all([
       query<{ id: number; code: string; name: string }>(
         "SELECT id, code, name FROM centers WHERE id = $1", [centerId]),
@@ -200,12 +261,15 @@ export async function centreDay(centerId: number, on: string) {
           WHERE cf.center_id = $1 AND cf.raised_on = $2
           GROUP BY u.id, u.name, u.role`, [centerId, on]),
       query<Row & {
-        kind: string; status: string; overall: string | null; score_pct: string | null;
-        asks: number; summary: string | null;
+        visit_id: number; kind: string; status: string; overall: string | null;
+        score_pct: string | null; asks: number; summary: string | null;
+        children_present: number | null; children_on_roll: number | null;
+        staff_present: number | null; staff_on_roll: number | null;
       }>(
-        `SELECT u.id AS user_id, u.name, u.role, v.kind, v.status, v.overall, v.score_pct,
-                (SELECT count(*) FROM audit_suggestions s WHERE s.visit_id = v.id)::int AS asks,
-                v.summary
+        `SELECT u.id AS user_id, u.name, u.role, v.id AS visit_id, v.kind, v.status,
+                v.overall, v.score_pct, v.summary,
+                v.children_present, v.children_on_roll, v.staff_present, v.staff_on_roll,
+                (SELECT count(*) FROM audit_suggestions s WHERE s.visit_id = v.id)::int AS asks
            FROM audit_visits v
            JOIN users u ON u.id = v.auditor_id AND NOT u.is_test
           WHERE v.center_id = $1 AND COALESCE(v.visited_on, v.scheduled_for) = $2
@@ -230,6 +294,75 @@ export async function centreDay(centerId: number, on: string) {
            JOIN users u ON u.id = n.user_id AND NOT u.is_test
           WHERE n.on_date = $2
             AND (n.center_id = $1 OR n.center_id IS NULL)`, [centerId, on]),
+      // the form behind each visit: how each section came out, and every
+      // check that came out weak or poor, with what was said about it
+      query<{
+        visit_id: number; section: string; good: number; fair: number;
+        weak: number; na: number;
+      }>(
+        `SELECT r.visit_id, r.section,
+                count(*) FILTER (WHERE r.band = 4)::int AS good,
+                count(*) FILTER (WHERE r.band = 3)::int AS fair,
+                count(*) FILTER (WHERE r.band BETWEEN 1 AND 2)::int AS weak,
+                count(*) FILTER (WHERE r.band = 0)::int AS na
+           FROM audit_ratings r
+           JOIN audit_visits v ON v.id = r.visit_id
+          WHERE v.center_id = $1 AND COALESCE(v.visited_on, v.scheduled_for) = $2
+          GROUP BY r.visit_id, r.section, (SELECT min(id) FROM audit_ratings x
+                                            WHERE x.visit_id = r.visit_id
+                                              AND x.section = r.section)
+          ORDER BY (SELECT min(id) FROM audit_ratings x
+                     WHERE x.visit_id = r.visit_id AND x.section = r.section)`,
+        [centerId, on]),
+      query<{
+        visit_id: number; section: string; title: string; band: number;
+        reason: string | null; note: string | null;
+      }>(
+        `SELECT r.visit_id, r.section, r.criterion_title AS title, r.band, r.reason, r.note
+           FROM audit_ratings r
+           JOIN audit_visits v ON v.id = r.visit_id
+          WHERE v.center_id = $1 AND COALESCE(v.visited_on, v.scheduled_for) = $2
+            AND r.band BETWEEN 1 AND 2
+          ORDER BY r.band, r.id`, [centerId, on]),
+      query<{
+        visit_id: number; id: number; title: string; detail: string | null;
+        priority: string; status: string; due_on: string | null;
+      }>(
+        `SELECT s.visit_id, s.id, s.title, s.detail, s.priority, s.status,
+                to_char(s.due_on, 'YYYY-MM-DD') AS due_on
+           FROM audit_suggestions s
+           JOIN audit_visits v ON v.id = s.visit_id
+          WHERE v.center_id = $1 AND COALESCE(v.visited_on, v.scheduled_for) = $2
+          ORDER BY CASE s.priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1
+                                   WHEN 'medium' THEN 2 ELSE 3 END, s.id`,
+        [centerId, on]),
+      // each parent meeting as the mentor recorded it, child by child
+      query<Row & MeetingDetail>(
+        `SELECT u.id AS user_id, u.name, u.role, i.id,
+                trim(st.first_name || ' ' || COALESCE(st.last_name, '')) AS student,
+                cl.name AS class_name, i.mode, i.parent_present, i.engagement,
+                i.confidence, i.attendance_pct, i.marks_pct, i.discussion, i.concerns,
+                i.concern_tags, i.commitment_tags, i.action_items, i.support_needed,
+                i.follow_up_required,
+                to_char(i.follow_up_date, 'YYYY-MM-DD') AS follow_up_date,
+                i.follow_up_priority, i.follow_up_owner, asg.name AS follow_up_assignee
+           FROM ptm_interactions i
+           JOIN users u ON u.id = i.mentor_id AND NOT u.is_test
+           JOIN students st ON st.id = i.student_id
+           LEFT JOIN class_levels cl ON cl.id = i.class_level_id
+           LEFT JOIN users asg ON asg.id = i.follow_up_assignee_id
+          WHERE i.center_id = $1 AND i.interaction_date = $2
+          ORDER BY cl.sequence NULLS LAST, st.first_name`, [centerId, on]),
+      query<Row & FlagDetail>(
+        `SELECT u.id AS user_id, u.name, u.role, cf.id,
+                trim(st.first_name || ' ' || COALESCE(st.last_name, '')) AS student,
+                cl.name AS class_name, cf.reasons, cf.urgency, cf.note
+           FROM counselling_flags cf
+           JOIN users u ON u.id = cf.raised_by AND NOT u.is_test
+           JOIN students st ON st.id = cf.student_id
+           LEFT JOIN class_levels cl ON cl.id = cf.class_level_id
+          WHERE cf.center_id = $1 AND cf.raised_on = $2
+          ORDER BY st.first_name`, [centerId, on]),
     ]);
 
   /* Everybody who appears anywhere in the day, folded into one entry each. */
@@ -240,7 +373,7 @@ export async function centreDay(centerId: number, on: string) {
       p = {
         user_id: r.user_id, name: r.name, role: r.role,
         check_in: null, check_out: null, minutes: null, by_hand: null, distance_m: null,
-        did: [], wrote: [],
+        did: [], wrote: [], audits: [], meetings: [], flagged: [],
       };
       people.set(r.user_id, p);
     }
@@ -279,12 +412,22 @@ export async function centreDay(centerId: number, on: string) {
     at(r).did.push(`${r.n} child${r.n === 1 ? "" : "ren"} flagged for counselling`);
   }
   for (const r of visits) {
-    const score = r.score_pct == null ? "" : ` · ${Math.round(Number(r.score_pct))}%`;
-    at(r).did.push(
-      `Audit visit (${r.kind.replace(/_/g, " ")}) — ${r.status.replace(/_/g, " ")}`
-      + `${score}${r.overall ? ` · ${r.overall}` : ""} · ${r.asks} ask${r.asks === 1 ? "" : "s"}`);
-    if (r.summary) at(r).wrote.push({ label: "The auditor's summary", text: r.summary });
+    at(r).audits.push({
+      visit_id: r.visit_id, kind: r.kind, status: r.status, overall: r.overall,
+      score_pct: r.score_pct, summary: r.summary,
+      children_present: r.children_present, children_on_roll: r.children_on_roll,
+      staff_present: r.staff_present, staff_on_roll: r.staff_on_roll,
+      sections: bands.filter((b) => b.visit_id === r.visit_id)
+        .map(({ section, good, fair, weak, na }) => ({ section, good, fair, weak, na })),
+      weak: weakChecks.filter((w) => w.visit_id === r.visit_id)
+        .map(({ section, title, band, reason, note }) => ({ section, title, band, reason, note })),
+      asks: asks.filter((a) => a.visit_id === r.visit_id)
+        .map(({ id, title, detail, priority, status, due_on }) =>
+          ({ id, title, detail, priority, status, due_on })),
+    });
   }
+  for (const r of meetings) at(r).meetings.push(r);
+  for (const r of flagged) at(r).flagged.push(r);
   for (const r of sports) {
     const p = at(r);
     p.did.push(
