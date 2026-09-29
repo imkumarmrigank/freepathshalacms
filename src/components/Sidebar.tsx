@@ -37,6 +37,8 @@ const isGroup = (n: Node): n is Group => "children" in n;
  */
 const MENU: Node[] = [
   { href: "/dashboard", label: "Dashboard", icon: IconGrid },
+  { href: "/centre-today", label: "Centre today", icon: IconGrid,
+    roles: ["super_admin", "admin"] },
 
   {
     label: "Students", icon: IconUsers, children: [
