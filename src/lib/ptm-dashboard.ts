@@ -420,7 +420,8 @@ export function ptmPeople(centerId: number | null) {
             (SELECT count(*) FROM ptm_interactions i
               WHERE i.mentor_id = u.id${at})::int AS recorded
        FROM users u
-      WHERE (u.role = 'mentor'${centerId ? " AND u.center_id = $1" : ""})
-         OR EXISTS (SELECT 1 FROM ptm_interactions i WHERE i.mentor_id = u.id${at})
+      WHERE NOT u.is_test
+        AND ((u.role = 'mentor'${centerId ? " AND u.center_id = $1" : ""})
+         OR EXISTS (SELECT 1 FROM ptm_interactions i WHERE i.mentor_id = u.id${at}))
       ORDER BY (u.role = 'mentor') DESC, u.name`, args);
 }

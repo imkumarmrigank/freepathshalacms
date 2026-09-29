@@ -20,6 +20,12 @@ export type SessionUser = {
   centerIds: number[];
   /** Teachers this person is currently covering, whose classes they inherit. */
   coveringIds: number[];
+  /**
+   * A test login — the office seeing the system as this role. Kept out of
+   * every staff list, count and report, and so is the work it does. The
+   * person signed in still sees their own work; nobody else does.
+   */
+  isTest: boolean;
 };
 
 function secret() {
@@ -62,6 +68,7 @@ export async function getSession(): Promise<SessionUser | null> {
       centerName: payload.centerName == null ? null : String(payload.centerName),
       centerIds: Array.isArray(payload.centerIds) ? payload.centerIds.map(Number) : [],
       coveringIds: Array.isArray(payload.coveringIds) ? payload.coveringIds.map(Number) : [],
+      isTest: payload.isTest === true,
     };
   } catch {
     return null;
@@ -135,9 +142,10 @@ export async function verifyLogin(email: string, password: string) {
   const row = await one<{
     id: number; name: string; email: string; password_hash: string;
     role: Role; center_id: number | null; center_name: string | null; is_active: boolean;
+    is_test: boolean;
   }>(
     `SELECT u.id, u.name, u.email, u.password_hash, u.role, u.center_id, u.is_active,
-            c.name AS center_name
+            u.is_test, c.name AS center_name
        FROM users u LEFT JOIN centers c ON c.id = u.center_id
       WHERE lower(u.email) = lower($1)`,
     [email.trim()],
@@ -159,6 +167,7 @@ export async function verifyLogin(email: string, password: string) {
     centerId: row.center_id, centerName: row.center_name,
     centerIds: [...new Set(coverage.map((c) => c.center_id))],
     coveringIds: [...new Set(coverage.map((c) => c.covering_id))],
+    isTest: row.is_test,
   } satisfies SessionUser;
 }
 

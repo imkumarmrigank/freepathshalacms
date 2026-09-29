@@ -9,12 +9,15 @@ import StaffForm, { type Staff } from "./StaffForm";
 
 export default async function StaffPage({
   searchParams,
-}: { searchParams: Promise<{ edit?: string }> }) {
+}: { searchParams: Promise<{ edit?: string; test?: string }> }) {
   const user = await requireUser();
   if (!canManageStaff(user.role))
     return <Alert kind="bad">You don’t have access to staff management.</Alert>;
 
-  const { edit } = await searchParams;
+  const { edit, test } = await searchParams;
+  // Test logins are not staff. Only a super admin can see them, and only by
+  // asking: the list is the real team unless this is on.
+  const showTest = test === "1" && user.role === "super_admin";
   const centers = await centersForUser(user);
   const scope = user.role === "super_admin" ? "" : " AND u.center_id = $1";
   const params = user.role === "super_admin" ? [] : [user.centerId];
@@ -23,35 +26,52 @@ export default async function StaffPage({
     id: number; name: string; email: string; phone: string | null; role: Role;
     center_id: number | null; center_name: string | null; designation: string | null;
     is_active: boolean; last_login_at: string | null; is_manager: boolean;
+    is_test: boolean;
   }>(
     `SELECT u.id, u.name, u.email, u.phone, u.role, u.center_id, c.name AS center_name,
-            u.designation, u.is_active, u.last_login_at,
+            u.designation, u.is_active, u.last_login_at, u.is_test,
             (c.manager_id = u.id) AS is_manager
        FROM users u LEFT JOIN centers c ON c.id = u.center_id
-      WHERE 1=1 ${scope}
+      WHERE ${showTest ? "u.is_test" : "NOT u.is_test"} ${scope}
       ORDER BY u.role, u.name`,
     params,
   );
 
   const editing = edit
     ? await one<Staff>(
-        "SELECT id, name, email, phone, role, center_id, designation, is_active FROM users WHERE id = $1",
+        `SELECT id, name, email, phone, role, center_id, designation, is_active, is_test
+           FROM users WHERE id = $1`,
         [Number(edit)])
     : null;
 
   return (
     <>
       <PageHeader title="Staff"
-        subtitle={user.role === "super_admin"
-          ? "Managers and teachers across all centres"
-          : `Teachers at ${user.centerName}`}
-        right={edit ? <Link href="/manage/staff" className="btn btn-ghost">Cancel edit</Link> : undefined} />
+        subtitle={showTest
+          ? "Test logins — hidden from every list, count and report"
+          : user.role === "super_admin"
+            ? "Managers and teachers across all centres"
+            : `Teachers at ${user.centerName}`}
+        right={
+          <div className="flex items-center gap-2">
+            {user.role === "super_admin" && (
+              <Link href={showTest ? "/manage/staff" : "/manage/staff?test=1"}
+                className="btn btn-ghost btn-sm">
+                {showTest ? "Back to staff" : "Test logins"}
+              </Link>
+            )}
+            {edit && <Link href="/manage/staff" className="btn btn-ghost">Cancel edit</Link>}
+          </div>
+        } />
 
       <div className="grid gap-5 lg:grid-cols-5">
         <div className="lg:col-span-3">
           <Card pad={false}>
             {rows.length === 0 ? (
-              <Empty title="No staff yet" hint="Add your first teacher using the form." />
+              <Empty title={showTest ? "No test logins" : "No staff yet"}
+                hint={showTest
+                  ? "Add one with the form, ticking “Test login”."
+                  : "Add your first teacher using the form."} />
             ) : (
               <div className="overflow-x-auto">
                 <table className="tbl">
@@ -79,13 +99,17 @@ export default async function StaffPage({
                             </Badge>
                             {r.is_manager && <Badge tone="info" dot={false}>Centre head</Badge>}
                             {!r.is_active && <Badge tone="bad">Disabled</Badge>}
+                            {r.is_test && <Badge tone="warn">Test login</Badge>}
                           </div>
                         </td>
                         <td className="text-[var(--muted)]">{r.center_name ?? "—"}</td>
                         <td className="text-[13px] text-[var(--muted)]">
                           {r.last_login_at ? fmtDateTime(r.last_login_at) : "Never"}
                         </td>
-                        <td><Link href={`/manage/staff?edit=${r.id}`} className="btn btn-ghost btn-sm">Edit</Link></td>
+                        <td>
+                          <Link href={`/manage/staff?edit=${r.id}${showTest ? "&test=1" : ""}`}
+                            className="btn btn-ghost btn-sm">Edit</Link>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

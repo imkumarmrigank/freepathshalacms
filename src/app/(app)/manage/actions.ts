@@ -119,6 +119,9 @@ export async function saveStaff(_prev: unknown, form: FormData) {
   if (centerId && !canTouchCenter(actor, centerId))
     return { error: "That centre is not one of yours." };
 
+  // Only a super admin decides what is a test login.
+  const isTest = actor.role === "super_admin" && form.get("is_test") === "on";
+
   const password = str(form, "password");
   if (!id && !password) return { error: "Set an initial password." };
   if (password && password.length < 8) return { error: "Password must be at least 8 characters." };
@@ -138,20 +141,22 @@ export async function saveStaff(_prev: unknown, form: FormData) {
 
       await query(
         `UPDATE users SET name=$2, email=$3, phone=$4, role=$5, center_id=$6,
-            designation=$7, is_active=$8 ${password ? ", password_hash=$9" : ""}
+            designation=$7, is_active=$8
+            ${actor.role === "super_admin" ? ", is_test=$9" : ""}
+            ${password ? `, password_hash=$${actor.role === "super_admin" ? 10 : 9}` : ""}
           WHERE id=$1`,
-        password
-          ? [id, name, email, str(form, "phone"), role, centerId, str(form, "designation"),
-             form.get("is_active") === "on", await hashPassword(password)]
-          : [id, name, email, str(form, "phone"), role, centerId, str(form, "designation"),
-             form.get("is_active") === "on"],
+        [id, name, email, str(form, "phone"), role, centerId, str(form, "designation"),
+         form.get("is_active") === "on",
+         ...(actor.role === "super_admin" ? [isTest] : []),
+         ...(password ? [await hashPassword(password)] : [])],
       );
     } else {
       await query(
-        `INSERT INTO users (name, email, phone, password_hash, role, center_id, designation)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        `INSERT INTO users (name, email, phone, password_hash, role, center_id,
+                            designation, is_test)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
         [name, email, str(form, "phone"), await hashPassword(password!), role, centerId,
-         str(form, "designation")],
+         str(form, "designation"), isTest],
       );
     }
   } catch (err) {
@@ -159,6 +164,7 @@ export async function saveStaff(_prev: unknown, form: FormData) {
     return { error: msg.includes("users_email_key") ? `${email} is already registered.` : msg };
   }
   revalidatePath("/manage/staff");
+  if (isTest) return { ok: id ? "Test login updated." : "Test login added." };
   return { ok: id ? "Staff member updated." : "Staff member added." };
 }
 

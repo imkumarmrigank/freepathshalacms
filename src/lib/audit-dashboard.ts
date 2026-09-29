@@ -79,7 +79,7 @@ export function auditorWork(
               WHERE s.raised_by = u.id ${sugCentre} AND s.status = 'verified')::int        AS verified
        FROM users u
        LEFT JOIN audit_visits v ON v.auditor_id = u.id ${atCentre}
-      WHERE u.role = 'auditor' ${who}
+      WHERE u.role = 'auditor' AND NOT u.is_test ${who}
       GROUP BY u.id, u.name, u.is_active
       ORDER BY u.is_active DESC, count(v.id) DESC, u.name`,
     args);
@@ -191,5 +191,6 @@ export function overdueSuggestions(
 /** The auditors, for the office's "whose work?" picker. */
 export function auditorList() {
   return query<{ id: number; name: string }>(
-    `SELECT id, name FROM users WHERE role = 'auditor' ORDER BY is_active DESC, name`);
+    `SELECT id, name FROM users WHERE role = 'auditor' AND NOT is_test
+      ORDER BY is_active DESC, name`);
 }

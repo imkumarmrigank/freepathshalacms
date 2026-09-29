@@ -103,7 +103,7 @@ export function sportsTeacherDays(from: string, to: string, teacherId: number | 
             to_char(max(v.visit_date), 'YYYY-MM-DD')                AS last_visit
        FROM users u
        LEFT JOIN sports_visits v ON v.user_id = u.id AND v.visit_date BETWEEN $1 AND $2
-      WHERE u.role = 'sports_teacher' ${teacherId ? "AND u.id = $3" : ""}
+      WHERE u.role = 'sports_teacher' AND NOT u.is_test ${teacherId ? "AND u.id = $3" : ""}
       GROUP BY u.id, u.name
       ORDER BY count(v.id) DESC, u.name`,
     teacherId ? [from, to, teacherId] : [from, to]);
@@ -127,7 +127,7 @@ export function sportsVisitsOn(day: string, teacherId: number | null, centerId: 
             v.worked_minutes, v.sports_covered, v.children_count, v.activities, v.issues,
             (v.report_submitted_at IS NOT NULL) AS submitted
        FROM sports_visits v
-       JOIN users u ON u.id = v.user_id
+       JOIN users u ON u.id = v.user_id AND NOT u.is_test
        JOIN centers c ON c.id = v.center_id
       WHERE v.visit_date = $1 ${t} ${c}
       ORDER BY v.check_in_at`,
@@ -184,5 +184,6 @@ export function sportsTalentList(centerId: number | null, limit = 20) {
 /** The sports teachers, for the office's "whose work?" picker. */
 export function sportsTeachers() {
   return query<{ id: number; name: string }>(
-    `SELECT id, name FROM users WHERE role = 'sports_teacher' ORDER BY is_active DESC, name`);
+    `SELECT id, name FROM users WHERE role = 'sports_teacher' AND NOT is_test
+      ORDER BY is_active DESC, name`);
 }

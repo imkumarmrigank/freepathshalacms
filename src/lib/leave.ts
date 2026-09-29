@@ -19,7 +19,7 @@ const SELECT = `
              AND (tc.ends_on IS NULL OR tc.ends_on >= r.starts_on)
            ORDER BY tc.starts_on LIMIT 1)               AS backup_name
     FROM staff_leave_requests r
-    JOIN users u ON u.id = r.user_id
+    JOIN users u ON u.id = r.user_id AND NOT u.is_test
     LEFT JOIN centers c  ON c.id = r.center_id
     LEFT JOIN centers uc ON uc.id = u.center_id
     LEFT JOIN users d ON d.id = r.decided_by`;
@@ -49,7 +49,7 @@ export function leaveQueue(status: string | null, centerId: number | null) {
 export async function pendingLeaveCount(centerId: number | null) {
   const row = await one<{ n: string }>(
     `SELECT count(*) AS n FROM staff_leave_requests r
-       JOIN users u ON u.id = r.user_id
+       JOIN users u ON u.id = r.user_id AND NOT u.is_test
       WHERE r.status = 'pending'
         ${centerId ? "AND COALESCE(r.center_id, u.center_id) = $1" : ""}`,
     centerId ? [centerId] : [],
@@ -101,7 +101,7 @@ export function awayToday(centerId: number | null) {
        LEFT JOIN staff_leave_requests l
               ON l.user_id = u.id AND l.status = 'approved'
              AND CURRENT_DATE BETWEEN l.starts_on AND l.ends_on
-      WHERE u.is_active AND u.role IN ('teacher','center_manager') ${where}
+      WHERE u.is_active AND NOT u.is_test AND u.role IN ('teacher','center_manager') ${where}
         AND (a.check_in_at IS NULL OR a.status IN ('absent','leave'))
       ORDER BY (l.id IS NOT NULL) DESC, c.code, u.name`,
     params,
@@ -121,7 +121,7 @@ export async function staffToday(centerId: number | null) {
        FROM users u
        LEFT JOIN staff_attendance a
               ON a.user_id = u.id AND a.att_date = CURRENT_DATE
-      WHERE u.is_active AND u.role IN ('teacher','center_manager')
+      WHERE u.is_active AND NOT u.is_test AND u.role IN ('teacher','center_manager')
         ${centerId ? "AND u.center_id = $1" : ""}`,
     centerId ? [centerId] : [],
   );

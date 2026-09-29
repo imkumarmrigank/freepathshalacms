@@ -46,7 +46,7 @@ export default async function TeachingPlansPage({
               WHERE t.plan_id = p.id AND t.status = 'completed') AS done
        FROM teaching_plans p
        JOIN class_levels cl ON cl.id = p.class_level_id
-       JOIN users u ON u.id = p.teacher_id
+       JOIN users u ON u.id = p.teacher_id AND NOT u.is_test
        JOIN centers ce ON ce.id = p.center_id
       WHERE p.session_id = $1 ${where}
       ORDER BY cl.sequence, p.created_at DESC, p.id
@@ -68,7 +68,7 @@ export default async function TeachingPlansPage({
 
   const teachers = !isTeaching(user.role)
     ? await query<{ id: number; name: string }>(
-        `SELECT id, name FROM users WHERE role = 'teacher' AND is_active
+        `SELECT id, name FROM users WHERE role = 'teacher' AND is_active AND NOT is_test
           ${centerId ? "AND center_id = $1" : ""} ORDER BY name`,
         centerId ? [centerId] : [])
     : [];

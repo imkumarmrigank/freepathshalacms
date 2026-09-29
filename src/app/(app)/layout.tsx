@@ -99,6 +99,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
         {/* the foot of a phone screen belongs to the dock, so leave room for it */}
         <main className="mx-auto w-full max-w-[1180px] flex-1 px-5 py-6 pb-[calc(5.25rem+env(safe-area-inset-bottom))] lg:px-8 lg:py-8 lg:pb-8">
+          {/* Whoever is on a test login should never be in doubt that they are. */}
+          {user.isTest && (
+            <p className="mb-5 rounded-[9px] border border-[#f0d08a] bg-[#fdf6e3] px-3.5 py-2.5 text-[12.5px] text-[#7a5a12]">
+              <b>Test login.</b> This account is hidden from the system — it is in no staff
+              list, headcount, day book, dashboard or report, and neither is anything you do
+              on it. Only you can see your own work here.
+            </p>
+          )}
           {children}
         </main>
       </div>

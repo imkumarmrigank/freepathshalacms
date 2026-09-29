@@ -54,7 +54,7 @@ export default async function AuditReportsPage({
     all
       ? query<{ id: number; name: string }>(
           `SELECT DISTINCT u.id, u.name FROM audit_visits v JOIN users u ON u.id = v.auditor_id
-            WHERE v.status = 'submitted' ORDER BY u.name`)
+            WHERE v.status = 'submitted' AND NOT u.is_test ORDER BY u.name`)
       : Promise.resolve([]),
   ]);
 

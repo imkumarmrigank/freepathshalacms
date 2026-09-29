@@ -49,7 +49,7 @@ export default async function TestResultsPage({
                    THEN round(extract(epoch FROM t.submitted_at - t.started_at) / 60)
               END::int AS minutes
          FROM staff_tests t
-         JOIN users u ON u.id = t.user_id
+         JOIN users u ON u.id = t.user_id AND NOT u.is_test
          LEFT JOIN centers c ON c.id = t.center_id
          LEFT JOIN staff_test_config cfg ON cfg.for_role = t.for_role
         WHERE 1=1 ${where}

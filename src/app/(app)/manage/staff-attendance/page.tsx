@@ -49,7 +49,8 @@ export default async function StaffAttendancePage({
        LEFT JOIN centers c ON c.id = u.center_id
        LEFT JOIN staff_attendance a ON a.user_id = u.id AND a.att_date = $1
        LEFT JOIN users o ON o.id = a.override_by
-      WHERE u.is_active AND u.role IN ('center_manager','teacher','rider') ${scope}
+      WHERE u.is_active AND NOT u.is_test
+        AND u.role IN ('center_manager','teacher','rider') ${scope}
       ORDER BY c.code, u.role, u.name`,
     params,
   );
@@ -67,7 +68,7 @@ export default async function StaffAttendancePage({
             max(f.radius_m) AS radius_m,
             bool_or(f.distance_m IS NULL) AS no_pin
        FROM staff_checkin_refusals f
-       JOIN users u ON u.id = f.user_id
+       JOIN users u ON u.id = f.user_id AND NOT u.is_test
        LEFT JOIN centers c ON c.id = f.center_id
       WHERE f.att_date > CURRENT_DATE - 7 ${centerId ? "AND f.center_id = $1" : ""}
       GROUP BY u.id, u.name, u.role, c.id, c.name

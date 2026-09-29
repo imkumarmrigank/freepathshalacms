@@ -56,6 +56,25 @@ export async function listCriteria(includeRetired = false) {
  * Returns an empty string for the roles that see everything, so the common case
  * costs nothing.
  */
+/**
+ * A test login's visits are its own business: nobody else's list, count or
+ * report includes them. The person signed in on the test login still sees
+ * everything they did — otherwise the login could not be used to try the
+ * form at all.
+ */
+function hideTestWork(user: SessionUser, alias = "v") {
+  if (user.isTest) return "";
+  return ` AND NOT EXISTS (SELECT 1 FROM users tu
+                            WHERE tu.id = ${alias}.auditor_id AND tu.is_test)`;
+}
+
+/** The same for an ask: raised by a test login, seen only by that login. */
+function hideTestAsk(user: SessionUser) {
+  if (user.isTest) return "";
+  return ` AND NOT EXISTS (SELECT 1 FROM users tu
+                            WHERE tu.id = s.raised_by AND tu.is_test)`;
+}
+
 function visibility(user: SessionUser, params: unknown[], alias = "v") {
   if (seesAllAudits(user.role)) return "";
   const ids = user.role === "backup_teacher"
@@ -88,7 +107,7 @@ export async function listVisits(user: SessionUser, opts: {
   if (opts.centerId) { params.push(opts.centerId); where += ` AND v.center_id = $${params.length}`; }
   if (opts.status) { params.push(opts.status); where += ` AND v.status = $${params.length}`; }
   if (opts.auditorId) { params.push(opts.auditorId); where += ` AND v.auditor_id = $${params.length}`; }
-  where += visibility(user, params);
+  where += visibility(user, params) + hideTestWork(user);
 
   params.push(opts.limit ?? 50, opts.offset ?? 0);
   return query<VisitRow>(
@@ -110,7 +129,7 @@ export async function countVisits(user: SessionUser, opts: {
   if (opts.centerId) { params.push(opts.centerId); where += ` AND v.center_id = $${params.length}`; }
   if (opts.status) { params.push(opts.status); where += ` AND v.status = $${params.length}`; }
   if (opts.auditorId) { params.push(opts.auditorId); where += ` AND v.auditor_id = $${params.length}`; }
-  where += visibility(user, params);
+  where += visibility(user, params) + hideTestWork(user);
   const r = await one<{ n: string }>(
     `SELECT count(*) AS n FROM audit_visits v ${where}`, params);
   return Number(r?.n ?? 0);
@@ -119,7 +138,7 @@ export async function countVisits(user: SessionUser, opts: {
 /** One visit, or null when this person may not see it. */
 export async function getVisit(user: SessionUser, id: number) {
   const params: unknown[] = [id];
-  const where = `WHERE v.id = $1` + visibility(user, params);
+  const where = `WHERE v.id = $1` + visibility(user, params) + hideTestWork(user);
   return one<VisitRow>(
     `SELECT ${VISIT_COLS}
        FROM audit_visits v
@@ -189,6 +208,8 @@ export async function listSuggestions(user: SessionUser, opts: {
                   WHERE v.id = s.visit_id AND v.status = 'submitted'))`;
   }
 
+  where += hideTestAsk(user);
+
   params.push(opts.limit ?? 100, opts.offset ?? 0);
   return query<SuggestionRow>(
     `SELECT ${SUGG_COLS}
@@ -220,6 +241,7 @@ export async function getSuggestion(user: SessionUser, id: number) {
                  SELECT 1 FROM audit_visits v
                   WHERE v.id = s.visit_id AND v.status = 'submitted'))`;
   }
+  where += hideTestAsk(user);
   return one<SuggestionRow>(
     `SELECT ${SUGG_COLS}
        FROM audit_suggestions s
@@ -392,7 +414,7 @@ export async function monthly(month: string): Promise<MonthlyRow[]> {
 export async function auditors() {
   return query<{ id: number; name: string; email: string }>(
     `SELECT id, name, email FROM users
-      WHERE role = 'auditor' AND is_active ORDER BY name`);
+      WHERE role = 'auditor' AND is_active AND NOT is_test ORDER BY name`);
 }
 
 /** Recomputes and freezes a visit's rating score. Called when it is filed. */
@@ -431,7 +453,7 @@ export async function rollFor(centerId: number, on: string) {
     one<{ n: string }>(
       `SELECT count(DISTINCT u.id) AS n
          FROM users u
-        WHERE u.is_active
+        WHERE u.is_active AND NOT u.is_test
           AND (
             (u.role IN ('center_manager','teacher') AND u.center_id = $1)
             OR EXISTS (
@@ -486,6 +508,7 @@ export async function filedReports(user: SessionUser, opts: {
     where += ` AND v.center_id = ANY($${params.length})`;
   }
 
+  where += hideTestWork(user);
   params.push(opts.limit ?? 25, opts.offset ?? 0);
   return query<FiledVisit>(
     `SELECT count(*) OVER () AS total_rows,
@@ -520,6 +543,7 @@ export async function filedReport(user: SessionUser, visitId: number) {
     params.push(ids.length ? ids : [-1]);
     where += ` AND v.center_id = ANY($${params.length})`;
   }
+  where += hideTestWork(user);
   const visit = await one<FiledVisit>(
     `SELECT '0' AS total_rows, v.id, v.center_id, c.name AS center_name, c.code AS center_code,
             u.name AS auditor_name, v.kind, to_char(v.visited_on, 'YYYY-MM-DD') AS visited_on,

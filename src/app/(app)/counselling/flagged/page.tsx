@@ -157,10 +157,12 @@ export default async function FlaggedStudentsPage({
   const [raisers, mentors] = await Promise.all([
     query<{ id: number; name: string; role: string }>(
       `SELECT DISTINCT u.id, u.name, u.role FROM users u
-         JOIN counselling_flags f ON f.raised_by = u.id ORDER BY u.name`),
+         JOIN counselling_flags f ON f.raised_by = u.id
+        WHERE NOT u.is_test ORDER BY u.name`),
     query<{ id: number; name: string; role: string }>(
       `SELECT DISTINCT u.id, u.name, u.role FROM users u
-         JOIN counselling_flags f ON f.mentor_id = u.id ORDER BY u.name`),
+         JOIN counselling_flags f ON f.mentor_id = u.id
+        WHERE NOT u.is_test ORDER BY u.name`),
   ]);
 
   return (

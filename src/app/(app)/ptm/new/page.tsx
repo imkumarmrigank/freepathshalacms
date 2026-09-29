@@ -36,7 +36,7 @@ export default async function NewInteractionPage({
   // who a follow-up can be handed to, and who can be named as the mentor
   const mentors = await query<{ id: number; name: string }>(
     `SELECT u.id, u.name FROM users u
-      WHERE u.is_active AND u.role <> 'super_admin'
+      WHERE u.is_active AND NOT u.is_test AND u.role <> 'super_admin'
         ${centerId ? "AND (u.center_id = $1 OR u.center_id IS NULL)" : ""}
       ORDER BY u.name`,
     centerId ? [centerId] : [],

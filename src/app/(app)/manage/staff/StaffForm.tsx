@@ -8,6 +8,7 @@ import { CREATABLE_ROLES, ROLE_LABEL, needsCentre, type Role } from "@/lib/roles
 export type Staff = {
   id: number; name: string; email: string; phone: string | null; role: string;
   center_id: number | null; designation: string | null; is_active: boolean;
+  is_test?: boolean;
 };
 
 export default function StaffForm({
@@ -85,6 +86,20 @@ export default function StaffForm({
           <label className="mb-4 flex items-center gap-2.5">
             <input type="checkbox" name="is_active" className="h-4 w-4" defaultChecked={staff.is_active} />
             <span className="text-[13px]">Account is active</span>
+          </label>
+        )}
+        {isAdmin && (
+          <label className="mb-4 flex items-start gap-2.5">
+            <input type="checkbox" name="is_test" className="mt-0.5 h-4 w-4"
+              defaultChecked={staff?.is_test ?? false} />
+            <span className="text-[13px]">
+              Test login
+              <span className="block text-[12px] text-[var(--muted)]">
+                A real login for trying the system as this role. It is left out of every
+                staff list, count, day book, dashboard and report — and so is the work it
+                does. Find these again under “Test logins”.
+              </span>
+            </span>
           </label>
         )}
         <Submit>{staff ? "Save changes" : "Add staff member"}</Submit>

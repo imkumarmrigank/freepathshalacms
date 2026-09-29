@@ -178,7 +178,7 @@ export default async function Dashboard({
                 count(a.*) FILTER (WHERE a.att_date = $2::date
                                      AND a.status = 'absent')             AS absent,
                 (SELECT count(*) FROM users u
-                  WHERE u.center_id = ce.id AND u.is_active
+                  WHERE u.center_id = ce.id AND u.is_active AND NOT u.is_test
                     AND u.role IN ('teacher','center_manager'))           AS staff,
                 (SELECT count(*) FROM staff_attendance sa
                   WHERE sa.center_id = ce.id AND sa.att_date = $2::date

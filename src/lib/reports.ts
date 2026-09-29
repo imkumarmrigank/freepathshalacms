@@ -364,7 +364,7 @@ async function staffAttendanceTrend(p: ReportParams, period: string): Promise<Re
             count(*) FILTER (WHERE NOT a.within_geofence)    AS off_site
        FROM staff_attendance a
        JOIN centers ce ON ce.id = a.center_id
-       JOIN users u ON u.id = a.user_id
+       JOIN users u ON u.id = a.user_id AND NOT u.is_test
       WHERE a.att_date BETWEEN $1 AND $2 ${where}
       GROUP BY 1, ce.name, ce.code
       ORDER BY 1, ce.code`,
@@ -560,7 +560,8 @@ async function staffAttendanceRegister(p: ReportParams, period: string): Promise
        LEFT JOIN centers c ON c.id = u.center_id
        LEFT JOIN staff_attendance a
               ON a.user_id = u.id AND a.att_date BETWEEN $1 AND $2
-      WHERE u.is_active AND u.role IN ('teacher','center_manager','backup_teacher','rider') ${where}
+      WHERE u.is_active AND NOT u.is_test
+        AND u.role IN ('teacher','center_manager','backup_teacher','rider') ${where}
       ORDER BY c.code NULLS LAST, u.name, a.att_date`,
     params,
   );
@@ -626,7 +627,8 @@ async function staffAttendanceSummary(p: ReportParams, period: string): Promise<
        LEFT JOIN centers c ON c.id = u.center_id
        LEFT JOIN staff_attendance a
          ON a.user_id = u.id AND a.att_date BETWEEN $1 AND $2
-      WHERE u.is_active AND u.role IN ('teacher','center_manager','rider') ${where}
+      WHERE u.is_active AND NOT u.is_test
+        AND u.role IN ('teacher','center_manager','rider') ${where}
       GROUP BY u.name, u.role, c.name, c.code
       ORDER BY c.code, u.role, u.name`,
     params,
@@ -685,7 +687,7 @@ async function staffAttendanceDetail(p: ReportParams, period: string): Promise<R
             a.worked_minutes, a.status, a.check_in_distance_m, a.within_geofence,
             o.name AS override_by_name, a.override_reason, a.by_hand, a.away_reason
        FROM staff_attendance a
-       JOIN users u ON u.id = a.user_id
+       JOIN users u ON u.id = a.user_id AND NOT u.is_test
        JOIN centers c ON c.id = a.center_id
        LEFT JOIN users o ON o.id = a.override_by
       WHERE a.att_date BETWEEN $1 AND $2 ${where}
@@ -1368,7 +1370,7 @@ async function teachingPlanProgress(p: ReportParams): Promise<ReportResult> {
               WHERE t.plan_id = pl.id AND t.issues_faced IS NOT NULL) AS issues
        FROM teaching_plans pl
        JOIN class_levels cl ON cl.id = pl.class_level_id
-       JOIN users u ON u.id = pl.teacher_id
+       JOIN users u ON u.id = pl.teacher_id AND NOT u.is_test
        JOIN centers ce ON ce.id = pl.center_id
       WHERE pl.session_id = $1 ${where}
       ORDER BY ce.code, cl.sequence, pl.created_at DESC`,
@@ -1795,7 +1797,7 @@ async function sportsVisits(p: ReportParams, period: string): Promise<ReportResu
             v.activities, v.highlights, v.issues,
             (v.report_submitted_at IS NOT NULL) AS submitted, v.closed_late
        FROM sports_visits v
-       JOIN users u ON u.id = v.user_id
+       JOIN users u ON u.id = v.user_id AND NOT u.is_test
        JOIN centers c ON c.id = v.center_id
       WHERE v.visit_date BETWEEN $1 AND $2 ${where}
       ORDER BY v.visit_date DESC, u.name, v.check_in_at`,
@@ -1848,7 +1850,7 @@ async function sportsTeacherDays(p: ReportParams, period: string): Promise<Repor
             count(*) FILTER (WHERE v.report_submitted_at IS NULL)::int AS pending,
             sum(v.children_count)::int AS children
        FROM sports_visits v
-       JOIN users u ON u.id = v.user_id
+       JOIN users u ON u.id = v.user_id AND NOT u.is_test
        JOIN centers c ON c.id = v.center_id
       WHERE v.visit_date BETWEEN $1 AND $2
       GROUP BY v.visit_date, u.id, u.name

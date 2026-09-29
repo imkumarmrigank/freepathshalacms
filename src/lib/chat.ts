@@ -195,7 +195,7 @@ export async function centreRoom(centerId: number): Promise<number> {
   await query(
     `INSERT INTO conversation_members (conversation_id, user_id)
      SELECT $1, u.id FROM users u
-      WHERE u.is_active AND u.center_id = $2
+      WHERE u.is_active AND NOT u.is_test AND u.center_id = $2
      ON CONFLICT DO NOTHING`,
     [id, centerId]);
 
@@ -252,7 +252,7 @@ export async function contactsFor(user: SessionUser) {
     `SELECT u.id, u.name, u.role, u.designation, c.name AS center_name
        FROM users u
        LEFT JOIN centers c ON c.id = u.center_id
-      WHERE u.is_active AND u.id <> $1 ${scope}
+      WHERE u.is_active AND NOT u.is_test AND u.id <> $1 ${scope}
       ORDER BY u.name`,
     params,
   );

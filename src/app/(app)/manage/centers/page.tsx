@@ -18,14 +18,15 @@ export default async function CentersPage({
     user.role === "super_admin" || user.role === "admin" ? listCenters(false) : centersForUser(user),
     edit ? getCenter(Number(edit)) : Promise.resolve(null),
     query<{ id: number; name: string; email: string }>(
-      "SELECT id, name, email FROM users WHERE role IN ('center_manager','teacher') AND is_active ORDER BY name",
+      "SELECT id, name, email FROM users WHERE role IN ('center_manager','teacher')\n         AND is_active AND NOT is_test ORDER BY name",
     ),
   ]);
 
   const counts = await query<{ center_id: number; students: string; staff: string }>(
     `SELECT c.id AS center_id,
             (SELECT count(*) FROM students s WHERE s.center_id = c.id AND s.status = 'active') AS students,
-            (SELECT count(*) FROM users u WHERE u.center_id = c.id AND u.is_active) AS staff
+            (SELECT count(*) FROM users u
+              WHERE u.center_id = c.id AND u.is_active AND NOT u.is_test) AS staff
        FROM centers c`,
   );
   const byId = new Map(counts.map((c) => [Number(c.center_id), c]));

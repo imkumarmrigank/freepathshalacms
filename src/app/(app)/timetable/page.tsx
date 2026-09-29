@@ -54,7 +54,8 @@ export default async function TimetablePage({
   const teachers = centerId
     ? await query<{ id: number; name: string }>(
         `SELECT id, name FROM users
-          WHERE is_active AND center_id = $1 AND role IN ('teacher','center_manager')
+          WHERE is_active AND NOT is_test AND center_id = $1
+            AND role IN ('teacher','center_manager')
           ORDER BY name`, [centerId])
     : [];
 

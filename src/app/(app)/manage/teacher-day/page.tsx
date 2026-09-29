@@ -56,7 +56,7 @@ export default async function TeacherDayBookPage({
     centersForUser(user),
     query<{ id: number; name: string; is_active: boolean }>(
       `SELECT id, name, is_active FROM users
-        WHERE role IN ('teacher', 'backup_teacher')
+        WHERE role IN ('teacher', 'backup_teacher') AND NOT is_test
           ${centerId ? "AND center_id = $1" : ""}
         ORDER BY is_active DESC, name`, centerId ? [centerId] : []),
   ]);

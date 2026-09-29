@@ -79,7 +79,7 @@ export function byCentre(role: string, cycle: string, centerId: number | null) {
             round(avg(100.0 * t.score / NULLIF(t.total, 0))
                   FILTER (WHERE t.status <> 'in_progress'))::int AS avg_pct
        FROM centers ce
-       JOIN users u ON u.center_id = ce.id AND u.is_active AND u.role = $2
+       JOIN users u ON u.center_id = ce.id AND u.is_active AND NOT u.is_test AND u.role = $2
        LEFT JOIN staff_tests t ON t.user_id = u.id AND t.cycle_month = $1
       WHERE ce.is_active ${c}
       GROUP BY ce.id, ce.code, ce.name
@@ -169,7 +169,7 @@ export function notTakenYet(role: string, cycle: string, centerId: number | null
        FROM users u
        LEFT JOIN centers ce ON ce.id = u.center_id
        LEFT JOIN staff_tests t ON t.user_id = u.id
-      WHERE u.is_active AND u.role = $2 ${c}
+      WHERE u.is_active AND NOT u.is_test AND u.role = $2 ${c}
         AND NOT EXISTS (SELECT 1 FROM staff_tests x
                          WHERE x.user_id = u.id AND x.cycle_month = $1)
       GROUP BY u.id, u.name, ce.name
@@ -192,7 +192,7 @@ export function standings(role: string, centerId: number | null, months: number,
             round(max(100.0 * t.score / NULLIF(t.total, 0)))::int AS best_pct,
             count(*) FILTER (WHERE t.status = 'expired')::int AS expired
        FROM staff_tests t
-       JOIN users u ON u.id = t.user_id
+       JOIN users u ON u.id = t.user_id AND NOT u.is_test
        LEFT JOIN centers ce ON ce.id = t.center_id
       WHERE t.status <> 'in_progress'
         AND t.cycle_month > (date_trunc('month', CURRENT_DATE)

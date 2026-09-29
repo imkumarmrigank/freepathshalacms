@@ -19,7 +19,8 @@ export default async function AllocationsPage() {
   }>(
     `SELECT u.id, u.name, u.email, c.name AS center_name
        FROM users u LEFT JOIN centers c ON c.id = u.center_id
-      WHERE u.is_active AND u.role = 'teacher' ${centerId ? "AND u.center_id = $1" : ""}
+      WHERE u.is_active AND NOT u.is_test AND u.role = 'teacher'
+        ${centerId ? "AND u.center_id = $1" : ""}
       ORDER BY c.code, u.name`,
     centerId ? [centerId] : [],
   );

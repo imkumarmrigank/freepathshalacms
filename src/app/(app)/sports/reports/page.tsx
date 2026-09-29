@@ -44,7 +44,7 @@ export default async function SportsReportsPage({
     }),
     centersForUser(user),
     query<{ id: number; name: string }>(
-      `SELECT id, name FROM users WHERE role = 'sports_teacher'
+      `SELECT id, name FROM users WHERE role = 'sports_teacher' AND NOT is_test
         ORDER BY is_active DESC, name`),
   ]);
 

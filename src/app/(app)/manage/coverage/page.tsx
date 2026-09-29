@@ -27,11 +27,13 @@ export default async function CoveragePage() {
     query<{ id: number; name: string; center_name: string | null }>(
       `SELECT u.id, u.name, c.name AS center_name FROM users u
          LEFT JOIN centers c ON c.id = u.center_id
-        WHERE u.is_active AND u.role = 'backup_teacher' ORDER BY u.name`),
+        WHERE u.is_active AND NOT u.is_test AND u.role = 'backup_teacher'
+        ORDER BY u.name`),
     query<{ id: number; name: string; center_name: string | null }>(
       `SELECT u.id, u.name, c.name AS center_name FROM users u
          LEFT JOIN centers c ON c.id = u.center_id
-        WHERE u.is_active AND u.role = 'teacher' ORDER BY c.code, u.name`),
+        WHERE u.is_active AND NOT u.is_test AND u.role = 'teacher'
+        ORDER BY c.code, u.name`),
   ]);
 
   const isLive = (r: { starts_on: string; ends_on: string | null }) =>

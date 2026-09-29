@@ -72,7 +72,8 @@ export default async function FollowUpsPage({
   // anyone who can actually carry out a follow-up
   const people = await query<{ id: number; name: string }>(
     `SELECT u.id, u.name FROM users u
-      WHERE u.is_active AND u.role IN ('teacher','backup_teacher','center_manager')
+      WHERE u.is_active AND NOT u.is_test
+        AND u.role IN ('teacher','backup_teacher','center_manager')
         ${centerId ? "AND (u.center_id = $1 OR u.role = 'backup_teacher')" : ""}
       ORDER BY u.name`,
     centerId ? [centerId] : [],

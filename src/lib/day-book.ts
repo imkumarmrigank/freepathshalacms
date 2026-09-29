@@ -105,7 +105,7 @@ export function auditorDays(
        LEFT JOIN replies r  ON r.day = d.day AND r.person = d.person
        LEFT JOIN verified ve ON ve.day = d.day AND ve.person = d.person
        LEFT JOIN booked b   ON b.day = d.day AND b.person = d.person
-      WHERE u.role = 'auditor' ${who}
+      WHERE u.role = 'auditor' AND NOT u.is_test ${who}
         ${focus === "visits" ? "AND COALESCE(v.filed, 0) > 0" : ""}
         ${focus === "suggestions" ? "AND COALESCE(s.n, 0) > 0" : ""}
         ${focus === "late" ? "AND COALESCE(m.n, 0) = 0 AND COALESCE(v.filed, 0) > 0" : ""}
@@ -196,7 +196,7 @@ export function mentorDays(
        LEFT JOIN flags fl   ON fl.day = d.day AND fl.person = d.person
        LEFT JOIN steps st   ON st.day = d.day AND st.person = d.person
        LEFT JOIN feedback fb ON fb.day = d.day AND fb.person = d.person
-      WHERE u.role = 'mentor' ${who}
+      WHERE u.role = 'mentor' AND NOT u.is_test ${who}
         ${focus === "written" ? "AND COALESCE(w.n, 0) > 0" : ""}
         ${focus === "backdated" ? "AND w.oldest IS NOT NULL AND w.oldest < to_char(d.day, 'YYYY-MM-DD')" : ""}
         ${focus === "counselling" ? "AND (COALESCE(fl.n, 0) > 0 OR COALESCE(st.n, 0) > 0)" : ""}
@@ -208,7 +208,7 @@ export function mentorDays(
 /** The people who appear in a day book, for its picker. */
 export function dayBookPeople(role: "auditor" | "mentor" | "sports_teacher") {
   return query<{ id: number; name: string; is_active: boolean }>(
-    `SELECT id, name, is_active FROM users WHERE role = $1
+    `SELECT id, name, is_active FROM users WHERE role = $1 AND NOT is_test
       ORDER BY is_active DESC, name`, [role]);
 }
 
@@ -420,7 +420,7 @@ export function sportsDays(
        LEFT JOIN tests t  ON t.day = d.day AND t.person = d.person
        LEFT JOIN marks m  ON m.day = d.day AND m.person = d.person
        LEFT JOIN notes nt ON nt.day = d.day AND nt.person = d.person
-      WHERE u.role = 'sports_teacher' ${who}
+      WHERE u.role = 'sports_teacher' AND NOT u.is_test ${who}
         ${focus === "visits" ? "AND COALESCE(v.n, 0) > 0" : ""}
         ${focus === "noreport" ? "AND COALESCE(v.n, 0) > COALESCE(v.filed, 0)" : ""}
         ${focus === "marked" ? "AND COALESCE(a.n, 0) > 0" : ""}
@@ -571,7 +571,7 @@ export function teacherDays(
        LEFT JOIN punch p ON p.day = d.day AND p.person = d.person
        LEFT JOIN reg r   ON r.day = d.day AND r.person = d.person
        LEFT JOIN notes n ON n.day = d.day AND n.person = d.person
-      WHERE u.role IN ('teacher', 'backup_teacher') ${who}
+      WHERE u.role IN ('teacher', 'backup_teacher') AND NOT u.is_test ${who}
         ${focus === "unwritten" ? "AND COALESCE(n.n, 0) = 0" : ""}
         ${focus === "written" ? "AND COALESCE(n.n, 0) > 0" : ""}
         ${focus === "nocheckin" ? "AND p.check_in IS NULL" : ""}
@@ -713,7 +713,8 @@ export function sportsReports(opts: {
        JOIN centers c ON c.id = v.center_id
        LEFT JOIN users u ON u.id = v.user_id
        LEFT JOIN staff_day_notes n ON n.user_id = v.user_id AND n.on_date = v.visit_date
-      WHERE v.visit_date BETWEEN $1 AND $2 ${centre} ${who}
+      WHERE v.visit_date BETWEEN $1 AND $2
+        AND NOT COALESCE(u.is_test, false) ${centre} ${who}
       ORDER BY v.visit_date DESC, c.code
       LIMIT $${args.length - 1} OFFSET $${args.length}`,
     args);
