@@ -235,10 +235,16 @@ function Confidence({ rows }: { rows: MeetingDetail[] }) {
     : "bg-[#fdf6e3] text-[#7a5a12]";
   return (
     <span className={`ml-2 rounded-full px-2 py-[2px] text-[11.5px] ${tone}`}
-      title={`The mentor's confidence in each child, averaged over `
-        + `${scored.length} of ${rows.length} meetings`}>
+      title={`The mentor scored their confidence in each child out of 5. `
+        + `Averaged over ${scored.length} of ${rows.length} meeting`
+        + `${rows.length === 1 ? "" : "s"}`
+        + (low !== high
+          ? `, the lowest child was ${low} and the highest ${high}.`
+          : `, every child was scored ${low}.`)}>
       confidence {avg.toFixed(1)}/5
-      {low !== high && <span className="opacity-70"> · {low}–{high}</span>}
+      {low !== high && (
+        <span className="opacity-70"> · lowest {low}, highest {high}</span>
+      )}
     </span>
   );
 }
