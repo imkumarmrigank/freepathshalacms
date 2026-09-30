@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { Card, Empty, PageHeader } from "@/components/ui";
 import { fmtDate, today } from "@/lib/format";
 import { centreCards } from "@/lib/centre-today";
+import { getT } from "@/lib/i18n";
 import DatePick from "./DatePick";
 import CentreCards from "./CentreCards";
 
@@ -26,6 +27,7 @@ export default async function CentreTodayPage({
   const now = today();
   const on = sp.on && /^\d{4}-\d{2}-\d{2}$/.test(sp.on) ? sp.on : now;
   const rows = await centreCards(on);
+  const t = await getT();
 
   const present = rows.reduce((n, r) => n + r.present, 0);
   const roll = rows.reduce((n, r) => n + r.roll, 0);
@@ -34,24 +36,25 @@ export default async function CentreTodayPage({
 
   return (
     <>
-      <PageHeader title="Centre today"
-        subtitle={on === now
-          ? `Today · ${fmtDate(on)}`
-          : fmtDate(on)}
+      <PageHeader title={t("Centre today")}
+        subtitle={on === now ? t("Today · {d}", { d: fmtDate(on) }) : fmtDate(on)}
         right={<DatePick on={on} max={now} />} />
 
       <Card className="mb-5">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Fig n={rows.length} of={rows.length === 1 ? "centre open" : "centres open"} />
-          <Fig n={present} of={roll ? `of ${roll} children present` : "children marked"} />
-          <Fig n={staffIn} of="staff checked in" />
-          <Fig n={quiet} of={quiet === 1 ? "centre with nothing yet" : "centres with nothing yet"}
+          <Fig n={rows.length} of={t(rows.length === 1 ? "centre open" : "centres open")} />
+          <Fig n={present}
+            of={roll ? t("of {n} children present", { n: roll }) : t("children marked")} />
+          <Fig n={staffIn} of={t("staff checked in")} />
+          <Fig n={quiet}
+            of={t(quiet === 1 ? "centre with nothing yet" : "centres with nothing yet")}
             tone={quiet ? "warn" : undefined} />
         </div>
       </Card>
 
       {rows.length === 0 ? (
-        <Empty title="No centres" hint="Add a centre before this page has anything to show." />
+        <Empty title={t("No centres")}
+          hint={t("Add a centre before this page has anything to show.")} />
       ) : (
         <CentreCards rows={rows} on={on} />
       )}

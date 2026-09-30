@@ -2,10 +2,12 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui";
 import type { CentreCard } from "@/lib/centre-today";
+import { useT } from "@/components/LocaleProvider";
 import CentrePanel from "./CentrePanel";
 
 /** A card is a centre's day; opening it breaks the day down person by person. */
 export default function CentreCards({ rows, on }: { rows: CentreCard[]; on: string }) {
+  const t = useT();
   const [open, setOpen] = useState<CentreCard | null>(null);
 
   return (
@@ -25,34 +27,40 @@ export default function CentreCards({ rows, on }: { rows: CentreCard[]; on: stri
                   <div className="text-[12px] text-[var(--muted)]">{r.code}</div>
                 </div>
                 {quiet
-                  ? <Badge tone="warn">Nothing yet</Badge>
+                  ? <Badge tone="warn">{t("Nothing yet")}</Badge>
                   : pct != null && <Badge tone={pct >= 75 ? "ok" : pct >= 50 ? "info" : "warn"}>
-                      {pct}% present
+                      {pct}% {t("present")}
                     </Badge>}
               </div>
 
               <div className="mt-3.5 grid grid-cols-3 gap-2 text-center">
-                <Cell top={r.roll ? `${r.present}/${r.roll}` : "—"} label="children" />
-                <Cell top={`${r.staff_in}/${r.staff_on_roll}`} label="staff in"
-                  hint={r.first_in ? `from ${r.first_in}` : undefined} />
+                <Cell top={r.roll ? `${r.present}/${r.roll}` : "—"} label="children" t={t} />
+                <Cell top={`${r.staff_in}/${r.staff_on_roll}`} label="staff in" t={t}
+                  hint={r.first_in ? t("from {at}", { at: r.first_in }) : undefined} />
                 <Cell top={r.classes_expected
                   ? `${r.classes_marked}/${r.classes_expected}`
                   : String(r.classes_marked)}
-                  label="classes marked"
+                  label="classes marked" t={t}
                   hint={r.classes_expected && r.classes_marked < r.classes_expected
-                    ? `${r.classes_expected - r.classes_marked} not marked`
+                    ? t("{n} not marked", { n: r.classes_expected - r.classes_marked })
                     : undefined} />
               </div>
 
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {r.ptms > 0 && <Chip>{r.ptms} parent meeting{r.ptms === 1 ? "" : "s"}</Chip>}
-                {r.audit_visits > 0 && <Chip tone="info">Audit visit</Chip>}
-                {r.sports_visits > 0 && <Chip tone="info">Sports session</Chip>}
-                {r.flags > 0 && <Chip tone="warn">{r.flags} flagged</Chip>}
-                {r.notes_written > 0 && <Chip>{r.notes_written} written up</Chip>}
+                {r.ptms > 0 && (
+                  <Chip>{r.ptms === 1
+                    ? t("{n} parent meeting", { n: r.ptms })
+                    : t("{n} parent meetings", { n: r.ptms })}</Chip>
+                )}
+                {r.audit_visits > 0 && <Chip tone="info">{t("Audit visit")}</Chip>}
+                {r.sports_visits > 0 && <Chip tone="info">{t("Sports session")}</Chip>}
+                {r.flags > 0 && <Chip tone="warn">{t("{n} flagged", { n: r.flags })}</Chip>}
+                {r.notes_written > 0 && (
+                  <Chip>{t("{n} written up", { n: r.notes_written })}</Chip>
+                )}
                 {r.ptms + r.audit_visits + r.sports_visits + r.flags + r.notes_written === 0 && (
                   <span className="text-[12px] text-[var(--faint)]">
-                    nothing else recorded
+                    {t("nothing else recorded")}
                   </span>
                 )}
               </div>
@@ -72,11 +80,13 @@ const CELL_TITLE: Record<string, string> = {
     + "against the classes the centre runs",
 };
 
-function Cell({ top, label, hint }: { top: string; label: string; hint?: string }) {
+function Cell({ top, label, hint, t }: {
+  top: string; label: string; hint?: string; t: (s: string) => string;
+}) {
   return (
-    <div className="rounded-[9px] bg-[#f7f7fb] px-2 py-2" title={CELL_TITLE[label]}>
+    <div className="rounded-[9px] bg-[#f7f7fb] px-2 py-2" title={t(CELL_TITLE[label])}>
       <div className="text-[15px] font-semibold tabular-nums">{top}</div>
-      <div className="text-[11.5px] text-[var(--muted)]">{label}</div>
+      <div className="text-[11.5px] text-[var(--muted)]">{t(label)}</div>
       {hint && <div className="text-[11px] text-[var(--faint)]">{hint}</div>}
     </div>
   );

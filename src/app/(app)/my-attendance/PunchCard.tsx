@@ -5,6 +5,7 @@ import { FormMessage, Submit } from "@/components/form";
 import { Alert, Field } from "@/components/ui";
 import { AWAY_REASONS } from "@/lib/away-meta";
 import { BY_HAND_FROM_M, BY_HAND_UPTO_M } from "@/lib/geo";
+import { useT } from "@/components/LocaleProvider";
 
 type Today = {
   check_in_at: string | null; check_out_at: string | null;
@@ -20,6 +21,7 @@ export default function PunchCard({
 }: {
   today: Today; spells: Spell[]; centerName: string; radius: number; hasCoords: boolean;
 }) {
+  const t = useT();
   const [state, action] = useActionState(punch, null);
   const [byHandState, byHandAction] = useActionState(punchByHand, null);
   const [coords, setCoords] = useState<{ lat: number; lng: number; acc: number } | null>(null);
@@ -61,7 +63,7 @@ export default function PunchCard({
   const locate = () =>
     new Promise<void>((resolve) => {
       if (!("geolocation" in navigator)) {
-        setGeoError("This device cannot report its location.");
+        setGeoError(t("This device cannot report its location."));
         return resolve();
       }
       setLocating(true);
@@ -79,8 +81,8 @@ export default function PunchCard({
         (err) => {
           setGeoError(
             err.code === err.PERMISSION_DENIED
-              ? "Location permission is blocked. Enable it for this site and try again."
-              : "Could not read your location. Move to an open area and retry.",
+              ? t("Location permission is blocked. Enable it for this site and try again.")
+              : t("Could not read your location. Move to an open area and retry."),
           );
           setLocating(false);
           resolve();
@@ -119,46 +121,51 @@ export default function PunchCard({
       {refusedAt != null && (
         <div className="mb-4 flex flex-wrap items-center gap-2 rounded-[10px]
           border border-[var(--border)] bg-[#f7f7fb] px-3.5 py-2.5">
-          <span className="text-[13px] text-[var(--muted)]">You are</span>
+          <span className="text-[13px] text-[var(--muted)]">{t("You are")}</span>
           <span className="font-mono text-[17px] font-semibold text-[var(--bad)]">
             {readable(refusedAt)}
           </span>
           <span className="text-[13px] text-[var(--muted)]">
-            from {centerName} · check-in works within {radius} m
+            {t("from {centre} · check-in works within {r} m",
+              { centre: centerName, r: radius })}
           </span>
         </div>
       )}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div>
-          <div className="label-cap">Checked in</div>
+          <div className="label-cap">{t("Checked in")}</div>
           <div className="mt-1.5 text-[20px] font-semibold">{time(today?.check_in_at ?? null)}</div>
           {today?.check_in_distance_m != null && (
-            <div className="text-[12px] text-[var(--muted)]">{today.check_in_distance_m} m from centre</div>
+            <div className="text-[12px] text-[var(--muted)]">
+              {t("{m} m from centre", { m: today.check_in_distance_m })}
+            </div>
           )}
         </div>
         <div>
-          <div className="label-cap">Checked out</div>
+          <div className="label-cap">{t("Checked out")}</div>
           <div className="mt-1.5 text-[20px] font-semibold">{time(today?.check_out_at ?? null)}</div>
         </div>
         <div>
-          <div className="label-cap">Status</div>
+          <div className="label-cap">{t("Status")}</div>
           <div className="mt-1.5 text-[20px] font-semibold capitalize">
-            {today?.status ?? "not marked"}
+            {t(today?.status ?? "not marked")}
           </div>
           <div className="text-[12px] text-[var(--muted)]">
-            {open ? "Currently checked in" : `${hours(today?.worked_minutes)} logged today`}
+            {open
+              ? t("Currently checked in")
+              : t("{h} logged today", { h: hours(today?.worked_minutes) })}
           </div>
         </div>
       </div>
 
       {spells.length > 1 && (
         <div className="mt-4">
-          <div className="label-cap mb-1.5">Today’s spells</div>
+          <div className="label-cap mb-1.5">{t("Today’s spells")}</div>
           <ul className="text-[13px] text-[var(--muted)]">
             {spells.map((s, i) => (
               <li key={s.id}>
-                {i + 1}. {time(s.check_in_at)} → {s.check_out_at ? time(s.check_out_at) : "still in"}
+                {i + 1}. {time(s.check_in_at)} → {s.check_out_at ? time(s.check_out_at) : t("still in")}
                 {s.worked_minutes != null && ` · ${hours(s.worked_minutes)}`}
               </li>
             ))}
@@ -176,36 +183,40 @@ export default function PunchCard({
         {hasCoords && (
           coords ? (
             <button type="submit" className="btn btn-primary">
-              {kind === "in" ? "Confirm check-in" : "Confirm check-out"}
+              {kind === "in" ? t("Confirm check-in") : t("Confirm check-out")}
             </button>
           ) : (
             <button type="button" className="btn btn-primary" disabled={locating}
               onClick={() => { void locate(); }}>
-              {locating ? "Reading location…" : kind === "in" ? "Check in" : "Check out"}
+              {locating ? t("Reading location…")
+                : kind === "in" ? t("Check in") : t("Check out")}
             </button>
           )
         )}
         <span className="text-[13px] text-[var(--muted)]">
           {coords
-            ? `Location ready (±${coords.acc} m). Checking ${kind === "in" ? "in" : "out"} is only ` +
-              `possible within ${radius} m of ${centerName}.`
-            : `Both check-in and check-out must be done within ${radius} m of ${centerName}.`}
+            ? t("Location ready (±{a} m). This is only possible within {r} m of {centre}.",
+                { a: coords.acc, r: radius, centre: centerName })
+            : t("Both check-in and check-out must be done within {r} m of {centre}.",
+                { r: radius, centre: centerName })}
         </span>
       </form>
 
       {nearlyThere && (
         <div className="mt-5 rounded-[10px] border border-[var(--warn)] bg-[var(--warn-soft)]
           px-4 py-3 text-[13px] text-[#b45309]">
-          You are {readable(refusedAt!)} from {centerName} — almost there. Walk up to the
-          centre and check in; the circle is {radius} m wide.
+          {t("You are {d} from {centre} — almost there. Walk up to the centre and check in; "
+            + "the circle is {r} m wide.",
+            { d: readable(refusedAt!), centre: centerName, r: radius })}
         </div>
       )}
 
       {tooFar && (
         <div className="mt-5 rounded-[10px] border border-[var(--border)] bg-[#f7f7fb]
           px-4 py-3 text-[13px] text-[var(--muted)]">
-          You are {readable(refusedAt!)} from {centerName}. A day this far from the centre
-          is marked by your centre manager, with the reason, not from here.
+          {t("You are {d} from {centre}. A day this far from the centre is marked by your "
+            + "centre manager, with the reason, not from here.",
+            { d: readable(refusedAt!), centre: centerName })}
         </div>
       )}
 
@@ -213,11 +224,12 @@ export default function PunchCard({
       {byHand && (
         <div className="mt-5 rounded-[10px] border border-[var(--warn)] bg-[var(--warn-soft)] px-4 py-4">
           <div className="text-[14px] font-semibold text-[#b45309]">
-            Away from {centerName}? Enter it by hand
+            {t("Away from {centre}? Enter it by hand", { centre: centerName })}
           </div>
           <p className="mt-1 text-[13px] text-[#b45309]">
-            This only appears because you are outside the {radius} m circle. Say where you
-            are; your administrator sees the reason and the distance beside the punch.
+            {t("This only appears because you are outside the {r} m circle. Say where you "
+              + "are; your administrator sees the reason and the distance beside the punch.",
+              { r: radius })}
           </p>
           <form action={byHandAction} className="mt-3">
             <FormMessage state={byHandState} />
@@ -226,23 +238,26 @@ export default function PunchCard({
             <input type="hidden" name="lng" value={lastFix?.lng ?? ""} />
             <input type="hidden" name="accuracy" value={lastFix?.acc ?? ""} />
             <div className="grid gap-x-4 sm:grid-cols-2">
-              <Field label="Why you are not at the centre">
+              <Field label={t("Why you are not at the centre")}>
                 <select className="select" name="reason" value={reason}
                   onChange={(e) => setReason(e.target.value)}>
-                  {AWAY_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                  {AWAY_REASONS.map((r) => <option key={r} value={r}>{t(r)}</option>)}
                 </select>
               </Field>
-              <Field label={reason.startsWith("Other") ? "Where you are *" : "Anything to add"}>
+              <Field label={reason.startsWith("Other")
+                ? t("Where you are *") : t("Anything to add")}>
                 <input className="input" name="note"
                   required={reason.startsWith("Other")}
-                  placeholder="Home visits in Nathupur with the mentor" />
+                  placeholder={t("Home visits in Nathupur with the mentor")} />
               </Field>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <Submit>{kind === "in" ? "Check in by hand" : "Check out by hand"}</Submit>
+              <Submit>
+                {kind === "in" ? t("Check in by hand") : t("Check out by hand")}
+              </Submit>
               <button type="button" className="btn btn-ghost btn-sm"
                 onClick={() => setDismissed(state?.error ?? null)}>
-                Not now — I will try again at the centre
+                {t("Not now — I will try again at the centre")}
               </button>
             </div>
           </form>

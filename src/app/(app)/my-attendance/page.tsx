@@ -4,6 +4,7 @@ import { Alert, Badge, Card, Empty, PageHeader, StatCard } from "@/components/ui
 import { fmtDate, minutesToHours, today, titleCase } from "@/lib/format";
 import PunchCard from "./PunchCard";
 import { GEOFENCE_DEFAULT_M } from "@/lib/geo";
+import { getT } from "@/lib/i18n";
 
 const TONE: Record<string, string> = {
   present: "ok", late: "warn", absent: "bad", leave: "mute", holiday: "mute",
@@ -11,8 +12,11 @@ const TONE: Record<string, string> = {
 
 export default async function MyAttendancePage() {
   const user = await requireFeature("ownCheckIn");
+  const t = await getT();
   if (!user.centerId)
-    return <Alert kind="warn">You are not assigned to a centre, so check-in is unavailable.</Alert>;
+    return <Alert kind="warn">
+      {t("You are not assigned to a centre, so check-in is unavailable.")}
+    </Alert>;
 
   const center = await one<{
     name: string; latitude: number | null; longitude: number | null; geofence_radius_m: number;
@@ -60,8 +64,9 @@ export default async function MyAttendancePage() {
 
   return (
     <>
-      <PageHeader title="My attendance"
-        subtitle={`Check in from inside ${center?.name ?? "your centre"} — your location is verified against the centre.`} />
+      <PageHeader title={t("My attendance")}
+        subtitle={t("Check in from inside {centre} — your location is verified against the centre.",
+          { centre: center?.name ?? t("your centre") })} />
 
       <PunchCard
         today={todayRow}
@@ -72,21 +77,26 @@ export default async function MyAttendancePage() {
       />
 
       <div className="mt-5 grid gap-4 sm:grid-cols-3">
-        <StatCard label="Days present" value={summary?.days ?? 0} hint="this month" />
-        <StatCard label="Late arrivals" value={summary?.late ?? 0} hint="this month"
+        <StatCard label={t("Days present")} value={summary?.days ?? 0} hint={t("this month")} />
+        <StatCard label={t("Late arrivals")} value={summary?.late ?? 0} hint={t("this month")}
           tone={Number(summary?.late ?? 0) > 0 ? "warn" : "default"} />
-        <StatCard label="Hours logged" value={minutesToHours(Number(summary?.minutes ?? 0))} hint="this month" />
+        <StatCard label={t("Hours logged")} value={minutesToHours(Number(summary?.minutes ?? 0))}
+          hint={t("this month")} />
       </div>
 
-      <div className="label-cap mb-2.5 mt-6">Recent days</div>
+      <div className="label-cap mb-2.5 mt-6">{t("Recent days")}</div>
       <Card pad={false}>
         {history.length === 0 ? (
-          <Empty title="No check-ins yet" hint="Your daily punches will be listed here." />
+          <Empty title={t("No check-ins yet")}
+            hint={t("Your daily punches will be listed here.")} />
         ) : (
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
-                <tr><th>Date</th><th>In</th><th>Out</th><th>Hours</th><th>Distance</th><th>Status</th></tr>
+                <tr>
+                  <th>{t("Date")}</th><th>{t("In")}</th><th>{t("Out")}</th>
+                  <th>{t("Hours")}</th><th>{t("Distance")}</th><th>{t("Status")}</th>
+                </tr>
               </thead>
               <tbody>
                 {history.map((h) => (
@@ -98,7 +108,7 @@ export default async function MyAttendancePage() {
                     <td className="text-[var(--muted)]">
                       {h.check_in_distance_m == null ? "—" : `${h.check_in_distance_m} m`}
                     </td>
-                    <td><Badge tone={TONE[h.status]}>{titleCase(h.status)}</Badge></td>
+                    <td><Badge tone={TONE[h.status]}>{t(titleCase(h.status))}</Badge></td>
                   </tr>
                 ))}
               </tbody>
