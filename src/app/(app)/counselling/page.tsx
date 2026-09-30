@@ -10,6 +10,7 @@ import { fmtDate } from "@/lib/format";
 import { FLAG_STATUS_LABEL, FLAG_STATUS_TONE } from "@/lib/counselling-meta";
 import { isGlobalRole } from "@/lib/roles";
 import WorkFlag from "./WorkFlag";
+import { getT } from "@/lib/i18n";
 
 export const metadata = { title: "Counselling · Pehchaan" };
 
@@ -25,6 +26,7 @@ export default async function CounsellingPage({
   searchParams,
 }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const user = await requireFeature("counselling");
+  const t = await getT();
   const sp = await searchParams;
   const [centers, classes] = await Promise.all([centersForUser(user), listClasses()]);
 
@@ -64,7 +66,7 @@ export default async function CounsellingPage({
 
   return (
     <>
-      <PageHeader title="Counselling"
+      <PageHeader title={t("Counselling")}
         subtitle="Children a teacher has referred to the mentor" />
 
       <Filters
@@ -73,21 +75,21 @@ export default async function CounsellingPage({
         current={sp}
         extra={[
           { name: "status", label: "Open referrals", options: [
-            { value: "open", label: "Awaiting mentor" },
-            { value: "in_progress", label: "Counselling under way" },
-            { value: "closed", label: "Closed" },
+            { value: "open", label: t("Awaiting mentor") },
+            { value: "in_progress", label: t("Counselling under way") },
+            { value: "closed", label: t("Closed") },
           ] },
           { name: "urgency", label: "Any urgency", options: [
-            { value: "high", label: "Urgent only" },
-            { value: "normal", label: "Normal only" },
+            { value: "high", label: t("Urgent only") },
+            { value: "normal", label: t("Normal only") },
           ] },
         ]}
       />
 
       <Card className="mt-4" pad={false}>
         {rows.length === 0 ? (
-          <Empty title="Nothing waiting"
-            hint="A teacher flags a child from their profile, and it appears here." />
+          <Empty title={t("Nothing waiting")}
+            hint={t("A teacher flags a child from their profile, and it appears here.")} />
         ) : (
           <ul>
             {rows.map((r) => (
@@ -101,7 +103,7 @@ export default async function CounsellingPage({
                   <Badge tone={FLAG_STATUS_TONE[r.status]}>
                     {FLAG_STATUS_LABEL[r.status] ?? r.status}
                   </Badge>
-                  {r.urgency === "high" && <Badge tone="bad">Urgent</Badge>}
+                  {r.urgency === "high" && <Badge tone="bad">{t("Urgent")}</Badge>}
                   <span className="text-[12px] text-[var(--muted)]">
                     {r.class_name ?? "—"} · {r.center_name} · {fmtDate(r.raised_on)}
                     {r.raised_by_name ? ` · ${r.raised_by_name}` : ""}
@@ -130,7 +132,7 @@ export default async function CounsellingPage({
           </ul>
         )}
         <Pager page={pg.page} pages={win.pages} first={win.first} last={win.last}
-          total={total} unit="referral" />
+          total={total} unit={t("referral")} />
       </Card>
     </>
   );

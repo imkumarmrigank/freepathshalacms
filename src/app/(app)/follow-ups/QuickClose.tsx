@@ -1,6 +1,7 @@
 "use client";
 import { useActionState } from "react";
 import { closeFollowUp } from "../ptm/actions";
+import { useT } from "@/components/LocaleProvider";
 
 /**
  * Closing from the list itself. A mentor working through a morning's calls
@@ -8,6 +9,7 @@ import { closeFollowUp } from "../ptm/actions";
  * error goes straight back on the list.
  */
 export default function QuickClose({ id, status }: { id: number; status: string }) {
+  const t = useT();
   const [state, action] = useActionState(closeFollowUp, null);
 
   return (
@@ -16,17 +18,17 @@ export default function QuickClose({ id, status }: { id: number; status: string 
       {status === "pending" ? (
         <>
           <input className="input h-8 w-[150px] py-1 text-[12.5px]" name="follow_up_notes"
-            placeholder="What happened?" aria-label="What happened" />
+            placeholder={t("What happened?")} aria-label={t("What happened?")} />
           <button className="btn btn-primary btn-sm" name="follow_up_status" value="done" type="submit">
-            Done
+            {t("Done")}
           </button>
           <button className="btn btn-ghost btn-sm" name="follow_up_status" value="cancelled" type="submit">
-            Cancel
+            {t("Cancel")}
           </button>
         </>
       ) : (
         <button className="btn btn-ghost btn-sm" name="follow_up_status" value="pending" type="submit">
-          Reopen
+          {t("Reopen")}
         </button>
       )}
       {state?.error && <span className="text-[12px] text-[var(--bad)]">{state.error}</span>}

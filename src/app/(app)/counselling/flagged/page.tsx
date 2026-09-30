@@ -14,6 +14,7 @@ import {
   ACTION_LABEL, FLAG_REASONS, FLAG_STATUS_LABEL, FLAG_STATUS_TONE,
 } from "@/lib/counselling-meta";
 import { isGlobalRole, ROLE_LABEL, type Role } from "@/lib/roles";
+import { getT } from "@/lib/i18n";
 
 export const metadata = { title: "Flagged students · Pehchaan" };
 
@@ -57,6 +58,7 @@ export default async function FlaggedStudentsPage({
   searchParams,
 }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const user = await requireFeature("counselling");
+  const t = await getT();
   const sp = await searchParams;
   const [centers, classes] = await Promise.all([centersForUser(user), listClasses()]);
 
@@ -167,22 +169,22 @@ export default async function FlaggedStudentsPage({
 
   return (
     <>
-      <PageHeader title="Flagged students"
+      <PageHeader title={t("Flagged students")}
         subtitle="Every child a teacher has flagged, when it was flagged and what the mentor did about it"
         right={<Link href="/counselling" className="btn">Mentor&apos;s list</Link>} />
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard label="Flagged" value={total} hint="matching these filters" />
-        <StatCard label="Awaiting mentor" value={Number(tally?.open ?? 0)}
+        <StatCard label={t("Flagged")} value={total} hint={t("matching these filters")} />
+        <StatCard label={t("Awaiting mentor")} value={Number(tally?.open ?? 0)}
           tone={Number(tally?.open ?? 0) > 0 ? "warn" : "default"} />
-        <StatCard label="Counselling under way" value={Number(tally?.working ?? 0)} />
-        <StatCard label="Closed" value={Number(tally?.closed ?? 0)} tone="ok" />
-        <StatCard label="Urgent, still open" value={Number(tally?.urgent ?? 0)}
+        <StatCard label={t("Counselling under way")} value={Number(tally?.working ?? 0)} />
+        <StatCard label={t("Closed")} value={Number(tally?.closed ?? 0)} tone="ok" />
+        <StatCard label={t("Urgent, still open")} value={Number(tally?.urgent ?? 0)}
           hint={`${Number(tally?.untouched ?? 0)} untouched over a week`}
           tone={Number(tally?.urgent ?? 0) > 0 ? "bad" : "default"} />
         {/* one referral is a moment; three is a pattern */}
-        <StatCard label="Flagged more than once" value={Number(tally?.repeats ?? 0)}
-          hint="children with an earlier referral too"
+        <StatCard label={t("Flagged more than once")} value={Number(tally?.repeats ?? 0)}
+          hint={t("children with an earlier referral too")}
           tone={Number(tally?.repeats ?? 0) > 0 ? "warn" : "default"} />
       </div>
 
@@ -193,25 +195,25 @@ export default async function FlaggedStudentsPage({
           current={sp}
           dates
           extra={[
-            { name: "status", label: "Any stage", options: [
-              { value: "pending", label: "Not closed yet" },
-              { value: "open", label: "Awaiting mentor" },
-              { value: "in_progress", label: "Counselling under way" },
-              { value: "closed", label: "Closed" },
+            { name: "status", label: t("Any stage"), options: [
+              { value: "pending", label: t("Not closed yet") },
+              { value: "open", label: t("Awaiting mentor") },
+              { value: "in_progress", label: t("Counselling under way") },
+              { value: "closed", label: t("Closed") },
             ] },
-            { name: "urgency", label: "Any urgency", options: [
-              { value: "high", label: "Urgent only" },
-              { value: "normal", label: "Normal only" },
+            { name: "urgency", label: t("Any urgency"), options: [
+              { value: "high", label: t("Urgent only") },
+              { value: "normal", label: t("Normal only") },
             ] },
-            { name: "reason", label: "Any reason",
+            { name: "reason", label: t("Any reason"),
               options: FLAG_REASONS.map((x) => ({ value: x, label: x })) },
-            { name: "by", label: "Flagged by anyone",
+            { name: "by", label: t("Flagged by anyone"),
               options: raisers.map((u) => ({
                 value: u.id, label: `${u.name} · ${ROLE_LABEL[u.role as Role] ?? u.role}` })) },
-            { name: "mentor", label: "Any mentor",
+            { name: "mentor", label: t("Any mentor"),
               options: mentors.map((u) => ({ value: u.id, label: u.name })) },
-            { name: "repeat", label: "First or repeat", options: [
-              { value: "1", label: "Flagged more than once" },
+            { name: "repeat", label: t("First or repeat"), options: [
+              { value: "1", label: t("Flagged more than once") },
             ] },
           ]}
         />
@@ -219,22 +221,22 @@ export default async function FlaggedStudentsPage({
 
       <Card className="mt-4 overflow-hidden" pad={false}>
         {rows.length === 0 ? (
-          <Empty title="No flagged children here"
-            hint="A teacher flags a child from their profile. Try a wider period or another centre." />
+          <Empty title={t("No flagged children here")}
+            hint={t("A teacher flags a child from their profile. Try a wider period or another centre.")} />
         ) : (
           <div className="overflow-x-auto">
             <table className="tbl align-top">
               <thead>
                 <tr>
-                  <SortHeader label="Student" col="student" {...sortProps} />
-                  <SortHeader label="Class" col="class" {...sortProps} />
-                  {!centerId && <SortHeader label="Centre" col="centre" {...sortProps} />}
-                  <SortHeader label="Flagged on" col="flagged" {...sortProps} />
-                  <th>Why, and who flagged it</th>
-                  <SortHeader label="Mentor's action" col="action" {...sortProps} />
-                  <SortHeader label="Stage" col="status" {...sortProps} />
-                  <SortHeader label="Times flagged" col="times" {...sortProps} />
-                  <SortHeader label="Days" col="waiting" {...sortProps} />
+                  <SortHeader label={t("Student")} col="student" {...sortProps} />
+                  <SortHeader label={t("Class")} col="class" {...sortProps} />
+                  {!centerId && <SortHeader label={t("Centre")} col="centre" {...sortProps} />}
+                  <SortHeader label={t("Flagged on")} col="flagged" {...sortProps} />
+                  <th>{t("Why, and who flagged it")}</th>
+                  <SortHeader label={t("Mentor's action")} col="action" {...sortProps} />
+                  <SortHeader label={t("Stage")} col="status" {...sortProps} />
+                  <SortHeader label={t("Times flagged")} col="times" {...sortProps} />
+                  <SortHeader label={t("Days")} col="waiting" {...sortProps} />
                 </tr>
               </thead>
               <tbody>
@@ -302,7 +304,7 @@ export default async function FlaggedStudentsPage({
                         </ul>
                       ) : (
                         <span className="text-[13px] text-[var(--faint)]">
-                          {r.status === "open" ? "Nothing done yet" : "Not recorded"}
+                          {r.status === "open" ? t("Nothing done yet") : t("Not recorded")}
                         </span>
                       )}
                       {r.mentor_name && (
@@ -345,7 +347,7 @@ export default async function FlaggedStudentsPage({
           </div>
         )}
         <Pager page={pg.page} pages={win.pages} first={win.first} last={win.last}
-          total={total} unit="flagged student" />
+          total={total} unit={t("flagged student")} />
       </Card>
     </>
   );

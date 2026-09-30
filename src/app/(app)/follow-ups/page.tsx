@@ -11,11 +11,13 @@ import { isGlobalRole } from "@/lib/roles";
 import Pager from "@/components/Pager";
 import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
 import { one } from "@/lib/db";
+import { getT } from "@/lib/i18n";
 
 export default async function FollowUpsPage({
   searchParams,
 }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const user = await requireFeature("followUps");
+  const t = await getT();
   const sp = await searchParams;
   const [centers, session] = await Promise.all([centersForUser(user), currentSession()]);
   const centerId = resolveCenterId(user, sp.center);
@@ -82,46 +84,46 @@ export default async function FollowUpsPage({
 
   return (
     <>
-      <PageHeader title="Follow-ups"
-        subtitle="Commitments made to parents during a PTM" />
+      <PageHeader title={t("Follow-ups")}
+        subtitle={t("Commitments made to parents during a PTM")} />
 
       {/* The three numbers describe whichever list is on screen, so the
           Completed tab does not report its rows as "still pending". */}
       <div className="mb-5 grid gap-4 sm:grid-cols-3">
-        <StatCard label={status === "pending" ? "Overdue" : "Past the promised date"}
-          value={overdue} hint="promised date has gone by"
+        <StatCard label={status === "pending" ? t("Overdue") : t("Past the promised date")}
+          value={overdue} hint={t("promised date has gone by")}
           tone={status === "pending" && overdue ? "bad" : "default"} />
-        <StatCard label="Dated this week" value={dueSoon} hint="next 7 days"
+        <StatCard label={t("Dated this week")} value={dueSoon} hint={t("next 7 days")}
           tone={status === "pending" && dueSoon ? "warn" : "default"} />
         <StatCard
-          label={status === "pending" ? "Open in total"
-            : status === "done" ? "Completed" : "Cancelled"}
+          label={status === "pending" ? t("Open in total")
+            : status === "done" ? t("Completed") : t("Cancelled")}
           value={total}
-          hint={status === "pending" ? "still pending" : "in this period"} />
+          hint={status === "pending" ? t("still pending") : t("in this period")} />
       </div>
 
       <Filters
         centers={isGlobalRole(user.role) ? centers : []}
         current={sp}
-        extra={[{ name: "status", label: "Pending",
+        extra={[{ name: "status", label: t("Pending"),
           options: [
-            { value: "pending", label: "Pending" },
-            { value: "done", label: "Completed" },
-            { value: "cancelled", label: "Cancelled" },
+            { value: "pending", label: t("Pending") },
+            { value: "done", label: t("Completed") },
+            { value: "cancelled", label: t("Cancelled") },
           ] }]}
       />
 
       <Card className="mt-4 overflow-hidden" pad={false}>
         {rows.length === 0 ? (
-          <Empty title={status === "pending" ? "Nothing pending" : "Nothing here"}
-            hint="Follow-ups flagged while recording a parent interaction show up on this page." />
+          <Empty title={status === "pending" ? t("Nothing pending") : t("Nothing here")}
+            hint={t("Follow-ups flagged while recording a parent interaction show up on this page.")} />
         ) : (
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>Due</th><th>Student</th><th>Class</th><th>How</th>
-                  <th>Assigned to</th><th>From PTM</th><th></th>
+                  <th>{t("Due")}</th><th>{t("Student")}</th><th>{t("Class")}</th><th>{t("How")}</th>
+                  <th>{t("Assigned to")}</th><th>{t("From PTM")}</th><th></th>
                 </tr>
               </thead>
               <tbody>
@@ -135,7 +137,7 @@ export default async function FollowUpsPage({
                           className={`font-medium ${late ? "text-[var(--bad)]" : ""} hover:underline`}>
                           {fmtDate(r.follow_up_date)}
                         </Link>
-                        {late && <div><Badge tone="bad">Overdue</Badge></div>}
+                        {late && <div><Badge tone="bad">{t("Overdue")}</Badge></div>}
                       </td>
                       <td>
                         <div className="flex items-center gap-2.5">
@@ -146,7 +148,9 @@ export default async function FollowUpsPage({
                           </div>
                         </div>
                       </td>
-                      <td className="text-[var(--muted)]">{r.class_name ?? "—"}</td>
+                      <td className="text-[var(--muted)]">
+                        {r.class_name ? t(r.class_name) : "—"}
+                      </td>
                       <td className="text-[var(--muted)]">{titleCase(r.follow_up_mode ?? "—")}</td>
                       <td>
                         {canAssign && r.follow_up_status === "pending" ? (
@@ -168,7 +172,7 @@ export default async function FollowUpsPage({
           </div>
         )}
         <Pager page={pg.page} pages={win.pages} first={win.first} last={win.last}
-          total={total} unit="follow-up" />
+          total={total} unit={t("follow-up")} />
       </Card>
     </>
   );
