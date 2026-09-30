@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import {
   BAND_LABEL, OVERALL_LABEL, PRIORITY_LABEL, SUGGESTION_STATUS_LABEL,
-  VISIT_KIND_LABEL, bandPoints,
+  VISIT_KIND_LABEL,
 } from "@/lib/audit-meta";
 import Mark from "@/components/Mark";
 import { useLocale, useT } from "@/components/LocaleProvider";
@@ -15,24 +15,6 @@ type Loaded = Awaited<ReturnType<typeof loadReport>>;
 const BAND_TONE: Record<number, string> = {
   4: "ok", 3: "info", 2: "warn", 1: "bad", 0: "mute",
 };
-
-/**
- * What the check was worth and what it earned. Not every check counts the
- * same — attendance carries three points where punctuality carries one — so
- * a band on its own does not say how much it moved the score.
- */
-function Points({ band, weight }: { band: number; weight: number }) {
-  const p = bandPoints(band, weight);
-  if (!p) return null;
-  const round = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
-  return (
-    <span className="text-[12px] tabular-nums text-[var(--muted)]"
-      title={`This check is worth ${weight} of the score; the band chosen earns `
-        + `${round(p.got)}.`}>
-      {round(p.got)}/{p.of}
-    </span>
-  );
-}
 
 /**
  * The form as the auditor filled it: every check with its band, the reason
@@ -161,8 +143,7 @@ export default function ReportPanel({ visitId, onClose }:
                                 <span className="text-[13.5px] font-medium">
                                   {(hi && r.title_hi) || r.criterion_title}
                                 </span>
-                                <span className="ml-auto flex items-center gap-2">
-                                  <Points band={r.band} weight={r.weight} />
+                                <span className="ml-auto">
                                   <Badge tone={BAND_TONE[r.band] ?? "mute"}>
                                     {t(BAND_LABEL[r.band] ?? String(r.band))}
                                   </Badge>

@@ -71,8 +71,9 @@ export default async function PtmDashboardPage({
   const people = await ptmPeople(centerId);
   // several mentors record meetings; the office reads one at a time. Anyone
   // else who has written one up is kept apart — a teacher is not a mentor.
+  // Only mentors are named here. A teacher who wrote a meeting up is not a
+  // mentor, and listing them beside the mentors read as though they were one.
   const mentors = people.filter((p) => p.role === "mentor");
-  const others = people.filter((p) => p.role !== "mentor" && p.recorded > 0);
   const who = people.some((p) => String(p.id) === sp.who) ? Number(sp.who) : null;
   const chosen = people.find((p) => p.id === who);
 
@@ -127,7 +128,7 @@ export default async function PtmDashboardPage({
           : "Yesterday's meetings, today's diary, and what parents are raising"}
         right={<Link href="/ptm" className="btn btn-ghost btn-sm">All interactions</Link>} />
 
-      {people.length > 1 && (
+      {mentors.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <Link href={link({ who: null })} scroll={false}
             className={`btn btn-sm ${who === null ? "btn-primary" : "btn-ghost"}`}>
@@ -139,18 +140,6 @@ export default async function PtmDashboardPage({
               {p.name}
             </Link>
           ))}
-          {others.length > 0 && (
-            <>
-              <span className="text-[12.5px] text-[var(--muted)]">also written up by</span>
-              {others.map((p) => (
-                <Link key={p.id} href={link({ who: String(p.id) })} scroll={false}
-                  className={`btn btn-sm ${who === p.id ? "btn-primary" : "btn-ghost"}`}>
-                  {p.name}
-                  <span className="ml-1 text-[11px] opacity-70">{ROLE_LABEL[p.role as Role]}</span>
-                </Link>
-              ))}
-            </>
-          )}
         </div>
       )}
 

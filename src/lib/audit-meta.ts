@@ -286,11 +286,6 @@ export function markWord(mark: number) {
     : mark >= 1.5 ? "Weak" : "Poor";
 }
 
-/** What a check was worth, and what it earned: band 4 is the full weight. */
-export function bandPoints(band: number, weight: number) {
-  if (band <= 0) return null;                       // left out of the score
-  return { got: ((band - 1) / 3) * weight, of: weight };
-}
 
 export type SuggestionRow = {
   id: number; visit_id: number | null; center_id: number; center_name: string;
