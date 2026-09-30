@@ -10,6 +10,7 @@ import {
 import {
   can, canAdmitStudents, readsAllAuditReports, type Feature, type Role,
 } from "@/lib/roles";
+import { useT } from "./LocaleProvider";
 
 type Icon = (p: { className?: string }) => ReactNode;
 
@@ -284,6 +285,7 @@ function contains(n: Node, href: string): boolean {
 function Row({ node, role, active, depth }: {
   node: Node; role: Role; active: string | null; depth: number;
 }) {
+  const t = useT();
   const holdsActive = active !== null && contains(node, active);
   const [open, setOpen] = useState(holdsActive);
   // A group opens itself when the page moves inside it, and otherwise stays
@@ -302,7 +304,7 @@ function Row({ node, role, active, depth }: {
       <Link href={node.href} className="nav-item" data-active={active === node.href}
         style={depth ? { paddingLeft: `${0.75 + depth * 0.9}rem` } : undefined}>
         {Icon ? <Icon className="h-[18px] w-[18px] flex-none" /> : <span className="nav-dot" />}
-        <span className="truncate">{node.label}</span>
+        <span className="truncate">{t(node.label)}</span>
       </Link>
     );
   }
@@ -315,7 +317,7 @@ function Row({ node, role, active, depth }: {
         style={depth ? { paddingLeft: `${0.75 + depth * 0.9}rem` } : undefined}
         onClick={() => setOpen(!expanded)}>
         <Icon className="h-[18px] w-[18px] flex-none" />
-        <span className="flex-1 truncate text-left">{node.label}</span>
+        <span className="flex-1 truncate text-left">{t(node.label)}</span>
         <IconChevron className={`h-[14px] w-[14px] flex-none transition-transform ${
           expanded ? "rotate-90" : ""}`} />
       </button>
@@ -339,6 +341,7 @@ function Row({ node, role, active, depth }: {
  * whichever section you are in. Tapping a section switches the second row.
  */
 function Horizontal({ role, active }: { role: Role; active: string | null }) {
+  const t = useT();
   const top = MENU.filter((n) => visible(n, role));
   const current = top.find((n) => active !== null && contains(n, active));
   const [picked, setPicked] = useState<string | null>(null);
@@ -355,7 +358,7 @@ function Horizontal({ role, active }: { role: Role; active: string | null }) {
               <Link key={n.href} href={n.href} className="nav-item whitespace-nowrap"
                 data-active={active === n.href} onClick={() => setPicked(null)}>
                 {LeafIcon && <LeafIcon className="h-[18px] w-[18px] flex-none" />}
-                <span>{n.label}</span>
+                <span>{t(n.label)}</span>
               </Link>
             );
           }
@@ -367,7 +370,7 @@ function Horizontal({ role, active }: { role: Role; active: string | null }) {
               aria-expanded={on}
               onClick={() => setPicked(on ? null : n.label)}>
               <GroupIcon className="h-[18px] w-[18px] flex-none" />
-              <span>{n.label}</span>
+              <span>{t(n.label)}</span>
               <IconChevron className={`h-[13px] w-[13px] flex-none transition-transform ${
                 on ? "rotate-90" : ""}`} />
             </button>
@@ -382,7 +385,7 @@ function Horizontal({ role, active }: { role: Role; active: string | null }) {
             .map((l) => (
               <Link key={l.href} href={l.href} className="nav-item nav-item-sm whitespace-nowrap"
                 data-active={active === l.href}>
-                {l.label}
+                {t(l.label)}
               </Link>
             ))}
         </nav>

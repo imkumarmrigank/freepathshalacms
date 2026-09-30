@@ -12,6 +12,9 @@ import { destroySession, getSession } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { ROLE_LABEL } from "@/lib/roles";
 import { fmtDate } from "@/lib/format";
+import { dictFor, getLocale, getT } from "@/lib/i18n";
+import { LocaleProvider } from "@/components/LocaleProvider";
+import LanguageToggle from "@/components/LanguageToggle";
 
 async function logout() {
   "use server";
@@ -48,12 +51,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       : covering.map((c) => `${c.center_name} · covering ${c.teacher}`).join("  ·  ");
   }
 
+  const locale = await getLocale();
+  const t = await getT();
+
   return (
+    <LocaleProvider locale={locale} dict={dictFor(locale)}>
     <div className="flex min-h-screen">
       <aside className="sticky top-0 hidden h-screen w-[236px] flex-none flex-col border-r border-[var(--border)] bg-white lg:flex">
         <Link href="/dashboard" className="block px-5 py-5">
           <Brand size="md" />
-          <span className="mt-2 block text-[11px] text-[var(--muted)]">Centre Management</span>
+          <span className="mt-2 block text-[11px] text-[var(--muted)]">{t("Centre Management")}</span>
         </Link>
 
         <div className="flex-1 overflow-y-auto">
@@ -71,7 +78,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </div>
             <form action={logout}>
               <button className="rounded-md p-1.5 text-[var(--faint)] hover:bg-[#f1f1f8] hover:text-[var(--bad)]"
-                title="Sign out" type="submit">
+                title={t("Sign out")} type="submit">
                 <IconLogout className="h-[17px] w-[17px]" />
               </button>
             </form>
@@ -94,7 +101,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <div className="hidden text-[13px] text-[var(--muted)] lg:block">
             {user.centerName ?? scopeLabel}
           </div>
-          <div className="ml-auto text-[13px] text-[var(--muted)]">{fmtDate(new Date())}</div>
+          <div className="ml-auto flex items-center gap-3">
+            <LanguageToggle />
+            <span className="hidden text-[13px] text-[var(--muted)] sm:inline">
+              {fmtDate(new Date())}
+            </span>
+          </div>
         </header>
 
         {/* the foot of a phone screen belongs to the dock, so leave room for it */}
@@ -115,5 +127,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Live after={since} />
       <ChatBubble unread={unread} />
     </div>
+    </LocaleProvider>
   );
 }

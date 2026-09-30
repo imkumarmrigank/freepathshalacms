@@ -6,6 +6,8 @@ import { createPortal } from "react-dom";
 import Sidebar, { dockFor } from "./Sidebar";
 import { IconLogout, IconMenu, IconClose } from "./icons";
 import { ROLE_LABEL, type Role } from "@/lib/roles";
+import { useT } from "./LocaleProvider";
+import LanguageToggle from "./LanguageToggle";
 
 /**
  * The phone and the Android app.
@@ -33,6 +35,7 @@ export default function MobileNav({
   logout: () => Promise<void>;
   children?: ReactNode;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const path = usePathname();
 
@@ -85,7 +88,7 @@ export default function MobileNav({
               <div className="min-w-0">
                 <div className="truncate text-[15px] font-semibold">{name}</div>
                 <div className="truncate text-[12px] text-[var(--muted)]">
-                  {ROLE_LABEL[role]}{centerName ? ` · ${centerName}` : ` · ${scopeLabel}`}
+                  {t(ROLE_LABEL[role])}{centerName ? ` · ${centerName}` : ` · ${scopeLabel}`}
                 </div>
               </div>
               <button type="button" onClick={() => setOpen(false)} aria-label="Close the menu"
@@ -96,13 +99,14 @@ export default function MobileNav({
 
             <div className="min-h-0 flex-1 overflow-y-auto py-2">
               <Sidebar role={role} />
+              <div className="px-3 pt-3"><LanguageToggle /></div>
             </div>
 
             <form action={logout}
               className="flex-none border-t border-[var(--border)] p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
               <button type="submit"
                 className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-[var(--border)] px-3 py-2.5 text-[14px] font-medium text-[var(--bad)] hover:bg-[var(--bad-soft)]">
-                <IconLogout className="h-[17px] w-[17px]" /> Sign out
+                <IconLogout className="h-[17px] w-[17px]" /> {t("Sign out")}
               </button>
             </form>
           </nav>
@@ -116,14 +120,14 @@ export default function MobileNav({
           return (
             <Link key={d.href} href={d.href} className="dock-item" data-on={isOn(d.href)}>
               <Icon className="h-[21px] w-[21px]" />
-              <span className="dock-label">{d.label}</span>
+              <span className="dock-label">{t(d.label)}</span>
             </Link>
           );
         })}
         <button type="button" className="dock-item" onClick={() => setOpen(true)}
           data-on={open} aria-label="More">
           <IconMenu className="h-[21px] w-[21px]" />
-          <span className="dock-label">More</span>
+          <span className="dock-label">{t("More")}</span>
         </button>
       </nav>
         </>,
