@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { OVERALL_LABEL, VISIT_KIND_LABEL } from "@/lib/audit-meta";
 import type { FiledVisit } from "@/lib/audits";
+import Mark from "@/components/Mark";
 import ReportPanel from "./ReportPanel";
 
 /** A row is a filed report; opening it shows the form as it was filled. */
@@ -31,9 +32,7 @@ export default function ReportRows({ rows, showCentre }:
             <td className="text-[var(--muted)]">
               {VISIT_KIND_LABEL[r.kind as "scheduled"] ?? r.kind}
             </td>
-            <td className="tabular-nums">
-              {r.score_pct == null ? "—" : `${Math.round(Number(r.score_pct))}%`}
-            </td>
+            <td><Mark pct={r.score_pct} /></td>
             <td>
               {r.overall && (
                 <Badge tone={r.overall === "healthy" ? "ok"

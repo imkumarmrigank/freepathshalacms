@@ -6,6 +6,7 @@ import { BAND_LABEL, OVERALL_LABEL, PRIORITY_LABEL, VISIT_KIND_LABEL } from "@/l
 import { engagementLabel, modeLabel, parentLabel, priorityLabel } from "@/lib/ptm-meta";
 import { URGENCY_LABEL } from "@/lib/counselling-meta";
 import type { AuditDetail, CentreCard, FlagDetail, MeetingDetail } from "@/lib/centre-today";
+import Mark from "@/components/Mark";
 import { loadCentreDay } from "./actions";
 
 type Loaded = Awaited<ReturnType<typeof loadCentreDay>>;
@@ -143,7 +144,6 @@ const LOW_CONFIDENCE = 2;
  * centre to do.
  */
 function Audit({ a }: { a: AuditDetail }) {
-  const score = a.score_pct == null ? null : Math.round(Number(a.score_pct));
   return (
     <div className="mt-2.5 rounded-[9px] border border-[var(--border)] px-3 py-2.5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -154,7 +154,7 @@ function Audit({ a }: { a: AuditDetail }) {
           </span>
         </div>
         <div className="text-[12.5px] text-[var(--muted)]">
-          {score != null && <b className="text-[var(--ink)]">{score}%</b>}
+          {a.score_pct != null && <Mark pct={a.score_pct} size="sm" />}
           {a.overall && ` · ${OVERALL_LABEL[a.overall as "healthy"] ?? a.overall}`}
           {a.children_present != null
             && ` · ${a.children_present} of ${a.children_on_roll ?? "—"} children`}

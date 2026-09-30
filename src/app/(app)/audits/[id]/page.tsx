@@ -11,6 +11,7 @@ import {
   rollFor,
 } from "@/lib/audits";
 import VisitEditor from "./VisitEditor";
+import Mark from "@/components/Mark";
 
 export const metadata = { title: "Visit · Pehchaan" };
 
@@ -84,11 +85,7 @@ export default async function VisitPage({
             {OVERALL_LABEL[visit.overall]}
           </Badge>
         )}
-        {visit.score_pct != null && (
-          <span className="text-[13px] tabular-nums text-[var(--muted)]">
-            Score {Number(visit.score_pct).toFixed(1)}%
-          </span>
-        )}
+        {visit.score_pct != null && <Mark pct={visit.score_pct} />}
       </div>
 
       {visit.status !== "submitted" && (

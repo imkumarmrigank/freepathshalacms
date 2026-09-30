@@ -6,6 +6,7 @@ import type { SessionUser } from "./auth";
 import { isGlobalRole, ROLE_LABEL, type Role } from "./roles";
 import { auditorDays, mentorDays, sportsDays, teacherDays } from "./day-book";
 import { FAMILY_PHONE, PARENT_NAME, PHONE } from "./ptm-dashboard";
+import { outOfFive } from "./audit-meta";
 
 export type ReportColumn = { key: string; label: string; width?: number; numeric?: boolean };
 export type ReportRow = Record<string, string | number | null>;
@@ -2617,6 +2618,7 @@ async function auditReportsFiled(p: ReportParams, period: string): Promise<Repor
       { key: "auditor", label: "Auditor", width: 18 },
       { key: "kind", label: "Kind of visit", width: 14 },
       { key: "overall", label: "How the centre was found", width: 22 },
+      { key: "mark", label: "Mark out of 5", numeric: true },
       { key: "score_pct", label: "Score %", numeric: true },
       { key: "children", label: "Children present", width: 15 },
       { key: "staff", label: "Staff present", width: 13 },
@@ -2628,6 +2630,7 @@ async function auditReportsFiled(p: ReportParams, period: string): Promise<Repor
       visited_on: r.visited_on, center_name: r.center_name, auditor: r.auditor ?? "",
       kind: titleCase(r.kind.replace(/_/g, " ")),
       overall: r.overall ? OVERALL_WORDS[r.overall] ?? r.overall : "",
+      mark: outOfFive(r.score_pct),
       score_pct: r.score_pct == null ? null : Number(r.score_pct),
       children: r.children_present == null ? "" : `${r.children_present} of ${r.children_on_roll ?? "—"}`,
       staff: r.staff_present == null ? "" : `${r.staff_present} of ${r.staff_on_roll ?? "—"}`,

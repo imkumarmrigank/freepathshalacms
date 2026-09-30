@@ -14,6 +14,7 @@ import {
 import ScheduleVisit from "./ScheduleVisit";
 import StartVisit from "./StartVisit";
 import { listCenters } from "@/lib/queries";
+import Mark from "@/components/Mark";
 
 export const metadata = { title: "Centre audits · Pehchaan" };
 
@@ -227,9 +228,7 @@ export default async function AuditsPage({
                   <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-[var(--muted)]">
                     {v.overall && <span>Found: {OVERALL_LABEL[v.overall]}</span>}
                     {v.score_pct != null && (
-                      <span className="tabular-nums">
-                        Score {Number(v.score_pct).toFixed(0)}%
-                      </span>
+                      <span>Mark <Mark pct={v.score_pct} size="sm" /></span>
                     )}
                     {Number(v.suggestions) > 0 && (
                       <span>

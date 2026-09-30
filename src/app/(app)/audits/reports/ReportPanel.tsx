@@ -3,6 +3,7 @@ import { useEffect, useState, useTransition } from "react";
 import { Badge } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { BAND_LABEL, OVERALL_LABEL, VISIT_KIND_LABEL, bandPoints } from "@/lib/audit-meta";
+import Mark from "@/components/Mark";
 import { loadReport } from "./actions";
 
 type Loaded = Awaited<ReturnType<typeof loadReport>>;
@@ -83,11 +84,7 @@ export default function ReportPanel({ visitId, onClose }:
           </div>
           {visit && (
             <div className="flex flex-none items-center gap-2">
-              {visit.score_pct != null && (
-                <span className="text-[15px] font-semibold tabular-nums">
-                  {Math.round(Number(visit.score_pct))}%
-                </span>
-              )}
+              {visit.score_pct != null && <Mark pct={visit.score_pct} size="lg" />}
               {visit.overall && (
                 <Badge tone={visit.overall === "healthy" ? "ok"
                   : visit.overall === "attention" ? "info"

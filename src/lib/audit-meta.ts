@@ -266,6 +266,26 @@ export function bandIndex(band: number) {
   return BANDS.indexOf(band as 4);
 }
 
+/**
+ * The visit's score as a mark out of 5 — the same number the percentage
+ * carries, in the shape people read a rating in. Half a mark is the finest
+ * step worth showing: an auditor's judgement is not accurate to a tenth.
+ */
+export function outOfFive(scorePct: number | string | null | undefined) {
+  if (scorePct == null || scorePct === "") return null;
+  const n = Number(scorePct);
+  if (!Number.isFinite(n)) return null;
+  return Math.round((n / 100) * 5 * 2) / 2;
+}
+
+/** What a mark out of 5 says about the centre, in one word. */
+export function markWord(mark: number) {
+  return mark >= 4.5 ? "Excellent"
+    : mark >= 3.5 ? "Good"
+    : mark >= 2.5 ? "Fair"
+    : mark >= 1.5 ? "Weak" : "Poor";
+}
+
 /** What a check was worth, and what it earned: band 4 is the full weight. */
 export function bandPoints(band: number, weight: number) {
   if (band <= 0) return null;                       // left out of the score

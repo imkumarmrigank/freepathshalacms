@@ -10,6 +10,7 @@ import { fmtDate, today } from "@/lib/format";
 import { centersForUser } from "@/lib/queries";
 import { can, readsAllAuditReports } from "@/lib/roles";
 import { filedReports } from "@/lib/audits";
+import { outOfFive } from "@/lib/audit-meta";
 import ReportRows from "./ReportRows";
 
 export const metadata = { title: "Audit reports · Pehchaan" };
@@ -100,7 +101,9 @@ export default async function AuditReportsPage({
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Reports filed" value={total}
           hint={`on this page: ${rows.length}`} />
-        <StatCard label="Average score" value={average == null ? "—" : `${average}%`}
+        <StatCard label="Average mark"
+          value={average == null ? "—" : `${outOfFive(average)?.toFixed(1)} / 5`}
+          hint={average == null ? undefined : `${average}% of the points these visits could score`}
           tone={average == null ? "default" : average >= 75 ? "ok" : average >= 50 ? "warn" : "bad"} />
         <StatCard label="Needing help" value={urgent}
           hint="support required or immediate"
@@ -119,7 +122,7 @@ export default async function AuditReportsPage({
                 <tr>
                   <th>Visited on</th>
                   {all && <th>Centre</th>}
-                  <th>Auditor</th><th>Visit</th><th>Score</th><th>Verdict</th>
+                  <th>Auditor</th><th>Visit</th><th>Mark</th><th>Verdict</th>
                   <th>Children present</th><th>Weakest checks</th><th>Asks</th>
                 </tr>
               </thead>
