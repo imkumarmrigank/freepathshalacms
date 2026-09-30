@@ -14,6 +14,7 @@ import FlagMark from "@/components/FlagMark";
 import SiblingMark from "@/components/SiblingMark";
 import { SIBLING_COLS, SIBLING_JOIN } from "@/lib/siblings";
 import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
+import { getT } from "@/lib/i18n";
 
 const STATUS_TONE: Record<string, string> = {
   active: "ok", inactive: "mute", graduated: "info", transferred: "mute", dropped: "bad", suspended: "warn",
@@ -115,17 +116,20 @@ export default async function StudentsPage({
 
   const total = totalOf(rows);
   const office = canChangeSection(user.role);
+  const t = await getT();
   const sortProps = { sort, dir, sp, basePath: "/students" };
   const win = pageWindow(pg, rows.length, total);
 
   return (
     <>
       <PageHeader
-        title="Students"
-        subtitle={`${total} student${total === 1 ? "" : "s"}${
-          cur && sessionId === cur.id ? ` in ${cur.name}` : ""}`}
+        title={t("Students")}
+        subtitle={(total === 1 ? t("{n} student", { n: total }) : t("{n} students", { n: total }))
+          + (cur && sessionId === cur.id ? ` ${t("in {s}", { s: cur.name })}` : "")}
         right={canAdmitStudents(user.role)
-          ? <Link href="/students/new" className="btn btn-primary">+ Add student</Link>
+          ? <Link href="/students/new" className="btn btn-primary">
+              {t("+ Add student")}
+            </Link>
           : undefined}
       />
 
@@ -134,36 +138,39 @@ export default async function StudentsPage({
         classes={classes}
         sessions={sessions}
         current={{ ...sp, session: String(sessionId ?? "") }}
-        searchPlaceholder="Search by name, enrolment no. or phone"
-        extra={[{ name: "section", label: "All sections",
-          options: SECTIONS.map((x) => ({ value: x.value, label: `Section ${x.label}` })) },
-          { name: "status", label: "All statuses",
+        searchPlaceholder={t("Search by name, enrolment no. or phone")}
+        extra={[{ name: "section", label: t("All sections"),
+          options: SECTIONS.map((x) => ({
+            value: x.value, label: t("Section {s}", { s: x.label }) })) },
+          { name: "status", label: t("All statuses"),
           options: ["active", "inactive", "suspended", "graduated", "transferred", "dropped"]
-            .map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) })) }]}
+            .map((v) => ({ value: v, label: t(v[0].toUpperCase() + v.slice(1)) })) }]}
       />
 
       <Card className="mt-4 overflow-hidden" pad={false}>
         {rows.length === 0 ? (
-          <Empty title="No students found"
+          <Empty title={t("No students found")}
             hint={canAdmitStudents(user.role)
-              ? "Try a different filter, or add the first student for this centre."
-              : "Try a different filter. The centre manager admits new students."}
+              ? t("Try a different filter, or add the first student for this centre.")
+              : t("Try a different filter. The centre manager admits new students.")}
             action={canAdmitStudents(user.role)
-              ? <Link href="/students/new" className="btn btn-primary btn-sm">Add student</Link>
+              ? <Link href="/students/new" className="btn btn-primary btn-sm">
+                  {t("Add student")}
+                </Link>
               : undefined} />
         ) : (
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
                 <tr>
-                  <SortHeader label="Student" col="name" {...sortProps} />
-                  <SortHeader label="Enrolment no." col="enrolment" {...sortProps} />
-                  <SortHeader label="Class" col="class" {...sortProps} />
-                  {!centerId && <SortHeader label="Centre" col="centre" {...sortProps} />}
-                  <SortHeader label="Attendance" col="attendance" {...sortProps} />
-                  <SortHeader label="Admitted" col="admitted" {...sortProps} />
-                  <SortHeader label="Status" col="status" {...sortProps} />
-                  <SortHeader label="Status changed" col="changed" {...sortProps} />
+                  <SortHeader label={t("Student")} col="name" {...sortProps} />
+                  <SortHeader label={t("Enrolment no.")} col="enrolment" {...sortProps} />
+                  <SortHeader label={t("Class")} col="class" {...sortProps} />
+                  {!centerId && <SortHeader label={t("Centre")} col="centre" {...sortProps} />}
+                  <SortHeader label={t("Attendance")} col="attendance" {...sortProps} />
+                  <SortHeader label={t("Admitted")} col="admitted" {...sortProps} />
+                  <SortHeader label={t("Status")} col="status" {...sortProps} />
+                  <SortHeader label={t("Status changed")} col="changed" {...sortProps} />
                 </tr>
               </thead>
               <tbody>
@@ -184,25 +191,33 @@ export default async function StudentsPage({
                       {r.class_name
                         ? (office && r.enrollment_id
                             ? <span className="inline-flex items-center gap-2">
-                                {r.class_name}
+                                {t(r.class_name)}
                                 <SectionPicker enrollmentId={r.enrollment_id} section={r.section} compact />
                               </span>
-                            : <>{r.class_name}{r.section ? ` · ${r.section}` : ""}</>)
-                        : <span className="text-[13px] text-[var(--faint)]">Not enrolled</span>}
+                            : <>{t(r.class_name)}{r.section ? ` · ${r.section}` : ""}</>)
+                        : <span className="text-[13px] text-[var(--faint)]">
+                            {t("Not enrolled")}
+                          </span>}
                     </td>
                     {!centerId && <td className="text-[var(--muted)]">{r.center_name}</td>}
                     <td>{r.attendance_pct === null
                       ? <span className="text-[13px] text-[var(--faint)]">—</span>
                       : <Meter value={Number(r.attendance_pct)} />}</td>
                     <td className="text-[var(--muted)]">{fmtDate(r.admission_date)}</td>
-                    <td><Badge tone={STATUS_TONE[r.status]}>{r.status[0].toUpperCase() + r.status.slice(1)}</Badge></td>
+                    <td>
+                      <Badge tone={STATUS_TONE[r.status]}>
+                        {t(r.status[0].toUpperCase() + r.status.slice(1))}
+                      </Badge>
+                    </td>
                     <td className="whitespace-nowrap text-[var(--muted)]">
                       {r.status_changed_on
                         ? fmtDate(r.status_changed_on)
                         : r.status === "active"
-                          ? <span title="Active since admission">—</span>
+                          ? <span title={t("Active since admission")}>—</span>
                           // taken off the roll before the date began to be kept
-                          : <span className="text-[12px] text-[var(--faint)]">Not recorded</span>}
+                          : <span className="text-[12px] text-[var(--faint)]">
+                              {t("Not recorded")}
+                            </span>}
                     </td>
                   </tr>
                 ))}
@@ -211,7 +226,7 @@ export default async function StudentsPage({
           </div>
         )}
         <Pager page={pg.page} pages={win.pages} first={win.first} last={win.last}
-          total={total} unit="student" />
+          total={total} unit={t("student")} />
       </Card>
     </>
   );

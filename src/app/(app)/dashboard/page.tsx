@@ -15,6 +15,8 @@ import { awayToday, pendingLeaveCount, staffToday } from "@/lib/leave";
 import { LEAVE_LABEL } from "@/lib/leave-meta";
 import DailyByCentre, { type CentreDay } from "./DailyByCentre";
 import AuditStanding from "./AuditStanding";
+import { getT } from "@/lib/i18n";
+import { engagementLabel, modeLabel, parentLabel } from "@/lib/ptm-meta";
 
 const ENGAGEMENT_TONE: Record<string, string> = {
   attentive: "ok", neutral: "warn", resistant: "bad",
@@ -225,7 +227,9 @@ export default async function Dashboard({
   const totalStudents = byStatus.reduce((n, b) => n + b.n, 0);
 
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const t = await getT();
+  const greeting = hour < 12 ? t("Good morning")
+    : hour < 17 ? t("Good afternoon") : t("Good evening");
   const attPct = Number(attToday?.total ?? 0) > 0
     ? Math.round((Number(attToday!.present) / Number(attToday!.total)) * 100) : null;
 
@@ -255,25 +259,25 @@ export default async function Dashboard({
         </div>
       )}
 
-      <AuditStanding rows={audit} everyCentre={isGlobalRole(user.role)} />
+      <AuditStanding rows={audit} everyCentre={isGlobalRole(user.role)} t={t} />
 
       <div className="mb-6">
         <div className="label-cap">{greeting}</div>
         <h1 className="mt-1.5 text-[26px] font-semibold tracking-[-0.02em]">{user.name}</h1>
         <p className="mt-0.5 text-[13px] text-[var(--muted)]">
-          {user.centerName ?? "All centres"} · Session {session.name}
+          {user.centerName ?? t("All centres")} · {t("Session {s}", { s: session.name })}
         </p>
       </div>
 
       {byStatus.length > 0 && (
         <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {[
-            { label: "Total students", value: totalStudents, href: "/students", hint: "on the books" },
-            { label: "Active", value: countOf("active"), href: "/students?status=active", hint: "on the roll", tone: "ok" as const },
-            { label: "Inactive", value: countOf("inactive"), href: "/students?status=inactive", hint: "not attending" },
-            { label: "Suspended", value: countOf("suspended"), href: "/students?status=suspended", hint: "may come back", tone: "warn" as const },
-            { label: "Dropped", value: countOf("dropped"), href: "/students?status=dropped", hint: "left for good", tone: "bad" as const },
-            { label: "Passed out", value: countOf("graduated"), href: "/students?status=graduated", hint: "to formal school" },
+            { label: t("Total students"), value: totalStudents, href: "/students", hint: t("on the books") },
+            { label: t("Active"), value: countOf("active"), href: "/students?status=active", hint: t("on the roll"), tone: "ok" as const },
+            { label: t("Inactive"), value: countOf("inactive"), href: "/students?status=inactive", hint: t("not attending") },
+            { label: t("Suspended"), value: countOf("suspended"), href: "/students?status=suspended", hint: t("may come back"), tone: "warn" as const },
+            { label: t("Dropped"), value: countOf("dropped"), href: "/students?status=dropped", hint: t("left for good"), tone: "bad" as const },
+            { label: t("Passed out"), value: countOf("graduated"), href: "/students?status=graduated", hint: t("to formal school") },
           ].map((c) => (
             <Link key={c.label} href={c.href} className="block transition hover:-translate-y-0.5">
               <StatCard label={c.label} value={c.value} hint={c.hint} tone={c.tone} />
@@ -283,27 +287,30 @@ export default async function Dashboard({
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Enrolled this session" value={students.n}
+        <StatCard label={t("Enrolled this session")} value={students.n}
           hint={wantsDaily
-            ? `Section M ${students.m} · Section E ${students.e}`
-            : "enrolled this session"} />
-        <StatCard label="Attendance today" value={attPct === null ? "—" : `${attPct}%`}
+            ? `${t("Section {s}", { s: "M" })} ${students.m} · ${t("Section {s}", { s: "E" })} ${students.e}`
+            : t("enrolled this session")} />
+        <StatCard label={t("Attendance today")} value={attPct === null ? "—" : `${attPct}%`}
           hint={attToday && Number(attToday.total) > 0
-            ? `${attToday.present} of ${attToday.total} marked` : "not marked yet"}
+            ? t("{n} of {total} marked", { n: attToday.present, total: attToday.total })
+            : t("not marked yet")}
           tone={attPct !== null && attPct < 70 ? "warn" : "default"} />
-        <StatCard label="PTMs this month" value={ptms.n}
+        <StatCard label={t("PTMs this month")} value={ptms.n}
           hint={new Date().toLocaleString("en-IN", { month: "long", year: "numeric" })} />
         <StatCard
-          label="Follow-ups"
+          label={t("Follow-ups")}
           value={followUps.pending}
           hint={
             Number(followUps.overdue) > 0
-              ? `${followUps.overdue} overdue · ${followUps.due_today} due today`
+              ? t("{n} overdue · {d} due today",
+                  { n: followUps.overdue, d: followUps.due_today })
               : Number(followUps.due_today) > 0
-                ? `${followUps.due_today} due today · ${followUps.this_week} later this week`
+                ? t("{d} due today · {w} later this week",
+                    { d: followUps.due_today, w: followUps.this_week })
                 : Number(followUps.this_week) > 0
-                  ? `${followUps.this_week} due this week`
-                  : "nothing pending"
+                  ? t("{w} due this week", { w: followUps.this_week })
+                  : t("nothing pending")
           }
           tone={
             Number(followUps.overdue) > 0
@@ -315,11 +322,12 @@ export default async function Dashboard({
         />
         {watchesSupport && counselling && Number(counselling.open) > 0 && (
           <StatCard
-            label="Counselling"
+            label={t("Counselling")}
             value={counselling.open}
             hint={Number(counselling.urgent) > 0
-              ? `${counselling.urgent} urgent · ${counselling.waiting} not picked up`
-              : `${counselling.waiting} not picked up yet`}
+              ? t("{n} urgent · {w} not picked up",
+                  { n: counselling.urgent, w: counselling.waiting })
+              : t("{w} not picked up yet", { w: counselling.waiting })}
             tone={Number(counselling.urgent) > 0 ? "bad"
               : Number(counselling.waiting) > 0 ? "warn" : "default"} />
         )}
@@ -327,17 +335,17 @@ export default async function Dashboard({
 
       <div className="mt-5 flex flex-wrap gap-2.5">
         <Link href="/ptm/new" className="btn btn-primary">
-          <IconPlus className="h-4 w-4" /> Record Parent Interaction
+          <IconPlus className="h-4 w-4" /> {t("Record Parent Interaction")}
         </Link>
-        <Link href="/ptm" className="btn btn-ghost">View Interaction History</Link>
+        <Link href="/ptm" className="btn btn-ghost">{t("View Interaction History")}</Link>
         {can(user.role, "attendance") && (
-          <Link href="/attendance" className="btn btn-ghost">Mark student attendance</Link>
+          <Link href="/attendance" className="btn btn-ghost">{t("Mark student attendance")}</Link>
         )}
         {!isGlobalRole(user.role) && (
-          <Link href="/my-attendance" className="btn btn-ghost">My check-in</Link>
+          <Link href="/my-attendance" className="btn btn-ghost">{t("My check-in")}</Link>
         )}
         {canAdmitStudents(user.role) && (
-          <Link href="/students/new" className="btn btn-ghost">Add student</Link>
+          <Link href="/students/new" className="btn btn-ghost">{t("Add student")}</Link>
         )}
       </div>
 
@@ -440,16 +448,17 @@ export default async function Dashboard({
       {watchesSupport && behind.length > 0 && (
         <>
           <div className="label-cap mb-2.5 mt-6">
-            Falling behind in tests — worth a parent meeting
+            {t("Falling behind in tests — worth a parent meeting")}
           </div>
           <Card pad={false}>
             <div className="overflow-x-auto">
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th>Student</th><th>Class</th>
-                    {!centerId && <th>Centre</th>}
-                    <th>Scored</th><th>Needed to pass</th><th>Last PTM</th><th></th>
+                    <th>{t("Student")}</th><th>{t("Class")}</th>
+                    {!centerId && <th>{t("Centre")}</th>}
+                    <th>{t("Scored")}</th><th>{t("Needed to pass")}</th>
+                    <th>{t("Last PTM")}</th><th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -461,10 +470,12 @@ export default async function Dashboard({
                           {b.student}
                         </Link>
                         {b.flagged && (
-                          <Badge tone="warn">Counselling open</Badge>
+                          <Badge tone="warn">{t("Counselling open")}</Badge>
                         )}
                       </td>
-                      <td className="text-[var(--muted)]">{b.class_name ?? "—"}</td>
+                      <td className="text-[var(--muted)]">
+                        {b.class_name ? t(b.class_name) : "—"}
+                      </td>
                       {!centerId && <td className="text-[var(--muted)]">{b.center_name}</td>}
                       <td className="whitespace-nowrap tabular-nums">
                         {Math.round(Number(b.obtained))}
@@ -475,11 +486,11 @@ export default async function Dashboard({
                         {Math.round(Number(b.pass_mark))}
                       </td>
                       <td className="whitespace-nowrap text-[var(--muted)]">
-                        {b.last_ptm ? fmtDate(b.last_ptm) : "never"}
+                        {b.last_ptm ? fmtDate(b.last_ptm) : t("never")}
                       </td>
                       <td className="text-right">
                         <Link href={`/ptm/new?student=${b.id}`} className="btn btn-ghost btn-sm">
-                          Arrange PTM
+                          {t("Arrange PTM")}
                         </Link>
                       </td>
                     </tr>
@@ -493,14 +504,14 @@ export default async function Dashboard({
 
       <div className="mt-6 grid gap-5 lg:grid-cols-2">
         <div>
-          <div className="label-cap mb-2.5">Recent interactions</div>
+          <div className="label-cap mb-2.5">{t("Recent interactions")}</div>
           <Card pad={false}>
             {recent.length === 0
-              ? <Empty title="No interactions yet"
-                  hint="Parent-teacher conversations you record will show up here."
+              ? <Empty title={t("No interactions yet")}
+                  hint={t("Parent-teacher conversations you record will show up here.")}
                   action={
                     <Link href="/ptm/new" className="btn btn-primary btn-sm">
-                      <IconPlus className="h-3.5 w-3.5" /> Record Parent Interaction
+                      <IconPlus className="h-3.5 w-3.5" /> {t("Record Parent Interaction")}
                     </Link>
                   } />
               : <ul>
@@ -512,11 +523,11 @@ export default async function Dashboard({
                           {fullName(r)}
                         </Link>
                         <div className="truncate text-[12px] text-[var(--muted)]">
-                          {fmtDate(r.interaction_date)} · {r.parent_present === "both" ? "Both parents" : r.parent_present}
+                          {fmtDate(r.interaction_date)} · {t(parentLabel(r.parent_present))}
                         </div>
                       </div>
                       <Badge tone={ENGAGEMENT_TONE[r.engagement]}>
-                        {r.engagement[0].toUpperCase() + r.engagement.slice(1)}
+                        {t(engagementLabel(r.engagement))}
                       </Badge>
                     </li>
                   ))}
@@ -525,10 +536,11 @@ export default async function Dashboard({
         </div>
 
         <div>
-          <div className="label-cap mb-2.5">Upcoming follow-ups</div>
+          <div className="label-cap mb-2.5">{t("Upcoming follow-ups")}</div>
           <Card pad={false}>
             {upcoming.length === 0
-              ? <Empty title="Nothing pending" hint="Follow-ups you flag during a PTM appear here." />
+              ? <Empty title={t("Nothing pending")}
+                  hint={t("Follow-ups you flag during a PTM appear here.")} />
               : <ul>
                   {upcoming.map((f) => {
                     const due = f.follow_up_date ? f.follow_up_date.slice(0, 10) : null;
@@ -542,13 +554,14 @@ export default async function Dashboard({
                           <Link href={`/ptm/${f.id}`} className="block truncate text-[14px] font-medium hover:text-[var(--brand)]">
                             {fullName(f)}
                           </Link>
-                          <div className="text-[12px] capitalize text-[var(--muted)]">
-                            {(f.follow_up_mode ?? "follow-up").replace("_", " ")}
+                          <div className="text-[12px] text-[var(--muted)]">
+                            {t(f.follow_up_mode
+                              ? modeLabel(f.follow_up_mode) : "follow-up")}
                           </div>
                         </div>
                         <span className="flex flex-none items-center gap-2">
-                          {overdue && <Badge tone="bad">Overdue</Badge>}
-                          {dueToday && <Badge tone="warn">Today</Badge>}
+                          {overdue && <Badge tone="bad">{t("Overdue")}</Badge>}
+                          {dueToday && <Badge tone="warn">{t("Today")}</Badge>}
                           <span className={`text-[13px] ${
                             overdue ? "text-[var(--bad)]" : dueToday ? "text-[var(--warn)]" : "text-[var(--muted)]"}`}>
                             {fmtDate(f.follow_up_date)}

@@ -19,6 +19,8 @@ import SiblingMark from "@/components/SiblingMark";
 import { siblingMark } from "@/lib/siblings";
 import EnrollmentControls from "./EnrollmentControls";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
+import { getT } from "@/lib/i18n";
+import { engagementLabel, parentLabel } from "@/lib/ptm-meta";
 
 const STATUS_TONE: Record<string, string> = {
   active: "ok", inactive: "mute", graduated: "info", transferred: "mute", dropped: "bad", suspended: "warn",
@@ -40,6 +42,7 @@ export default async function StudentPage({
   const { created, flag: openFlag } = await searchParams;
   const sid = Number(id);
 
+  const t = await getT();
   const student = await one<Student & { center_name: string; dropout_marked_by_name: string | null }>(
     `SELECT s.*, c.name AS center_name,
             (SELECT u.name FROM users u WHERE u.id = s.dropout_marked_by) AS dropout_marked_by_name
@@ -48,7 +51,7 @@ export default async function StudentPage({
   );
   if (!student) notFound();
   if (!canTouchCenter(user, student.center_id))
-    return <Alert kind="bad">This student belongs to another centre.</Alert>;
+    return <Alert kind="bad">{t("This student belongs to another centre.")}</Alert>;
 
   const [enrollments, attendance, interactions, classes] = await Promise.all([
     query<{
@@ -136,7 +139,8 @@ export default async function StudentPage({
       {created && (
         <div className="mb-5">
           <Alert kind="ok">
-            Student saved. Enrolment number <strong className="font-mono">{created}</strong> has been allotted.
+            {t("Student saved. Enrolment number")}{" "}
+            <strong className="font-mono">{created}</strong> {t("has been allotted.")}
           </Alert>
         </div>
       )}
@@ -147,20 +151,20 @@ export default async function StudentPage({
           <SiblingMark count={sib.n} names={sib.names} /></>}
         subtitle={`${student.enrollment_no} · ${student.center_name}${
           currentEnr ? ` · ${currentEnr.class_name}` : ""}`}
-        back={{ href: "/students", label: "Students" }}
+        back={{ href: "/students", label: t("Students") }}
         right={
           <>
-            <Badge tone={STATUS_TONE[student.status]}>{titleCase(student.status)}</Badge>
+            <Badge tone={STATUS_TONE[student.status]}>{t(titleCase(student.status))}</Badge>
             <Link href={`/students/${student.id}/report-card`} className="btn btn-ghost btn-sm">
-              Progress report
+              {t("Progress report")}
             </Link>
             {canTransferStudents(user.role) && student.status === "active" && (
               <Link href={`/manage/transfers?student=${student.id}`} className="btn btn-ghost btn-sm">
-                Transfer centre
+                {t("Transfer centre")}
               </Link>
             )}
             <Link href={`/ptm/new?student=${student.id}`} className="btn btn-primary btn-sm">
-              <IconPlus className="h-3.5 w-3.5" /> Record Parent Interaction
+              <IconPlus className="h-3.5 w-3.5" /> {t("Record Parent Interaction")}
             </Link>
           </>
         }
@@ -169,33 +173,34 @@ export default async function StudentPage({
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">
           <Card>
-            <h2 className="mb-4 text-[15px] font-semibold">Profile</h2>
+            <h2 className="mb-4 text-[15px] font-semibold">{t("Profile")}</h2>
             <EditStudent s={student} readOnly={!canEditStudents(user.role)}
               canDrop={canMarkDropout(user.role)} />
           </Card>
 
           <Card>
-            <h2 className="mb-4 text-[15px] font-semibold">Admission record</h2>
+            <h2 className="mb-4 text-[15px] font-semibold">{t("Admission record")}</h2>
             <AdmissionRecord s={student} />
           </Card>
 
           <Card pad={false}>
             <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5">
-              <h2 className="text-[15px] font-semibold">Test results</h2>
+              <h2 className="text-[15px] font-semibold">{t("Test results")}</h2>
               <Link href={`/students/${student.id}/report-card`}
                 className="text-[13px] text-[var(--brand)] hover:underline">
-                Printable progress report →
+                {t("Printable progress report →")}
               </Link>
             </div>
             {marks.length === 0 ? (
-              <Empty title="No marks recorded yet"
-                hint="Results appear here once a teacher enters them against a test." />
+              <Empty title={t("No marks recorded yet")}
+                hint={t("Results appear here once a teacher enters them against a test.")} />
             ) : (
               <div className="mt-3 overflow-x-auto">
                 <table className="tbl">
                   <thead>
-                    <tr><th>Test</th><th>Subject</th><th>Date</th>
-                      <th className="text-right">Marks</th><th className="text-right">Grade</th></tr>
+                    <tr><th>{t("Test")}</th><th>{t("Subject")}</th><th>{t("Date")}</th>
+                      <th className="text-right">{t("Marks")}</th>
+                      <th className="text-right">{t("Grade")}</th></tr>
                   </thead>
                   <tbody>
                     {marks.map((m) => {
@@ -210,14 +215,14 @@ export default async function StudentPage({
                               {m.title}
                             </Link>
                             <div className="text-[12px] text-[var(--muted)]">
-                              {EXAM_TYPE_LABEL[m.exam_type] ?? m.exam_type}
+                              {t(EXAM_TYPE_LABEL[m.exam_type] ?? m.exam_type)}
                             </div>
                           </td>
                           <td className="text-[var(--muted)]">{m.subject}</td>
                           <td className="whitespace-nowrap text-[var(--muted)]">{fmtDate(m.exam_date)}</td>
                           <td className="whitespace-nowrap text-right tabular-nums">
                             {m.is_absent
-                              ? <Badge tone="mute">Absent</Badge>
+                              ? <Badge tone="mute">{t("Absent")}</Badge>
                               : <>{obtained}<span className="text-[var(--faint)]"> / {Number(m.max_marks)}</span></>}
                           </td>
                           <td className="text-right">
@@ -237,12 +242,12 @@ export default async function StudentPage({
           </Card>
 
           <Card pad={false}>
-            <h2 className="px-5 pt-5 text-[15px] font-semibold">Parent interactions</h2>
+            <h2 className="px-5 pt-5 text-[15px] font-semibold">{t("Parent interactions")}</h2>
             {interactions.length === 0
-              ? <Empty title="No interactions recorded"
+              ? <Empty title={t("No interactions recorded")}
                   action={
                     <Link href={`/ptm/new?student=${student.id}`} className="btn btn-primary btn-sm">
-                      <IconPlus className="h-3.5 w-3.5" /> Record Parent Interaction
+                      <IconPlus className="h-3.5 w-3.5" /> {t("Record Parent Interaction")}
                     </Link>
                   } />
               : <ul className="mt-3">
@@ -252,12 +257,15 @@ export default async function StudentPage({
                         <Link href={`/ptm/${i.id}`} className="text-[14px] font-medium hover:text-[var(--brand)]">
                           {fmtDate(i.interaction_date)}
                         </Link>
-                        <Badge tone={ENGAGEMENT_TONE[i.engagement]}>{titleCase(i.engagement)}</Badge>
+                        <Badge tone={ENGAGEMENT_TONE[i.engagement]}>{t(engagementLabel(i.engagement))}</Badge>
                         <span className="text-[13px] text-[var(--muted)]">
-                          {titleCase(i.parent_present)} present{i.mentor ? ` · ${i.mentor}` : ""}
+                          {t("{who} present", { who: t(parentLabel(i.parent_present)) })}
+                          {i.mentor ? ` · ${i.mentor}` : ""}
                         </span>
                         {i.follow_up_required && i.follow_up_status === "pending" && (
-                          <Badge tone="warn">Follow-up {fmtDate(i.follow_up_date)}</Badge>
+                          <Badge tone="warn">
+                            {t("Follow-up {d}", { d: fmtDate(i.follow_up_date) })}
+                          </Badge>
                         )}
                       </div>
                       {i.discussion && (
@@ -281,17 +289,17 @@ export default async function StudentPage({
             </div>
             <dl className="mt-4 space-y-2.5 text-[13px]">
               <div className="flex justify-between gap-3">
-                <dt className="text-[var(--muted)]">Centre</dt><dd>{student.center_name}</dd>
+                <dt className="text-[var(--muted)]">{t("Centre")}</dt><dd>{student.center_name}</dd>
               </div>
               <div className="flex justify-between gap-3">
-                <dt className="text-[var(--muted)]">Admitted</dt><dd>{fmtDate(student.admission_date)}</dd>
+                <dt className="text-[var(--muted)]">{t("Admitted")}</dt><dd>{fmtDate(student.admission_date)}</dd>
               </div>
               <div className="flex justify-between gap-3">
-                <dt className="text-[var(--muted)]">Attendance</dt>
+                <dt className="text-[var(--muted)]">{t("Attendance")}</dt>
                 <dd>{attPct === null ? "—" : <Meter value={attPct} />}</dd>
               </div>
               <div className="flex justify-between gap-3">
-                <dt className="text-[var(--muted)]">Days marked</dt>
+                <dt className="text-[var(--muted)]">{t("Days marked")}</dt>
                 <dd>{attendance?.total ?? 0}</dd>
               </div>
             </dl>
@@ -311,9 +319,9 @@ export default async function StudentPage({
           )}
 
           <Card>
-            <h2 className="mb-3 text-[15px] font-semibold">Enrolment history</h2>
+            <h2 className="mb-3 text-[15px] font-semibold">{t("Enrolment history")}</h2>
             {enrollments.length === 0 ? (
-              <p className="text-[13px] text-[var(--muted)]">Not enrolled in any session yet.</p>
+              <p className="text-[13px] text-[var(--muted)]">{t("Not enrolled in any session yet.")}</p>
             ) : (
               <ol className="space-y-3">
                 {enrollments.map((e) => (
@@ -328,7 +336,7 @@ export default async function StudentPage({
                               Section <SectionPicker enrollmentId={e.id} section={e.section} />
                             </span>
                           : e.section && <span className="text-[13px] text-[var(--muted)]">Section {e.section}</span>}
-                        {e.is_current && <Badge tone="info" dot={false}>Current</Badge>}
+                        {e.is_current && <Badge tone="info" dot={false}>{t("Current")}</Badge>}
                       </div>
                       <div className="text-[12px] text-[var(--muted)]">
                         {e.session_name} · {SOURCE_LABEL[e.source] ?? e.source} · {fmtDate(e.enrolled_on)}
@@ -340,7 +348,7 @@ export default async function StudentPage({
             )}
             {moves.length > 0 && (
               <div className="mt-4 border-t border-[var(--border)] pt-3">
-                <h3 className="label-cap mb-2">Promotions</h3>
+                <h3 className="label-cap mb-2">{t("Promotions")}</h3>
                 <ul className="space-y-2">
                   {moves.map((m) => (
                     <li key={m.id} className="text-[12px] text-[var(--muted)]">

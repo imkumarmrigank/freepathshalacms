@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
+import type { T } from "@/lib/locale";
 import {
   CENTRE_PRIORITY_LABEL, OVERALL_LABEL, type Standing,
 } from "@/lib/audit-meta";
@@ -13,8 +14,8 @@ import {
  * only the ones that need something — twelve green rows on a dashboard is noise,
  * and noise is what gets scrolled past.
  */
-export default function AuditStanding({ rows, everyCentre }: {
-  rows: Standing[]; everyCentre: boolean;
+export default function AuditStanding({ rows, everyCentre, t }: {
+  rows: Standing[]; everyCentre: boolean; t: T;
 }) {
   if (rows.length === 0) return null;
 
@@ -27,9 +28,9 @@ export default function AuditStanding({ rows, everyCentre }: {
     return (
       <div className="mb-5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-[14px] font-semibold">Centres the auditor flagged</h2>
+          <h2 className="text-[14px] font-semibold">{t("Centres the auditor flagged")}</h2>
           <Link href="/audits" className="text-[13px] text-[var(--brand)] hover:underline">
-            All centres
+            {t("All centres")}
           </Link>
         </div>
         <ul className="flex flex-wrap gap-2">
@@ -65,31 +66,35 @@ export default function AuditStanding({ rows, everyCentre }: {
         : "border-[var(--border)] bg-[var(--surface)]"}`}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <Badge tone={bad ? "bad" : warn ? "warn" : me.priority === "watch" ? "info" : "ok"}>
-          {CENTRE_PRIORITY_LABEL[me.priority]}
+          {t(CENTRE_PRIORITY_LABEL[me.priority])}
         </Badge>
         <span className="text-[13.5px]">
           {me.open_total > 0 ? (
             <>
-              <strong>{me.open_total}</strong> suggestion{me.open_total === 1 ? "" : "s"} from
-              the auditor still to deal with
+              <strong>{me.open_total}</strong>{" "}
+              {t(me.open_total === 1
+                ? "suggestion from the auditor still to deal with"
+                : "suggestions from the auditor still to deal with")}
               {me.overdue > 0 && (
-                <>, <strong className="text-[var(--bad)]">{me.overdue} past the date</strong></>
+                <>, <strong className="text-[var(--bad)]">
+                  {t("{n} past the date", { n: me.overdue })}
+                </strong></>
               )}
             </>
           ) : (
-            "Nothing outstanding from the auditor."
+            t("Nothing outstanding from the auditor.")
           )}
         </span>
         <span className="text-[12.5px] text-[var(--muted)]">
           {me.last_visited_on
-            ? `Last visit ${fmtDate(me.last_visited_on)}${
-              me.overall ? ` — ${OVERALL_LABEL[me.overall]}` : ""}`
-            : "No visit yet"}
-          {me.next_visit_on && ` · next ${fmtDate(me.next_visit_on)}`}
+            ? t("Last visit {d}", { d: fmtDate(me.last_visited_on) })
+              + (me.overall ? ` — ${t(OVERALL_LABEL[me.overall])}` : "")
+            : t("No visit yet")}
+          {me.next_visit_on && ` · ${t("next {d}", { d: fmtDate(me.next_visit_on) })}`}
         </span>
         <Link href="/audits/suggestions"
           className="ml-auto text-[13px] font-medium text-[var(--brand)] hover:underline">
-          Open suggestions
+          {t("Open suggestions")}
         </Link>
       </div>
     </div>

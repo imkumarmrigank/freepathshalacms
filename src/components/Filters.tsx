@@ -2,6 +2,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 import { IconSearch } from "./icons";
+import { useT } from "./LocaleProvider";
 
 type Opt = { value: string | number; label: string };
 
@@ -18,6 +19,7 @@ export default function Filters({
   dates?: boolean;
   current?: Record<string, string | undefined>;
 }) {
+  const t = useT();
   const router = useRouter();
   const path = usePathname();
   const params = useSearchParams();
@@ -51,30 +53,32 @@ export default function Filters({
         <select className="select w-auto" value={current?.session ?? ""}
           onChange={(e) => set("session", e.target.value)}>
           {sessions.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}{s.is_current ? " (current)" : ""}</option>
+            <option key={s.id} value={s.id}>
+              {s.name}{s.is_current ? ` ${t("(current)")}` : ""}
+            </option>
           ))}
         </select>
       )}
       {classes.length > 0 && (
         <select className="select w-auto" value={params.get("class") ?? ""}
           onChange={(e) => set("class", e.target.value)}>
-          <option value="">All classes</option>
-          {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          <option value="">{t("All classes")}</option>
+          {classes.map((c) => <option key={c.id} value={c.id}>{t(c.name)}</option>)}
         </select>
       )}
       {centers.length > 0 && (
         <select className="select w-auto" value={params.get("center") ?? ""}
           onChange={(e) => set("center", e.target.value)}>
-          <option value="">All centres</option>
+          <option value="">{t("All centres")}</option>
           {centers.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
         </select>
       )}
       {dates && (
         <div className="flex items-center gap-2 text-[13px] text-[var(--muted)]">
-          <span>From</span>
+          <span>{t("From")}</span>
           <input type="date" className="input w-auto" value={params.get("from") ?? ""}
             onChange={(e) => set("from", e.target.value)} />
-          <span>to</span>
+          <span>{t("to")}</span>
           <input type="date" className="input w-auto" value={params.get("to") ?? ""}
             onChange={(e) => set("to", e.target.value)} />
         </div>
