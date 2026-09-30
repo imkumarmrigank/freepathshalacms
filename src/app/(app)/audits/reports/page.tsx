@@ -11,6 +11,7 @@ import { centersForUser } from "@/lib/queries";
 import { can, readsAllAuditReports } from "@/lib/roles";
 import { filedReports } from "@/lib/audits";
 import { outOfFive } from "@/lib/audit-meta";
+import { getT } from "@/lib/i18n";
 import ReportRows from "./ReportRows";
 
 export const metadata = { title: "Audit reports · Pehchaan" };
@@ -45,6 +46,7 @@ export default async function AuditReportsPage({
   const centerId = all ? (sp.center ? Number(sp.center) : null) : user.centerId;
   const pg = pageFrom(sp, 25);
 
+  const t = await getT();
   const [rows, centers, auditors] = await Promise.all([
     filedReports(user, {
       centerId, from, to,
@@ -70,16 +72,15 @@ export default async function AuditReportsPage({
 
   return (
     <>
-      <PageHeader title="Audit reports"
-        subtitle={all
-          ? `Every centre · ${fmtDate(from)} to ${fmtDate(to)}`
-          : `Your centre · ${fmtDate(from)} to ${fmtDate(to)}`}
+      <PageHeader title={t("Audit reports")}
+        subtitle={`${all ? t("Every centre") : t("Your centre")} · `
+          + `${fmtDate(from)} ${t("to")} ${fmtDate(to)}`}
         right={
           <div className="flex items-center gap-2">
-            <Link href="/audits" className="btn btn-ghost btn-sm">Visits &amp; standing</Link>
+            <Link href="/audits" className="btn btn-ghost btn-sm">{t("Visits & standing")}</Link>
             {can(user.role, "reports") && (
               <Link href="/reports?report=audit-reports" className="btn btn-ghost btn-sm">
-                Download
+                {t("Download")}
               </Link>
             )}
           </div>
@@ -95,35 +96,37 @@ export default async function AuditReportsPage({
           : []}
       />
       <p className="mt-1.5 text-[12px] text-[var(--faint)]">
-        The dates are the days the centres were visited. Only filed reports appear here.
+        {t("The dates are the days the centres were visited. Only filed reports appear here.")}
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Reports filed" value={total}
-          hint={`on this page: ${rows.length}`} />
-        <StatCard label="Average mark"
+        <StatCard label={t("Reports filed")} value={total}
+          hint={t("on this page: {n}", { n: rows.length })} />
+        <StatCard label={t("Average mark")}
           value={average == null ? "—" : `${outOfFive(average)?.toFixed(1)} / 5`}
-          hint={average == null ? undefined : `${average}% of the points these visits could score`}
+          hint={average == null ? undefined
+            : t("{n}% of the points these visits could score", { n: average })}
           tone={average == null ? "default" : average >= 75 ? "ok" : average >= 50 ? "warn" : "bad"} />
-        <StatCard label="Needing help" value={urgent}
-          hint="support required or immediate"
+        <StatCard label={t("Needing help")} value={urgent}
+          hint={t("support required or immediate")}
           tone={urgent > 0 ? "warn" : "ok"} />
-        <StatCard label="Asks raised" value={asks} hint="on the reports shown" />
+        <StatCard label={t("Asks raised")} value={asks} hint={t("on the reports shown")} />
       </div>
 
       <Card className="mt-5" pad={false}>
         {rows.length === 0 ? (
-          <Empty title="No reports in this period"
-            hint="A report appears here the moment the auditor files the visit." />
+          <Empty title={t("No reports in this period")}
+            hint={t("A report appears here the moment the auditor files the visit.")} />
         ) : (
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>Visited on</th>
-                  {all && <th>Centre</th>}
-                  <th>Auditor</th><th>Visit</th><th>Mark</th><th>Verdict</th>
-                  <th>Children present</th><th>Weakest checks</th><th>Asks</th>
+                  <th>{t("Visited on")}</th>
+                  {all && <th>{t("Centre")}</th>}
+                  <th>{t("Auditor")}</th><th>{t("Visit")}</th><th>{t("Mark")}</th>
+                  <th>{t("Verdict")}</th><th>{t("Children present")}</th>
+                  <th>{t("Weakest checks")}</th><th>{t("Asks")}</th>
                 </tr>
               </thead>
               <ReportRows rows={rows} showCentre={all} />
@@ -131,7 +134,7 @@ export default async function AuditReportsPage({
           </div>
         )}
         <Pager page={pg.page} pages={win.pages} first={win.first} last={win.last}
-          total={total} unit="report" />
+          total={total} unit={t("report")} />
       </Card>
     </>
   );

@@ -11,6 +11,8 @@ import {
   listSuggestions, standings,
   type SuggestionRow,
 } from "@/lib/audits";
+import { getT } from "@/lib/i18n";
+import type { T } from "@/lib/locale";
 
 export const metadata = { title: "Audit suggestions · Pehchaan" };
 
@@ -54,19 +56,20 @@ export default async function SuggestionsPage({
   ]);
 
   const overdue = rows.filter((r) => r.overdue).length;
+  const t = await getT();
   const mine = board.length === 1 ? board[0] : null;
 
   return (
     <>
       <PageHeader
-        title="Suggestions"
+        title={t("Suggestions")}
         subtitle={all
-          ? "What auditors have asked centres to do"
-          : "What your centre has been asked to do"}
+          ? t("What auditors have asked centres to do")
+          : t("What your centre has been asked to do")}
         right={
           <Link href={showClosed ? "/audits/suggestions" : "/audits/suggestions?show=all"}
             className="btn btn-ghost">
-            {showClosed ? "Only outstanding" : "Include closed"}
+            {showClosed ? t("Only outstanding") : t("Include closed")}
           </Link>
         }
       />
@@ -77,17 +80,17 @@ export default async function SuggestionsPage({
           current={sp}
           dates
           extra={[
-            { name: "show", label: "Only outstanding", options: [
-              { value: "all", label: "Include closed" },
+            { name: "show", label: t("Only outstanding"), options: [
+              { value: "all", label: t("Include closed") },
             ] },
             ...(auditors.length > 0
-              ? [{ name: "by", label: "Raised by anyone",
+              ? [{ name: "by", label: t("Raised by anyone"),
                   options: auditors.map((a) => ({ value: a.id, label: a.name })) }]
               : []),
           ]}
         />
         <p className="mt-1.5 text-[12px] text-[var(--faint)]">
-          The dates are the days the suggestions were raised.
+          {t("The dates are the days the suggestions were raised.")}
         </p>
       </div>
 
@@ -97,14 +100,17 @@ export default async function SuggestionsPage({
             <Badge tone={mine.priority === "critical" ? "bad"
               : mine.priority === "high" ? "warn"
               : mine.priority === "watch" ? "info" : "ok"}>
-              {CENTRE_PRIORITY_LABEL[mine.priority]}
+              {t(CENTRE_PRIORITY_LABEL[mine.priority])}
             </Badge>
             <span className="text-[13.5px] text-[var(--muted)]">
-              {mine.open_total} outstanding
+              {t("{n} outstanding", { n: mine.open_total })}
               {mine.overdue > 0 && (
-                <span className="font-semibold text-[var(--bad)]"> · {mine.overdue} overdue</span>
+                <span className="font-semibold text-[var(--bad)]">
+                  {" · "}{t("{n} overdue", { n: mine.overdue })}
+                </span>
               )}
-              {mine.next_visit_on && ` · next visit ${fmtDate(mine.next_visit_on)}`}
+              {mine.next_visit_on
+                && ` · ${t("next visit {d}", { d: fmtDate(mine.next_visit_on) })}`}
             </span>
           </div>
         </Card>
@@ -112,25 +118,27 @@ export default async function SuggestionsPage({
 
       {overdue > 0 && !mine && (
         <p className="mt-4 rounded-[9px] bg-[var(--bad-soft)] px-3.5 py-2.5 text-[13px] text-[#b91c1c]">
-          {overdue} suggestion{overdue === 1 ? " is" : "s are"} past the date the auditor set.
+          {overdue === 1
+            ? t("One suggestion is past the date the auditor set.")
+            : t("{n} suggestions are past the date the auditor set.", { n: overdue })}
         </p>
       )}
 
       <Card className="mt-4" pad={false}>
         {rows.length === 0 ? (
-          <Empty title={showClosed ? "Nothing here yet" : "Nothing outstanding"}
+          <Empty title={showClosed ? t("Nothing here yet") : t("Nothing outstanding")}
             hint={showClosed
-              ? "Suggestions appear here after an auditor files a report."
-              : "Everything an auditor asked for has been dealt with."} />
+              ? t("Suggestions appear here after an auditor files a report.")
+              : t("Everything an auditor asked for has been dealt with.")} />
         ) : (
-          <ul>{rows.map((s) => <Row key={s.id} s={s} showCentre={all} />)}</ul>
+          <ul>{rows.map((s) => <Row key={s.id} s={s} showCentre={all} t={t} />)}</ul>
         )}
       </Card>
     </>
   );
 }
 
-function Row({ s, showCentre }: { s: SuggestionRow; showCentre: boolean }) {
+function Row({ s, showCentre, t }: { s: SuggestionRow; showCentre: boolean; t: T }) {
   return (
     <li className="border-t border-[#f1f1f6] first:border-0">
       <Link href={`/audits/suggestions/${s.id}`}
@@ -139,24 +147,26 @@ function Row({ s, showCentre }: { s: SuggestionRow; showCentre: boolean }) {
           <span className="text-[14px] font-medium">{s.title}</span>
           <Badge tone={s.priority === "critical" ? "bad"
             : s.priority === "high" ? "warn" : "mute"}>
-            {PRIORITY_LABEL[s.priority]}
+            {t(PRIORITY_LABEL[s.priority])}
           </Badge>
           <Badge tone={s.status === "verified" ? "ok"
             : s.status === "not_done" ? "bad"
             : s.status === "done" ? "info" : "mute"}>
-            {SUGGESTION_STATUS_LABEL[s.status]}
+            {t(SUGGESTION_STATUS_LABEL[s.status])}
           </Badge>
-          {s.overdue && <Badge tone="bad" dot={false}>Overdue</Badge>}
+          {s.overdue && <Badge tone="bad" dot={false}>{t("Overdue")}</Badge>}
         </div>
         <div className="mt-1 text-[12.5px] text-[var(--muted)]">
           {showCentre && <>{s.center_name} · </>}
-          {s.due_on ? `due ${fmtDate(s.due_on)}` : "no date"}
-          {s.criterion_title ? ` · ${s.criterion_title}` : ""}
-          {s.raised_by_name ? ` · raised by ${s.raised_by_name}` : ""}
-          {s.verdict ? ` · ${VERDICT_LABEL[s.verdict]}` : ""}
+          {s.due_on ? t("due {d}", { d: fmtDate(s.due_on) }) : t("no date")}
+          {s.criterion_title ? ` · ${t(s.criterion_title)}` : ""}
+          {s.raised_by_name ? ` · ${t("raised by {who}", { who: s.raised_by_name })}` : ""}
+          {s.verdict ? ` · ${t(VERDICT_LABEL[s.verdict])}` : ""}
           {Number(s.replies) > 0
-            ? ` · ${s.replies} repl${Number(s.replies) === 1 ? "y" : "ies"}`
-            : " · no reply yet"}
+            ? ` · ${Number(s.replies) === 1
+                ? t("{n} reply", { n: s.replies })
+                : t("{n} replies", { n: s.replies })}`
+            : ` · ${t("no reply yet")}`}
         </div>
         {s.detail && (
           <p className="mt-1 line-clamp-2 text-[13px] text-[var(--muted)]">{s.detail}</p>

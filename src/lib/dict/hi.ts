@@ -662,6 +662,76 @@ const hi: Record<string, string> = {
   "Official address": "कार्यालय का पता",
   "If other, which": "अन्य हो तो कौन-सा",
   "Notes": "टिप्पणियाँ",
+
+  /* --- audit suggestions, as the centre reads them ---------------------- */
+  "All suggestions": "सभी सुझाव",
+  "{p} priority": "{p} प्राथमिकता",
+  "Raised {d}": "{d} को उठाया",
+  "by {who}": "{who} द्वारा",
+  "due {d}": "{d} तक",
+  "from that visit": "उसी दौरे से",
+  "What the auditor asked for": "ऑडिटर ने क्या कहा",
+  "The auditor’s verdict": "ऑडिटर का फ़ैसला",
+  "What the centre did about it": "केंद्र ने इस पर क्या किया",
+  "Nobody has answered yet.": "अभी किसी ने जवाब नहीं दिया।",
+  "Someone": "कोई",
+  "This one is closed. If it comes back, the auditor will raise it again at the next visit.":
+    "यह बंद हो चुका है। दोबारा हुआ तो ऑडिटर अगले दौरे में फिर उठाएँगे।",
+  "Answer this": "इसका जवाब दें",
+  "Add a note": "टिप्पणी जोड़ें",
+  "What have you done about it? *": "आपने इस पर क्या किया? *",
+  "Note *": "टिप्पणी *",
+  "Carpenter came on Tuesday and rehung the door; photo sent to the mentor.":
+    "मंगलवार को बढ़ई आया और दरवाज़ा दोबारा लगाया; फ़ोटो मेंटर को भेज दी।",
+  "Anything worth recording against this.": "इसके साथ दर्ज करने लायक़ कुछ भी।",
+  "Where does this stand?": "यह कहाँ तक पहुँचा?",
+  "We have started on it": "हमने शुरू कर दिया है",
+  "It is done": "हो गया है",
+  "Just a note — no change": "सिर्फ़ टिप्पणी — कोई बदलाव नहीं",
+  "Send": "भेजें",
+  "The auditor confirms this at their next visit. It counts towards your centre’s monthly score once they have.":
+    "ऑडिटर अगले दौरे में इसकी पुष्टि करेंगे। पुष्टि के बाद ही यह आपके केंद्र के मासिक अंक में गिना जाता है।",
+  "What auditors have asked centres to do": "ऑडिटरों ने केंद्रों से क्या करने को कहा",
+  "What your centre has been asked to do": "आपके केंद्र से क्या करने को कहा गया",
+  "Only outstanding": "केवल बाक़ी",
+  "Include closed": "बंद भी दिखाएँ",
+  "Raised by anyone": "किसी के भी द्वारा उठाए",
+  "The dates are the days the suggestions were raised.":
+    "तारीख़ें वे दिन हैं जब सुझाव उठाए गए।",
+  "{n} outstanding": "{n} बाक़ी",
+  "{n} overdue": "{n} समय बीत चुके",
+  "next visit {d}": "अगला दौरा {d}",
+  "One suggestion is past the date the auditor set.":
+    "एक सुझाव ऑडिटर की तय तारीख़ से आगे निकल चुका है।",
+  "{n} suggestions are past the date the auditor set.":
+    "{n} सुझाव ऑडिटर की तय तारीख़ से आगे निकल चुके हैं।",
+  "Nothing here yet": "अभी यहाँ कुछ नहीं",
+  "Nothing outstanding": "कुछ बाक़ी नहीं",
+  "Suggestions appear here after an auditor files a report.":
+    "ऑडिटर के रिपोर्ट जमा करने के बाद सुझाव यहाँ दिखते हैं।",
+  "Everything an auditor asked for has been dealt with.":
+    "ऑडिटर ने जो कहा था, सब पूरा हो चुका है।",
+  "no date": "कोई तारीख़ नहीं",
+  "raised by {who}": "{who} ने उठाया",
+  "{n} reply": "{n} जवाब",
+  "{n} replies": "{n} जवाब",
+  "no reply yet": "अभी कोई जवाब नहीं",
+
+  /* --- audit reports, as the centre reads them -------------------------- */
+  "{n}% of the points these visits could score":
+    "इन दौरों के कुल संभावित अंकों का {n}%",
+  "on this page: {n}": "इस पेज पर: {n}",
+  "support required or immediate": "मदद चाहिए या तुरंत कार्रवाई",
+  "on the reports shown": "दिखाई गई रिपोर्ट पर",
+  "No reports in this period": "इस अवधि में कोई रिपोर्ट नहीं",
+  "A report appears here the moment the auditor files the visit.":
+    "ऑडिटर के दौरा जमा करते ही रिपोर्ट यहाँ दिखती है।",
+  "Read the report": "रिपोर्ट पढ़ें",
+  "report": "रिपोर्ट",
+  "Fetching the report…": "रिपोर्ट लाई जा रही है…",
+  "of {n}": "{n} में से",
+  "No checks were recorded against this visit.":
+    "इस दौरे में कोई बिंदु दर्ज नहीं हुआ।",
 };
 
 export default hi;

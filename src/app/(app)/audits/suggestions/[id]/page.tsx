@@ -9,6 +9,7 @@ import {
   getSuggestion, repliesFor,
 } from "@/lib/audits";
 import Answer from "./Answer";
+import { getT } from "@/lib/i18n";
 
 export const metadata = { title: "Suggestion · Pehchaan" };
 
@@ -18,6 +19,7 @@ export default async function SuggestionPage({
   const user = await requireFeature("auditReports");
   const { id } = await params;
 
+  const t = await getT();
   const s = await getSuggestion(user, Number(id));
   if (!s) notFound();
   const replies = await repliesFor(s.id);
@@ -33,27 +35,29 @@ export default async function SuggestionPage({
       <PageHeader
         title={s.title}
         subtitle={`${s.center_name}${s.criterion_title ? ` · ${s.criterion_title}` : ""}`}
-        right={<Link href="/audits/suggestions" className="btn btn-ghost">All suggestions</Link>}
+        right={<Link href="/audits/suggestions" className="btn btn-ghost">
+          {t("All suggestions")}
+        </Link>}
       />
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Badge tone={s.priority === "critical" ? "bad"
           : s.priority === "high" ? "warn" : "mute"}>
-          {PRIORITY_LABEL[s.priority]} priority
+          {t("{p} priority", { p: t(PRIORITY_LABEL[s.priority]) })}
         </Badge>
         <Badge tone={s.status === "verified" ? "ok"
           : s.status === "not_done" ? "bad"
           : s.status === "done" ? "info" : "mute"}>
-          {SUGGESTION_STATUS_LABEL[s.status]}
+          {t(SUGGESTION_STATUS_LABEL[s.status])}
         </Badge>
-        {s.overdue && <Badge tone="bad" dot={false}>Overdue</Badge>}
+        {s.overdue && <Badge tone="bad" dot={false}>{t("Overdue")}</Badge>}
         <span className="text-[12.5px] text-[var(--muted)]">
-          Raised {fmtDate(s.raised_on)}
-          {s.raised_by_name ? ` by ${s.raised_by_name}` : ""}
-          {s.due_on ? ` · due ${fmtDate(s.due_on)}` : ""}
+          {t("Raised {d}", { d: fmtDate(s.raised_on) })}
+          {s.raised_by_name ? ` ${t("by {who}", { who: s.raised_by_name })}` : ""}
+          {s.due_on ? ` · ${t("due {d}", { d: fmtDate(s.due_on) })}` : ""}
           {s.visit_id ? (
             <> · <Link href={`/audits/${s.visit_id}`} className="text-[var(--brand)] hover:underline">
-              from that visit
+              {t("from that visit")}
             </Link></>
           ) : null}
         </span>
@@ -61,16 +65,16 @@ export default async function SuggestionPage({
 
       {s.detail && (
         <Card className="mt-4">
-          <div className="label-cap mb-1.5">What the auditor asked for</div>
+          <div className="label-cap mb-1.5">{t("What the auditor asked for")}</div>
           <p className="whitespace-pre-line text-[14px] leading-relaxed">{s.detail}</p>
         </Card>
       )}
 
       {s.verdict && (
         <Card className="mt-4">
-          <div className="label-cap mb-1.5">The auditor&rsquo;s verdict</div>
+          <div className="label-cap mb-1.5">{t("The auditor’s verdict")}</div>
           <p className="text-[14px]">
-            <strong>{VERDICT_LABEL[s.verdict]}</strong>
+            <strong>{t(VERDICT_LABEL[s.verdict])}</strong>
             {s.verified_on ? ` — ${fmtDate(s.verified_on)}` : ""}
           </p>
         </Card>
@@ -79,27 +83,27 @@ export default async function SuggestionPage({
       {/* ------------------------------------------------------ the thread */}
       <Card className="mt-4" pad={false}>
         <div className="border-b border-[var(--border)] px-5 py-3">
-          <h2 className="text-[14px] font-semibold">What the centre did about it</h2>
+          <h2 className="text-[14px] font-semibold">{t("What the centre did about it")}</h2>
         </div>
         {replies.length === 0 ? (
           <p className="px-5 py-8 text-center text-[13.5px] text-[var(--muted)]">
-            Nobody has answered yet.
+            {t("Nobody has answered yet.")}
           </p>
         ) : (
           <ul>
             {replies.map((r) => (
               <li key={r.id} className="border-t border-[#f1f1f6] px-5 py-3.5 first:border-0">
                 <div className="flex flex-wrap items-baseline gap-2">
-                  <span className="text-[13.5px] font-medium">{r.author_name ?? "Someone"}</span>
+                  <span className="text-[13.5px] font-medium">{r.author_name ?? t("Someone")}</span>
                   <span className="text-[12px] text-[var(--faint)]">
-                    {r.author_role ? ROLE_LABEL[r.author_role as Role] ?? r.author_role : ""}
+                    {r.author_role ? t(ROLE_LABEL[r.author_role as Role] ?? r.author_role) : ""}
                     {" · "}{fmtDateTime(r.created_at)}
                   </span>
                   {r.set_status && (
                     <Badge tone={r.set_status === "verified" ? "ok"
                       : r.set_status === "not_done" ? "bad" : "info"}>
-                      {SUGGESTION_STATUS_LABEL[r.set_status as keyof typeof SUGGESTION_STATUS_LABEL]
-                        ?? r.set_status}
+                      {t(SUGGESTION_STATUS_LABEL[
+                        r.set_status as keyof typeof SUGGESTION_STATUS_LABEL] ?? r.set_status)}
                     </Badge>
                   )}
                 </div>
@@ -112,7 +116,7 @@ export default async function SuggestionPage({
 
       {closed ? (
         <p className="mt-4 text-[13px] text-[var(--muted)]">
-          This one is closed. If it comes back, the auditor will raise it again at the next visit.
+          {t("This one is closed. If it comes back, the auditor will raise it again at the next visit.")}
         </p>
       ) : (
         <Answer suggestionId={s.id} status={s.status} mayAnswer={mayAnswer} />

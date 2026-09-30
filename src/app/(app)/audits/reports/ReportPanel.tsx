@@ -2,8 +2,12 @@
 import { useEffect, useState, useTransition } from "react";
 import { Badge } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
-import { BAND_LABEL, OVERALL_LABEL, VISIT_KIND_LABEL, bandPoints } from "@/lib/audit-meta";
+import {
+  BAND_LABEL, OVERALL_LABEL, PRIORITY_LABEL, SUGGESTION_STATUS_LABEL,
+  VISIT_KIND_LABEL, bandPoints,
+} from "@/lib/audit-meta";
 import Mark from "@/components/Mark";
+import { useLocale, useT } from "@/components/LocaleProvider";
 import { loadReport } from "./actions";
 
 type Loaded = Awaited<ReturnType<typeof loadReport>>;
@@ -38,6 +42,10 @@ function Points({ band, weight }: { band: number; weight: number }) {
  */
 export default function ReportPanel({ visitId, onClose }:
   { visitId: number; onClose: () => void }) {
+  const t = useT();
+  // The audit form carries its own Hindi, written by whoever set the checks
+  // up. That is better than a translation of it, so it wins when it exists.
+  const hi = useLocale() === "hi";
   const [data, setData] = useState<Loaded | null>(null);
   const [, start] = useTransition();
 
@@ -59,7 +67,7 @@ export default function ReportPanel({ visitId, onClose }:
 
   // the checks come back in the order the form asks them; keep the sections
   const sections = ratings.reduce<Record<string, typeof ratings>>((g, r) => {
-    (g[r.section] ??= []).push(r);
+    (g[(hi && r.section_hi) || r.section] ??= []).push(r);
     return g;
   }, {});
 
@@ -72,11 +80,11 @@ export default function ReportPanel({ visitId, onClose }:
           border-b border-[var(--border)] bg-white px-5 py-4">
           <div className="min-w-0 flex-1">
             <div className="text-[16px] font-semibold">
-              {visit ? visit.center_name : "Loading…"}
+              {visit ? visit.center_name : t("Loading…")}
             </div>
             {visit && (
               <div className="mt-0.5 text-[13px] text-[var(--muted)]">
-                {fmtDate(visit.visited_on)} · {VISIT_KIND_LABEL[visit.kind as "scheduled"] ?? visit.kind}
+                {fmtDate(visit.visited_on)} · {t(VISIT_KIND_LABEL[visit.kind as "scheduled"] ?? visit.kind)}
                 {visit.auditor_name ? ` · ${visit.auditor_name}` : ""}
                 {visit.submitted_at ? ` · filed ${visit.submitted_at.slice(11)}` : ""}
               </div>
@@ -89,7 +97,7 @@ export default function ReportPanel({ visitId, onClose }:
                 <Badge tone={visit.overall === "healthy" ? "ok"
                   : visit.overall === "attention" ? "info"
                   : visit.overall === "support" ? "warn" : "bad"}>
-                  {OVERALL_LABEL[visit.overall as "healthy"] ?? visit.overall}
+                  {t(OVERALL_LABEL[visit.overall as "healthy"] ?? visit.overall)}
                 </Badge>
               )}
             </div>
@@ -102,7 +110,7 @@ export default function ReportPanel({ visitId, onClose }:
 
         <div className="space-y-5 px-5 py-4">
           {!data ? (
-            <p className="text-[13px] text-[var(--muted)]">Fetching the report…</p>
+            <p className="text-[13px] text-[var(--muted)]">{t("Fetching the report…")}</p>
           ) : "error" in data && data.error ? (
             <p className="text-[13px] text-[var(--bad)]">{data.error}</p>
           ) : (
@@ -112,13 +120,15 @@ export default function ReportPanel({ visitId, onClose }:
                   {visit.children_present != null && (
                     <span><b>{visit.children_present}</b>
                       <span className="text-[var(--muted)]">
-                        {visit.children_on_roll ? ` of ${visit.children_on_roll}` : ""} children present
+                        {visit.children_on_roll ? ` ${t("of {n}", { n: visit.children_on_roll })}` : ""}{" "}
+                        {t("children present")}
                       </span></span>
                   )}
                   {visit.staff_present != null && (
                     <span><b>{visit.staff_present}</b>
                       <span className="text-[var(--muted)]">
-                        {visit.staff_on_roll ? ` of ${visit.staff_on_roll}` : ""} staff present
+                        {visit.staff_on_roll ? ` ${t("of {n}", { n: visit.staff_on_roll })}` : ""}{" "}
+                        {t("staff present")}
                       </span></span>
                   )}
                 </section>
@@ -126,16 +136,16 @@ export default function ReportPanel({ visitId, onClose }:
 
               {visit?.summary && (
                 <section>
-                  <div className="label-cap mb-1.5">What the auditor wrote</div>
+                  <div className="label-cap mb-1.5">{t("What the auditor wrote")}</div>
                   <p className="text-[13.5px]">{visit.summary}</p>
                 </section>
               )}
 
               <section>
-                <div className="label-cap mb-2">The form, check by check</div>
+                <div className="label-cap mb-2">{t("The form, check by check")}</div>
                 {ratings.length === 0 ? (
                   <p className="text-[13px] text-[var(--muted)]">
-                    No checks were recorded against this visit.
+                    {t("No checks were recorded against this visit.")}
                   </p>
                 ) : (
                   <div className="space-y-4">
@@ -148,11 +158,13 @@ export default function ReportPanel({ visitId, onClose }:
                             <li key={r.id}
                               className="rounded-[9px] border border-[var(--border)] px-3 py-2">
                               <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-[13.5px] font-medium">{r.criterion_title}</span>
+                                <span className="text-[13.5px] font-medium">
+                                  {(hi && r.title_hi) || r.criterion_title}
+                                </span>
                                 <span className="ml-auto flex items-center gap-2">
                                   <Points band={r.band} weight={r.weight} />
                                   <Badge tone={BAND_TONE[r.band] ?? "mute"}>
-                                    {BAND_LABEL[r.band] ?? r.band}
+                                    {t(BAND_LABEL[r.band] ?? String(r.band))}
                                   </Badge>
                                 </span>
                               </div>
@@ -160,18 +172,22 @@ export default function ReportPanel({ visitId, onClose }:
                                   wording the form put in front of them */}
                               {r.chosen ? (
                                 <div className="mt-1 text-[13px]">
-                                  {r.chosen}
-                                  {r.chosen_hi && (
-                                    <span className="text-[var(--muted)]"> · {r.chosen_hi}</span>
+                                  {hi && r.chosen_hi ? r.chosen_hi : r.chosen}
+                                  {(hi ? r.chosen : r.chosen_hi) && (
+                                    <span className="text-[var(--muted)]">
+                                      {" · "}{hi ? r.chosen : r.chosen_hi}
+                                    </span>
                                   )}
                                 </div>
                               ) : r.band === 0 ? (
                                 <div className="mt-1 text-[13px] text-[var(--muted)]">
-                                  Does not apply — left out of the score
+                                  {t("Does not apply — left out of the score")}
                                 </div>
                               ) : null}
                               {r.reason && (
-                                <div className="mt-0.5 text-[12.5px] text-[#b45309]">{r.reason}</div>
+                                <div className="mt-0.5 text-[12.5px] text-[#b45309]">
+                                  {(hi && r.reason_hi) || r.reason}
+                                </div>
                               )}
                               {r.note && (
                                 <div className="mt-0.5 text-[13px] text-[var(--muted)]">{r.note}</div>
@@ -187,7 +203,7 @@ export default function ReportPanel({ visitId, onClose }:
 
               {suggestions.length > 0 && (
                 <section>
-                  <div className="label-cap mb-2">What was asked of the centre</div>
+                  <div className="label-cap mb-2">{t("What was asked of the centre")}</div>
                   <ul className="space-y-1.5">
                     {suggestions.map((s) => (
                       <li key={s.id}
@@ -196,9 +212,12 @@ export default function ReportPanel({ visitId, onClose }:
                           <span className="font-medium">{s.title}</span>
                           <Badge tone={s.priority === "critical" ? "bad"
                             : s.priority === "high" ? "warn" : "mute"}>
-                            {s.priority}
+                            {t(PRIORITY_LABEL[s.priority as "high"] ?? s.priority)}
                           </Badge>
-                          <span className="ml-auto text-[12px] text-[var(--muted)]">{s.status}</span>
+                          <span className="ml-auto text-[12px] text-[var(--muted)]">
+                            {t(SUGGESTION_STATUS_LABEL[
+                              s.status as keyof typeof SUGGESTION_STATUS_LABEL] ?? s.status)}
+                          </span>
                         </div>
                         {s.detail && (
                           <p className="mt-0.5 text-[13px] text-[var(--muted)]">{s.detail}</p>
