@@ -251,7 +251,26 @@ export type RatingRow = {
   id: number; criterion_id: number | null; section: string; criterion_title: string;
   weight: number; band: number; reason: string | null; note: string | null;
   section_hi?: string | null; title_hi?: string | null; reason_hi?: string | null;
+  /** The question the auditor was answering. */
+  question?: string | null;
+  /** The option they actually ticked, in the wording they saw. */
+  chosen?: string | null;
+  chosen_hi?: string | null;
 };
+
+/**
+ * Where a band sits in a criterion's four options. The form offers them best
+ * first, so band 4 is the first line and band 1 the last.
+ */
+export function bandIndex(band: number) {
+  return BANDS.indexOf(band as 4);
+}
+
+/** What a check was worth, and what it earned: band 4 is the full weight. */
+export function bandPoints(band: number, weight: number) {
+  if (band <= 0) return null;                       // left out of the score
+  return { got: ((band - 1) / 3) * weight, of: weight };
+}
 
 export type SuggestionRow = {
   id: number; visit_id: number | null; center_id: number; center_name: string;

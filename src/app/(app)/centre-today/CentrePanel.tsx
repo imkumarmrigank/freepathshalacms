@@ -185,6 +185,7 @@ function Audit({ a }: { a: AuditDetail }) {
               <span className="text-[var(--faint)]">{w.section} · </span>
               <b>{w.title}</b>
               <span className={`ml-1.5 ${BAND_TONE[w.band] ?? ""}`}>{BAND_LABEL[w.band]}</span>
+              {w.chosen && <span className="block">{w.chosen}</span>}
               {w.reason && <span className="block text-[#7a5a12]">{w.reason}</span>}
               {w.note && <span className="block text-[var(--muted)]">{w.note}</span>}
             </li>

@@ -128,7 +128,10 @@ export type AuditDetail = {
   staff_present: number | null;
   staff_on_roll: number | null;
   sections: { section: string; good: number; fair: number; weak: number; na: number }[];
-  weak: { section: string; title: string; band: number; reason: string | null; note: string | null }[];
+  weak: {
+    section: string; title: string; band: number; chosen: string | null;
+    reason: string | null; note: string | null;
+  }[];
   asks: {
     id: number; title: string; detail: string | null; priority: string;
     status: string; due_on: string | null;
@@ -316,11 +319,15 @@ export async function centreDay(centerId: number, on: string) {
         [centerId, on]),
       query<{
         visit_id: number; section: string; title: string; band: number;
-        reason: string | null; note: string | null;
+        chosen: string | null; reason: string | null; note: string | null;
       }>(
-        `SELECT r.visit_id, r.section, r.criterion_title AS title, r.band, r.reason, r.note
+        `SELECT r.visit_id, r.section, r.criterion_title AS title, r.band, r.reason, r.note,
+                -- the option the auditor ticked, best first, so band 4 is line 1
+                CASE WHEN r.band BETWEEN 1 AND 4
+                     THEN cr.band_labels[5 - r.band] END AS chosen
            FROM audit_ratings r
            JOIN audit_visits v ON v.id = r.visit_id
+           LEFT JOIN audit_criteria cr ON cr.id = r.criterion_id
           WHERE v.center_id = $1 AND COALESCE(v.visited_on, v.scheduled_for) = $2
             AND r.band BETWEEN 1 AND 2
           ORDER BY r.band, r.id`, [centerId, on]),
@@ -420,7 +427,8 @@ export async function centreDay(centerId: number, on: string) {
       sections: bands.filter((b) => b.visit_id === r.visit_id)
         .map(({ section, good, fair, weak, na }) => ({ section, good, fair, weak, na })),
       weak: weakChecks.filter((w) => w.visit_id === r.visit_id)
-        .map(({ section, title, band, reason, note }) => ({ section, title, band, reason, note })),
+        .map(({ section, title, band, chosen, reason, note }) =>
+          ({ section, title, band, chosen, reason, note })),
       asks: asks.filter((a) => a.visit_id === r.visit_id)
         .map(({ id, title, detail, priority, status, due_on }) =>
           ({ id, title, detail, priority, status, due_on })),

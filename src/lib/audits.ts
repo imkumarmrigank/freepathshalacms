@@ -153,9 +153,15 @@ export async function ratingsFor(visitId: number) {
   return query<RatingRow>(
     `SELECT r.id, r.criterion_id, r.section, r.criterion_title, r.weight,
             r.band, r.reason, r.note,
-            c.section_hi, c.title_hi,
+            c.section_hi, c.title_hi, c.question,
             -- the reason is saved in English; its Hindi is the line in the same place
-            c.reasons_hi[array_position(c.reasons, r.reason)] AS reason_hi
+            c.reasons_hi[array_position(c.reasons, r.reason)] AS reason_hi,
+            -- the wording of the option that was ticked: the form offers them
+            -- best first, so band 4 is line 1 and band 1 is line 4
+            CASE WHEN r.band BETWEEN 1 AND 4
+                 THEN c.band_labels[5 - r.band] END    AS chosen,
+            CASE WHEN r.band BETWEEN 1 AND 4
+                 THEN c.band_labels_hi[5 - r.band] END AS chosen_hi
        FROM audit_ratings r
        LEFT JOIN audit_criteria c ON c.id = r.criterion_id
       WHERE r.visit_id = $1

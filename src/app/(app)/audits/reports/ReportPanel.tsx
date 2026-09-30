@@ -2,7 +2,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { Badge } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
-import { BAND_LABEL, OVERALL_LABEL, VISIT_KIND_LABEL } from "@/lib/audit-meta";
+import { BAND_LABEL, OVERALL_LABEL, VISIT_KIND_LABEL, bandPoints } from "@/lib/audit-meta";
 import { loadReport } from "./actions";
 
 type Loaded = Awaited<ReturnType<typeof loadReport>>;
@@ -10,6 +10,24 @@ type Loaded = Awaited<ReturnType<typeof loadReport>>;
 const BAND_TONE: Record<number, string> = {
   4: "ok", 3: "info", 2: "warn", 1: "bad", 0: "mute",
 };
+
+/**
+ * What the check was worth and what it earned. Not every check counts the
+ * same — attendance carries three points where punctuality carries one — so
+ * a band on its own does not say how much it moved the score.
+ */
+function Points({ band, weight }: { band: number; weight: number }) {
+  const p = bandPoints(band, weight);
+  if (!p) return null;
+  const round = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+  return (
+    <span className="text-[12px] tabular-nums text-[var(--muted)]"
+      title={`This check is worth ${weight} of the score; the band chosen earns `
+        + `${round(p.got)}.`}>
+      {round(p.got)}/{p.of}
+    </span>
+  );
+}
 
 /**
  * The form as the auditor filled it: every check with its band, the reason
@@ -134,12 +152,27 @@ export default function ReportPanel({ visitId, onClose }:
                               className="rounded-[9px] border border-[var(--border)] px-3 py-2">
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="text-[13.5px] font-medium">{r.criterion_title}</span>
-                                <span className="ml-auto">
+                                <span className="ml-auto flex items-center gap-2">
+                                  <Points band={r.band} weight={r.weight} />
                                   <Badge tone={BAND_TONE[r.band] ?? "mute"}>
                                     {BAND_LABEL[r.band] ?? r.band}
                                   </Badge>
                                 </span>
                               </div>
+                              {/* what the auditor actually ticked, in the
+                                  wording the form put in front of them */}
+                              {r.chosen ? (
+                                <div className="mt-1 text-[13px]">
+                                  {r.chosen}
+                                  {r.chosen_hi && (
+                                    <span className="text-[var(--muted)]"> · {r.chosen_hi}</span>
+                                  )}
+                                </div>
+                              ) : r.band === 0 ? (
+                                <div className="mt-1 text-[13px] text-[var(--muted)]">
+                                  Does not apply — left out of the score
+                                </div>
+                              ) : null}
                               {r.reason && (
                                 <div className="mt-0.5 text-[12.5px] text-[#b45309]">{r.reason}</div>
                               )}
