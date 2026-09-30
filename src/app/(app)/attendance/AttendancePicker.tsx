@@ -3,6 +3,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { today } from "@/lib/format";
 import { useTransition } from "react";
 import { SECTIONS } from "@/lib/sections";
+import { useT } from "@/components/LocaleProvider";
 
 export default function AttendancePicker({
   centers, classes, defaults,
@@ -26,33 +27,35 @@ export default function AttendancePicker({
     });
   };
 
+  const t = useT();
+
   return (
     <div className={`grid gap-3 sm:grid-cols-2 lg:grid-cols-4 ${pending ? "opacity-60" : ""}`}>
       {centers.length > 0 && (
         <label>
-          <span className="mb-1.5 block text-[13px] font-medium text-[var(--muted)]">Centre</span>
+          <span className="mb-1.5 block text-[13px] font-medium text-[var(--muted)]">{t("Centre")}</span>
           <select className="select" value={defaults.center} onChange={(e) => set("center", e.target.value)}>
-            <option value="">Select centre</option>
+            <option value="">{t("Select centre")}</option>
             {centers.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
           </select>
         </label>
       )}
       <label>
-        <span className="mb-1.5 block text-[13px] font-medium text-[var(--muted)]">Class</span>
+        <span className="mb-1.5 block text-[13px] font-medium text-[var(--muted)]">{t("Class")}</span>
         <select className="select" value={defaults.class} onChange={(e) => set("class", e.target.value)}>
-          <option value="">Select class</option>
-          {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          <option value="">{t("Select class")}</option>
+          {classes.map((c) => <option key={c.id} value={c.id}>{t(c.name)}</option>)}
         </select>
       </label>
       <label>
-        <span className="mb-1.5 block text-[13px] font-medium text-[var(--muted)]">Section</span>
+        <span className="mb-1.5 block text-[13px] font-medium text-[var(--muted)]">{t("Section")}</span>
         <select className="select" value={defaults.section} onChange={(e) => set("section", e.target.value)}>
-          <option value="">Both sections</option>
-          {SECTIONS.map((x) => <option key={x.value} value={x.value}>Section {x.label}</option>)}
+          <option value="">{t("Both sections")}</option>
+          {SECTIONS.map((x) => <option key={x.value} value={x.value}>{t("Section {s}", { s: x.label })}</option>)}
         </select>
       </label>
       <label>
-        <span className="mb-1.5 block text-[13px] font-medium text-[var(--muted)]">Date</span>
+        <span className="mb-1.5 block text-[13px] font-medium text-[var(--muted)]">{t("Date")}</span>
         <input className="input" type="date" value={defaults.date}
           max={today()}
           onChange={(e) => set("date", e.target.value)} />

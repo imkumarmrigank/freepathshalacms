@@ -10,6 +10,7 @@ import {
 } from "@/lib/attendance-meta";
 import FlagMark from "@/components/FlagMark";
 import SiblingMark from "@/components/SiblingMark";
+import { useT } from "@/components/LocaleProvider";
 
 export type Row = {
   enrollment_id: number; student_id: number; enrollment_no: string;
@@ -33,6 +34,7 @@ export default function AttendanceSheet({
   /** Both sections on one sheet: say which each child is in. */
   showSection?: boolean;
 }) {
+  const t = useT();
   const [state, action] = useActionState(saveAttendance, null);
 
   // The register on the screen is the register the server sent, with whatever
@@ -110,14 +112,14 @@ export default function AttendanceSheet({
             {counts.map((c) => (
               <span key={c.value} className="inline-flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full" style={{ background: c.color }} />
-                <span className="text-[var(--muted)]">{c.title}</span>
+                <span className="text-[var(--muted)]">{t(c.title)}</span>
                 <strong className="tabular-nums">{c.n}</strong>
               </span>
             ))}
             {older > 0 && (
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-[var(--faint)]" />
-                <span className="text-[var(--muted)]">Older marks</span>
+                <span className="text-[var(--muted)]">{t("Older marks")}</span>
                 <strong className="tabular-nums">{older}</strong>
               </span>
             )}
@@ -126,18 +128,18 @@ export default function AttendanceSheet({
             <div className="flex flex-wrap gap-2">
               {absentIds.length > 1 && (
                 <select className="select w-auto py-1 text-[12.5px]" value=""
-                  aria-label="Reason for every absent student"
+                  aria-label={t("Reason for every absent student")}
                   onChange={(e) => e.target.value && applyToAll(absentIds, e.target.value)}>
-                  <option value="">Reason for all {absentIds.length} absent…</option>
-                  {ABSENT_REASONS.map((x) => <option key={x} value={x}>{x}</option>)}
+                  <option value="">{t("Reason for all {n} absent…", { n: absentIds.length })}</option>
+                  {ABSENT_REASONS.map((x) => <option key={x} value={x}>{t(x)}</option>)}
                 </select>
               )}
               {leaveIds.length > 1 && (
                 <select className="select w-auto py-1 text-[12.5px]" value=""
-                  aria-label="Reason for every student on leave"
+                  aria-label={t("Reason for every student on leave")}
                   onChange={(e) => e.target.value && applyToAll(leaveIds, e.target.value)}>
-                  <option value="">Reason for all {leaveIds.length} on leave…</option>
-                  {LEAVE_REASONS.map((x) => <option key={x} value={x}>{x}</option>)}
+                  <option value="">{t("Reason for all {n} on leave…", { n: leaveIds.length })}</option>
+                  {LEAVE_REASONS.map((x) => <option key={x} value={x}>{t(x)}</option>)}
                 </select>
               )}
             </div>
@@ -146,11 +148,11 @@ export default function AttendanceSheet({
             <div className="flex gap-2">
               {!isPast && (
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAll("present")}>
-                  Mark all present
+                  {t("Mark all present")}
                 </button>
               )}
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAll("absent")}>
-                Mark all absent
+                {t("Mark all absent")}
               </button>
             </div>
           )}
@@ -159,7 +161,7 @@ export default function AttendanceSheet({
         <div className="overflow-x-auto">
           <table className="tbl">
             <thead>
-              <tr><th className="w-12">Roll</th><th>Student</th><th className="text-right">Attendance</th></tr>
+              <tr><th className="w-12">{t("Roll")}</th><th>{t("Student")}</th><th className="text-right">{t("Attendance")}</th></tr>
             </thead>
             <tbody>
               {rows.map((r, i) => (
@@ -190,8 +192,8 @@ export default function AttendanceSheet({
                           second referral would only be refused */}
                       <Link href={`/students/${r.student_id}${r.flag_status ? "" : "?flag=1"}`}
                         title={r.flag_status
-                          ? "Already flagged for counselling — open the referral"
-                          : "Flag for counselling"}
+                          ? t("Already flagged for counselling — open the referral")
+                          : t("Flag for counselling")}
                         className={`ml-auto flex-none rounded-lg border px-2 py-1 text-[13px] leading-none ${
                           r.flag_status
                             ? "border-[var(--warn)] bg-[var(--warn-soft)] text-[#b45309]"
@@ -206,8 +208,8 @@ export default function AttendanceSheet({
                     <div className="flex items-center justify-end gap-1">
                       {!MARKABLE.has(marks[r.enrollment_id]) && (
                         <span className="mr-1 rounded-md border border-[var(--border)] px-1.5 py-0.5 text-[11px] text-[var(--muted)]"
-                          title="Recorded before the register was simplified — press P or A to change it">
-                          {LEGACY_STATUS_LABEL[marks[r.enrollment_id]] ?? marks[r.enrollment_id]}
+                          title={t("Recorded before the register was simplified — press P or A to change it")}>
+                          {t(LEGACY_STATUS_LABEL[marks[r.enrollment_id]] ?? marks[r.enrollment_id])}
                         </span>
                       )}
                       {OPTIONS.map((o) => {
@@ -217,8 +219,8 @@ export default function AttendanceSheet({
                             key={o.value} type="button"
                             disabled={disabledFor(r.enrollment_id, o.value)}
                             title={disabledFor(r.enrollment_id, o.value) && !locked
-                              ? `${o.title} can only be marked on the day itself`
-                              : o.title}
+                              ? t("{mark} can only be marked on the day itself", { mark: t(o.title) })
+                              : t(o.title)}
                             onClick={() => mark(r.enrollment_id, o.value)}
                             className="h-8 min-w-8 rounded-lg border px-2 text-[12px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-40"
                             style={on
@@ -234,17 +236,18 @@ export default function AttendanceSheet({
                       <div className="mt-1.5 flex justify-end">
                         <select
                           className="select w-auto py-1 text-[12.5px]"
-                          aria-label={`Reason for ${r.first_name}`}
+                          aria-label={t("Reason for {name}", { name: r.first_name })}
                           disabled={locked}
                           value={reasons[r.enrollment_id] ?? ""}
                           onChange={(e) => setReasons((x) => ({ ...x, [r.enrollment_id]: e.target.value }))}
                           style={owes(r.enrollment_id) ? { borderColor: "var(--bad)" } : undefined}>
                           <option value="">
-                            {marks[r.enrollment_id] === "leave" ? "Reason for leave" : "Reason for absence"}
-                            {required ? "…" : " (optional)"}
+                            {marks[r.enrollment_id] === "leave"
+                              ? t("Reason for leave") : t("Reason for absence")}
+                            {required ? "…" : ` ${t("(optional)")}`}
                           </option>
                           {reasonsFor(marks[r.enrollment_id]).map((x) =>
-                            <option key={x} value={x}>{x}</option>)}
+                            <option key={x} value={x}>{t(x)}</option>)}
                         </select>
                       </div>
                     )}
@@ -260,14 +263,16 @@ export default function AttendanceSheet({
         <div className="mt-4 flex flex-wrap items-center gap-3">
           {owing > 0 && (
             <span className="w-full text-[13px] font-medium text-[var(--bad)]">
-              Choose a reason for {owing} student{owing === 1 ? "" : "s"} marked absent or on leave.
+              {owing === 1
+                ? t("Choose a reason for the child marked absent or on leave.")
+                : t("Choose a reason for {n} children marked absent or on leave.", { n: owing })}
             </span>
           )}
-          <Submit>Save attendance</Submit>
+          <Submit>{t("Save attendance")}</Submit>
           <span className="text-[13px] text-[var(--muted)]">
             {isPast
-              ? "This day is closed — present can only be given on the day itself."
-              : "Saving again for the same date overwrites the earlier entry."}
+              ? t("This day is closed — present can only be given on the day itself.")
+              : t("Saving again for the same date overwrites the earlier entry.")}
           </span>
         </div>
       )}

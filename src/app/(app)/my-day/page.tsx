@@ -12,6 +12,7 @@ import { NOTE_FIELDS } from "@/lib/day-note-meta";
 import StaffNoteView from "@/components/StaffNoteView";
 import DayNoteForm from "./DayNoteForm";
 import StaffNoteForm from "./StaffNoteForm";
+import { getT } from "@/lib/i18n";
 
 export const metadata = { title: "My day book · Pehchaan" };
 
@@ -35,6 +36,7 @@ export default async function MyDayPage({
     redirect("/dashboard");
   const sp = await searchParams;
 
+  const t = await getT();
   const now = today();
   const day = sp.day && sp.day <= now ? sp.day : now;
 
@@ -54,50 +56,61 @@ export default async function MyDayPage({
 
   return (
     <>
-      <PageHeader title="My day book"
-        subtitle={`${fmtDate(day)} · what you did today, in your own words`}
-        back={day === now ? undefined : { href: "/my-day", label: "Today" }}
+      <PageHeader title={t("My day book")}
+        subtitle={`${fmtDate(day)} · ${t("what you did today, in your own words")}`}
+        back={day === now ? undefined : { href: "/my-day", label: t("Today") }}
         right={
           <>
             <Link href={`/my-day?day=${addDays(day, -1)}`} className="btn btn-ghost btn-sm">
-              ← Day before
+              {t("← Day before")}
             </Link>
             {day < now && (
               <Link href={`/my-day?day=${addDays(day, 1)}`} className="btn btn-ghost btn-sm">
-                Day after →
+                {t("Day after →")}
               </Link>
             )}
           </>
         } />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="You checked in" value={punch?.check_in ?? "—"}
-          hint={punch?.by_hand ? "entered by hand" : punch?.distance_m != null
-            ? `${punch.distance_m} m from the centre` : "not checked in"}
+        <StatCard label={t("You checked in")} value={punch?.check_in ?? "—"}
+          hint={punch?.by_hand ? t("entered by hand") : punch?.distance_m != null
+            ? t("{m} m from the centre", { m: punch.distance_m }) : t("not checked in")}
           tone={punch?.check_in ? "ok" : "warn"} />
-        <StatCard label="You checked out" value={punch?.check_out ?? "—"}
-          hint={punch?.minutes ? `${Math.floor(punch.minutes / 60)}h ${punch.minutes % 60}m at the centre` : "still open"} />
-        <StatCard label="Children present" value={present}
-          hint={`${byClass.length} class${byClass.length === 1 ? "" : "es"} marked`} />
-        <StatCard label="Children absent" value={absent}
+        <StatCard label={t("You checked out")} value={punch?.check_out ?? "—"}
+          hint={punch?.minutes
+            ? t("{h}h {m}m at the centre",
+                { h: Math.floor(punch.minutes / 60), m: punch.minutes % 60 })
+            : t("still open")} />
+        <StatCard label={t("Children present")} value={present}
+          hint={byClass.length === 1
+            ? t("{n} class marked", { n: byClass.length })
+            : t("{n} classes marked", { n: byClass.length })} />
+        <StatCard label={t("Children absent")} value={absent}
           tone={absent > present ? "warn" : "default"}
-          hint={reasons.length ? `${reasons.length} reason${reasons.length === 1 ? "" : "s"} given` : "no reasons given"} />
+          hint={reasons.length
+            ? (reasons.length === 1
+                ? t("{n} reason given", { n: reasons.length })
+                : t("{n} reasons given", { n: reasons.length }))
+            : t("no reasons given")} />
       </div>
 
       {byClass.length > 0 && (
         <>
-          <div className="label-cap mb-2.5 mt-6">Your register on {fmtDate(day)}</div>
+          <div className="label-cap mb-2.5 mt-6">
+            {t("Your register on {d}", { d: fmtDate(day) })}
+          </div>
           <Card pad={false}>
             <div className="overflow-x-auto">
               <table className="tbl">
                 <thead>
-                  <tr><th>Class</th><th>Section</th><th>Present</th><th>Absent</th>
-                    <th>Marked at</th></tr>
+                  <tr><th>{t("Class")}</th><th>{t("Section")}</th><th>{t("Present")}</th>
+                    <th>{t("Absent")}</th><th>{t("Marked at")}</th></tr>
                 </thead>
                 <tbody>
                   {byClass.map((c, i) => (
                     <tr key={i}>
-                      <td className="font-medium">{c.class_name}</td>
+                      <td className="font-medium">{t(c.class_name)}</td>
                       <td className="text-[var(--muted)]">{c.section ?? "—"}</td>
                       <td className="tabular-nums">{c.present}</td>
                       <td className="tabular-nums">{c.absent}</td>
@@ -110,45 +123,48 @@ export default async function MyDayPage({
           </Card>
           {reasons.length > 0 && (
             <p className="mt-2 text-[13px] text-[var(--muted)]">
-              Why they were away: {reasons.map((r) => `${r.reason} (${r.n})`).join(" · ")}
+              {t("Why they were away:")}{" "}
+              {reasons.map((r) => `${t(r.reason)} (${r.n})`).join(" · ")}
             </p>
           )}
         </>
       )}
 
       <div className="label-cap mb-2.5 mt-6">
-        {written === 0 ? "Write up the day" : "What you wrote"}
+        {written === 0 ? t("Write up the day") : t("What you wrote")}
       </div>
 
       {notes.map((n) => (
         <Card key={n.id} className="mb-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge tone="info">{n.class_name ?? "The whole day"}</Badge>
+            <Badge tone="info">{n.class_name ? t(n.class_name) : t("The whole day")}</Badge>
             {n.subject && <span className="text-[13px] text-[var(--muted)]">{n.subject}</span>}
-            <span className="ml-auto text-[12px] text-[var(--faint)]">saved {n.updated_at}</span>
+            <span className="ml-auto text-[12px] text-[var(--faint)]">
+              {t("saved {at}", { at: n.updated_at })}
+            </span>
           </div>
           <dl className="mt-3 space-y-2 text-[13.5px]">
             {n.chapter && (
-              <div><dt className="text-[var(--muted)]">Taught</dt>
+              <div><dt className="text-[var(--muted)]">{t("Taught")}</dt>
                 <dd>{n.chapter}{n.chapter_detail ? ` — ${n.chapter_detail}` : ""}</dd></div>
             )}
             {n.homework && (
-              <div><dt className="text-[var(--muted)]">Homework</dt>
+              <div><dt className="text-[var(--muted)]">{t("Homework")}</dt>
                 <dd>{n.homework}{n.homework_detail ? ` — ${n.homework_detail}` : ""}</dd></div>
             )}
             {n.equipment && (
-              <div><dt className="text-[var(--muted)]">Used</dt>
+              <div><dt className="text-[var(--muted)]">{t("Used")}</dt>
                 <dd>{n.equipment}{n.equipment_result ? ` — ${n.equipment_result}` : ""}</dd></div>
             )}
             {n.extra_activity && (
-              <div><dt className="text-[var(--muted)]">Beyond the class</dt>
+              <div><dt className="text-[var(--muted)]">{t("Beyond the class")}</dt>
                 <dd>{n.extra_activity}{n.extra_detail ? ` — ${n.extra_detail}` : ""}</dd></div>
             )}
             {n.other_work && (
-              <div><dt className="text-[var(--muted)]">Also did</dt><dd>{n.other_work}</dd></div>
+              <div><dt className="text-[var(--muted)]">{t("Also did")}</dt><dd>{n.other_work}</dd></div>
             )}
             {n.support_needed && (
-              <div><dt className="text-[var(--muted)]">Help needed</dt>
+              <div><dt className="text-[var(--muted)]">{t("Help needed")}</dt>
                 <dd className="text-[var(--warn)]">{n.support_needed}</dd></div>
             )}
           </dl>
@@ -157,16 +173,18 @@ export default async function MyDayPage({
 
       <DayNoteForm date={day} classes={classes} />
 
-      <div className="label-cap mb-2.5 mt-6">Your last thirty days</div>
+      <div className="label-cap mb-2.5 mt-6">{t("Your last thirty days")}</div>
       <Card pad={false}>
         {recent.length === 0 ? (
-          <Empty title="Nothing yet" hint="Your days appear here as you check in and write them up." />
+          <Empty title={t("Nothing yet")}
+            hint={t("Your days appear here as you check in and write them up.")} />
         ) : (
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
-                <tr><th>Day</th><th>In</th><th>Out</th><th>Present</th><th>Absent</th>
-                  <th>Written up</th><th></th></tr>
+                <tr><th>{t("Day")}</th><th>{t("In")}</th><th>{t("Out")}</th>
+                  <th>{t("Present")}</th><th>{t("Absent")}</th>
+                  <th>{t("Written up")}</th><th></th></tr>
               </thead>
               <tbody>
                 {recent.map((r, i) => (
@@ -178,12 +196,14 @@ export default async function MyDayPage({
                     <td className="tabular-nums">{r.absent || "—"}</td>
                     <td>
                       {r.notes_written > 0
-                        ? <Badge tone="ok">{r.chapters ?? "written"}</Badge>
-                        : <span className="text-[13px] text-[var(--faint)]">not written</span>}
+                        ? <Badge tone="ok">{r.chapters ?? t("written")}</Badge>
+                        : <span className="text-[13px] text-[var(--faint)]">
+                            {t("not written")}
+                          </span>}
                     </td>
                     <td>
                       <Link href={`/my-day?day=${r.day}`}
-                        className="text-[13px] text-[var(--brand)] hover:underline">Open</Link>
+                        className="text-[13px] text-[var(--brand)] hover:underline">{t("Open")}</Link>
                     </td>
                   </tr>
                 ))}
@@ -204,6 +224,7 @@ export default async function MyDayPage({
 async function OtherRolesDay({ user, day, now }: {
   user: { uid: number; role: string; name: string }; day: string; now: string;
 }) {
+  const t = await getT();
   const [note, mine] = await Promise.all([
     staffNoteOn(day, user.uid),
     user.role === "mentor" ? mentorDays(day, day, null, user.uid)
@@ -215,32 +236,32 @@ async function OtherRolesDay({ user, day, now }: {
   /** The two or three numbers that mean something for this role. */
   const counts: { label: string; value: number; hint?: string }[] =
     user.role === "mentor" ? [
-      { label: "Meetings written up", value: Number(row?.written_up ?? 0) },
-      { label: "Children referred", value: Number(row?.flags_raised ?? 0) },
-      { label: "Counselling steps", value: Number(row?.counselling_steps ?? 0) },
+      { label: t("Meetings written up"), value: Number(row?.written_up ?? 0) },
+      { label: t("Children referred"), value: Number(row?.flags_raised ?? 0) },
+      { label: t("Counselling steps"), value: Number(row?.counselling_steps ?? 0) },
     ] : user.role === "auditor" ? [
-      { label: "Visits filed", value: Number(row?.visits_filed ?? 0) },
-      { label: "Suggestions raised", value: Number(row?.suggestions ?? 0) },
-      { label: "Replies written", value: Number(row?.replies ?? 0) },
+      { label: t("Visits filed"), value: Number(row?.visits_filed ?? 0) },
+      { label: t("Suggestions raised"), value: Number(row?.suggestions ?? 0) },
+      { label: t("Replies written"), value: Number(row?.replies ?? 0) },
     ] : [
-      { label: "Centre visits", value: Number(row?.visits ?? 0) },
-      { label: "Children seen", value: Number(row?.children_seen ?? 0) },
-      { label: "Registers marked", value: Number(row?.sessions ?? 0) },
+      { label: t("Centre visits"), value: Number(row?.visits ?? 0) },
+      { label: t("Children seen"), value: Number(row?.children_seen ?? 0) },
+      { label: t("Registers marked"), value: Number(row?.sessions ?? 0) },
     ];
 
   return (
     <>
-      <PageHeader title="My day book"
-        subtitle={`${fmtDate(day)} · what you did today, in your own words`}
-        back={day === now ? undefined : { href: "/my-day", label: "Today" }}
+      <PageHeader title={t("My day book")}
+        subtitle={`${fmtDate(day)} · ${t("what you did today, in your own words")}`}
+        back={day === now ? undefined : { href: "/my-day", label: t("Today") }}
         right={
           <>
             <Link href={`/my-day?day=${addDays(day, -1)}`} className="btn btn-ghost btn-sm">
-              ← Day before
+              {t("← Day before")}
             </Link>
             {day < now && (
               <Link href={`/my-day?day=${addDays(day, 1)}`} className="btn btn-ghost btn-sm">
-                Day after →
+                {t("Day after →")}
               </Link>
             )}
           </>
@@ -253,18 +274,18 @@ async function OtherRolesDay({ user, day, now }: {
         ))}
       </div>
       <p className="mt-2 text-[13px] text-[var(--muted)]">
-        That is what the system recorded of your day. The rest is yours to write.
+        {t("That is what the system recorded of your day. The rest is yours to write.")}
       </p>
 
       {note && (
         <>
-          <div className="label-cap mb-2.5 mt-6">What you wrote</div>
+          <div className="label-cap mb-2.5 mt-6">{t("What you wrote")}</div>
           <div className="mb-4"><StaffNoteView note={note} /></div>
         </>
       )}
 
       <div className="label-cap mb-2.5 mt-6">
-        {note ? "Change it" : "Write up the day"}
+        {note ? t("Change it") : t("Write up the day")}
       </div>
       <StaffNoteForm role={user.role} date={day} note={note} />
     </>

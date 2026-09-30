@@ -11,6 +11,7 @@ import { SIBLING_COLS, SIBLING_JOIN } from "@/lib/siblings";
 import { EVENT_LABEL } from "@/lib/calendar-meta";
 import { canMarkAttendance, isGlobalRole } from "@/lib/roles";
 import { isSection } from "@/lib/sections";
+import { getT } from "@/lib/i18n";
 
 export default async function AttendancePage({
   searchParams,
@@ -21,9 +22,10 @@ export default async function AttendancePage({
     centersForUser(user), listClasses(), currentSession(),
   ]);
 
-  if (!session) return <Alert kind="warn">No academic session is open.</Alert>;
+  const t = await getT();
+  if (!session) return <Alert kind="warn">{t("No academic session is open.")}</Alert>;
   if (centers.length === 0)
-    return <Alert kind="warn">You are not assigned to a centre yet.</Alert>;
+    return <Alert kind="warn">{t("You are not assigned to a centre yet.")}</Alert>;
 
   // Close out any past day that was never filled in — those students go down as absent.
   await closeRegisterUpToYesterday();
@@ -64,9 +66,12 @@ export default async function AttendancePage({
   return (
     <>
       <PageHeader
-        title="Student attendance"
-        subtitle={`Session ${session.name}${
-          markedCount ? ` · ${markedCount} of ${rows.length} already marked for this date` : ""}`}
+        title={t("Student attendance")}
+        subtitle={t("Session {s}", { s: session.name })
+          + (markedCount
+            ? " · " + t("{n} of {total} already marked for this date",
+                { n: markedCount, total: rows.length })
+            : "")}
       />
 
       <Card className="mb-4">
@@ -111,13 +116,13 @@ export default async function AttendancePage({
 
       {!centerId || !classId ? (
         <Card pad={false}>
-          <Empty title="Choose a class"
-            hint="Pick the centre, class and date above to load the roster." />
+          <Empty title={t("Choose a class")}
+            hint={t("Pick the centre, class and date above to load the roster.")} />
         </Card>
       ) : rows.length === 0 ? (
         <Card pad={false}>
-          <Empty title="No students in this class"
-            hint="Nobody is enrolled in this class for the selected centre and session." />
+          <Empty title={t("No students in this class")}
+            hint={t("Nobody is enrolled in this class for the selected centre and session.")} />
         </Card>
       ) : (
         // The sheet holds the marks in its own state, keyed by enrolment. A
