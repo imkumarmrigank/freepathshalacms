@@ -4,11 +4,13 @@ import { centersForUser, currentSession, resolveCenterId } from "@/lib/queries";
 import { Alert, PageHeader } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import InteractionForm from "./InteractionForm";
+import { getT } from "@/lib/i18n";
 
 export default async function NewInteractionPage({
   searchParams,
 }: { searchParams: Promise<{ student?: string }> }) {
   const user = await requireFeature("ptm");
+  const t = await getT();
   const { student } = await searchParams;
   const session = await currentSession();
   if (!session) return <Alert kind="warn">No academic session is open.</Alert>;
@@ -52,7 +54,7 @@ export default async function NewInteractionPage({
 
   return (
     <>
-      <PageHeader title="PTM Mentor Interaction"
+      <PageHeader title={t("PTM Mentor Interaction")}
         subtitle={`Session ${session.name}`}
         back={{ href: "/ptm", label: "PTM interactions" }} />
       <InteractionForm

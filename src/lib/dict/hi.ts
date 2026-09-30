@@ -812,6 +812,338 @@ const hi: Record<string, string> = {
   "Done": "हो गया",
   "Reopen": "फिर से खोलें",
   "Unassigned": "किसी को नहीं सौंपा",
+
+  /* --- parent meetings --------------------------------------------------- */
+  "1 = not confident, 5 = very confident":
+    "1 = भरोसा नहीं, 5 = पूरा भरोसा",
+  "1. Admission Number":
+    "1. दाख़िला नंबर",
+  "2. Student Name *":
+    "2. बच्चे का नाम *",
+  "3. Learning Centre *":
+    "3. शिक्षण केंद्र *",
+  "4. Grade":
+    "4. कक्षा",
+  "5. Date of Interaction *":
+    "5. बातचीत की तारीख़ *",
+  "6. PTM Mentor Name *":
+    "6. बैठक करने वाले मेंटर का नाम *",
+  "7. Mode of Interaction *":
+    "7. बातचीत का तरीक़ा *",
+  "8. Who attended? *":
+    "8. कौन आया? *",
+  "9. Parent Engagement Level *":
+    "9. अभिभावक की भागीदारी *",
+  "10. What were the key concerns discussed? (Select all that apply) *":
+    "10. किन मुख्य बातों पर चर्चा हुई? (जो भी लागू हों चुनें) *",
+  "11. Brief Notes":
+    "11. संक्षिप्त टिप्पणी",
+  "12. What commitments did the parent make? *":
+    "12. अभिभावक ने क्या वादे किए? *",
+  "13. Additional Commitment Notes":
+    "13. वादों के बारे में और टिप्पणी",
+  "14. Is a follow-up needed? *":
+    "14. क्या फ़ॉलो-अप चाहिए? *",
+  "15. Follow-up Priority *":
+    "15. फ़ॉलो-अप की प्राथमिकता *",
+  "16. Next Follow-up Date *":
+    "16. अगले फ़ॉलो-अप की तारीख़ *",
+  "17. Follow-up Owner":
+    "17. फ़ॉलो-अप किसका",
+  "18. How confident do you feel about this family’s progress? *":
+    "18. इस परिवार की प्रगति पर आपको कितना भरोसा है? *",
+  "19. Any support needed from the Freepathshala team?":
+    "19. फ़्रीपाठशाला टीम से कोई मदद चाहिए?",
+  "Ad-hoc interaction":
+    "अलग से हुई बातचीत",
+  "Agenda":
+    "कार्यसूची",
+  "All engagement":
+    "सभी भागीदारी",
+  "All {n} of them. Pick another day above to check that one.":
+    "सभी {n}। ऊपर से कोई और दिन चुनकर देखें।",
+  "Assign the follow-up to":
+    "फ़ॉलो-अप किसे सौंपें",
+  "Attend next PTM":
+    "अगली बैठक में आएँ",
+  "Attentive":
+    "ध्यान देने वाले",
+  "Behaviour":
+    "व्यवहार",
+  "Both parents came":
+    "माता-पिता दोनों आए",
+  "Centre Teacher":
+    "केंद्र के शिक्षक",
+  "Children expected":
+    "अपेक्षित बच्चे",
+  "Choose a student to see their results.":
+    "नतीजे देखने के लिए बच्चा चुनें।",
+  "Commitments and follow-up":
+    "वादे और फ़ॉलो-अप",
+  "Complete admission-related tasks":
+    "दाख़िले से जुड़े काम पूरे करें",
+  "Completed, nothing recorded":
+    "पूरा हुआ, कुछ दर्ज नहीं",
+  "Concerns":
+    "चिंताएँ",
+  "Concerns discussed":
+    "जिन बातों पर चर्चा हुई",
+  "Concerns: last 30 days":
+    "चिंताएँ: पिछले 30 दिन",
+  "Concerns: last 7 days":
+    "चिंताएँ: पिछले 7 दिन",
+  "Concerns: last 90 days":
+    "चिंताएँ: पिछले 90 दिन",
+  "Confidence":
+    "भरोसा",
+  "Confidence in progress":
+    "प्रगति पर भरोसा",
+  "Counsellor":
+    "काउंसलर",
+  "Details":
+    "विवरण",
+  "Each day's meetings, by who came to them":
+    "हर दिन की बैठकें, कौन आया उसके हिसाब से",
+  "Engagement":
+    "भागीदारी",
+  "Ensure regular attendance":
+    "नियमित उपस्थिति सुनिश्चित करें",
+  "Every PTM day was written up":
+    "हर बैठक-दिवस लिखा गया",
+  "Every family expected that day was seen":
+    "उस दिन जिन परिवारों से मिलना था, सबसे मिले",
+  "Every meeting on {d}":
+    "{d} की सभी बैठकें",
+  "Father came":
+    "पिता आए",
+  "Fills automatically":
+    "अपने आप भर जाता है",
+  "Financial Challenges":
+    "आर्थिक कठिनाइयाँ",
+  "Follow-up":
+    "फ़ॉलो-अप",
+  "Follow-up owner":
+    "फ़ॉलो-अप किसका",
+  "Follow-ups promised":
+    "वादा किए गए फ़ॉलो-अप",
+  "Guardian came":
+    "अभिभावक आए",
+  "Health":
+    "स्वास्थ्य",
+  "High (within one week)":
+    "ज़रूरी (एक सप्ताह में)",
+  "Homework Support":
+    "गृहकार्य में मदद",
+  "How it went":
+    "कैसा रहा",
+  "If “Other”, what was it?":
+    "अगर “अन्य”, तो क्या?",
+  "Inform Freepathshala before relocation":
+    "जगह बदलने से पहले फ़्रीपाठशाला को बताएँ",
+  "Interaction":
+    "बातचीत",
+  "Interaction recorded.":
+    "बातचीत दर्ज हो गई।",
+  "Keep with me":
+    "अपने पास रखें",
+  "Last 30 days":
+    "पिछले 30 दिन",
+  "Last sat down with":
+    "आख़िरी बार कब बैठे",
+  "Learning Progress":
+    "पढ़ाई की प्रगति",
+  "Leave blank for all classes":
+    "सभी कक्षाओं के लिए ख़ाली छोड़ें",
+  "Low (next PTM)":
+    "कम (अगली बैठक में)",
+  "Marked as":
+    "किस रूप में दर्ज",
+  "Medium (within one month)":
+    "मध्यम (एक महीने में)",
+  "Meeting was on":
+    "बैठक की तारीख़",
+  "Meetings can still be recorded — a PTM day only sets the expectation.":
+    "बैठकें फिर भी दर्ज हो सकती हैं — बैठक-दिवस सिर्फ़ अपेक्षा तय करता है।",
+  "Meetings held":
+    "हुई बैठकें",
+  "Meetings held, against the children on each centre's roll":
+    "हुई बैठकें, हर केंद्र के रजिस्टर के बच्चों के मुक़ाबले",
+  "Mode":
+    "तरीक़ा",
+  "Monitor school progress":
+    "स्कूल की प्रगति पर नज़र रखें",
+  "Mother came":
+    "माता आईं",
+  "Never met":
+    "कभी नहीं मिले",
+  "No PTM day scheduled for today":
+    "आज के लिए कोई बैठक-दिवस तय नहीं",
+  "No PTMs scheduled":
+    "कोई बैठक तय नहीं",
+  "No day in the diary over the last {n} days passed without a meeting recorded against it.":
+    "पिछले {n} दिनों में डायरी का कोई दिन ऐसा नहीं गया जिस पर बैठक दर्ज न हुई हो।",
+  "No follow-up required":
+    "फ़ॉलो-अप की ज़रूरत नहीं",
+  "No meetings recorded that day":
+    "उस दिन कोई बैठक दर्ज नहीं",
+  "No test marks recorded for this student yet.":
+    "इस बच्चे के अभी कोई टेस्ट अंक दर्ज नहीं।",
+  "Nobody was expected that day":
+    "उस दिन किसी से मिलना तय नहीं था",
+  "None recorded.":
+    "कुछ दर्ज नहीं।",
+  "Not required":
+    "ज़रूरत नहीं",
+  "Nothing recorded":
+    "कुछ दर्ज नहीं",
+  "Nothing recorded yet":
+    "अभी कुछ दर्ज नहीं",
+  "Nothing was entered on this day":
+    "इस दिन कुछ दर्ज नहीं हुआ",
+  "Open the full progress report →":
+    "पूरी प्रगति रिपोर्ट खोलें →",
+  "Optional":
+    "वैकल्पिक",
+  "Optional — leave blank to keep it yourself":
+    "वैकल्पिक — अपने पास रखने के लिए ख़ाली छोड़ें",
+  "Overall":
+    "कुल मिलाकर",
+  "PTM Mentor Interaction":
+    "मेंटर की अभिभावक बातचीत",
+  "PTM dashboard":
+    "बैठक डैशबोर्ड",
+  "PTM days in the diary today":
+    "आज डायरी में बैठक-दिवस",
+  "PTM details":
+    "बैठक का विवरण",
+  "PTM interactions":
+    "अभिभावक बातचीत",
+  "Parent":
+    "अभिभावक",
+  "Parent Employment":
+    "अभिभावक का रोज़गार",
+  "Parents":
+    "अभिभावक",
+  "Parents engaged":
+    "भागीदार अभिभावक",
+  "Part of":
+    "किसका हिस्सा",
+  "Part of a scheduled PTM":
+    "किसी तय बैठक का हिस्सा",
+  "Pick a centre first":
+    "पहले केंद्र चुनें",
+  "Pick another day above, or open All interactions.":
+    "ऊपर से कोई और दिन चुनें, या सभी बातचीत खोलें।",
+  "Principal":
+    "प्रधानाचार्य",
+  "Priority":
+    "प्राथमिकता",
+  "Progress so far":
+    "अब तक की प्रगति",
+  "Record what was discussed with a parent, and the follow-up it needs.":
+    "अभिभावक से क्या बात हुई और आगे क्या करना है, दर्ज करें।",
+  "Recorded":
+    "दर्ज किया",
+  "Recorded so far":
+    "अब तक दर्ज",
+  "Relocation":
+    "जगह बदलना",
+  "Resistant":
+    "अनिच्छुक",
+  "Same Mentor":
+    "वही मेंटर",
+  "Save interaction":
+    "बातचीत सहेजें",
+  "Schedule a PTM day so mentors can log each parent conversation against it.":
+    "बैठक-दिवस तय करें ताकि मेंटर हर अभिभावक बातचीत उसके साथ दर्ज कर सकें।",
+  "Scheduled PTMs":
+    "तय बैठकें",
+  "School Admission":
+    "स्कूल में दाख़िला",
+  "Search student or mentor":
+    "बच्चा या मेंटर खोजें",
+  "Select student":
+    "बच्चा चुनें",
+  "Student Attendance":
+    "बच्चे की उपस्थिति",
+  "Student profile":
+    "बच्चे का विवरण",
+  "Summarise the discussion in 2–3 sentences.":
+    "चर्चा को 2–3 वाक्यों में लिखें।",
+  "Support homework at home":
+    "घर पर गृहकार्य में मदद करें",
+  "Support needed from the team":
+    "टीम से चाहिए मदद",
+  "The interaction is recorded on its own — nothing will appear on the follow-ups list.":
+    "बातचीत अपने आप में दर्ज होगी — फ़ॉलो-अप सूची में कुछ नहीं आएगा।",
+  "The mentor recorded that nothing was left outstanding after this conversation.":
+    "मेंटर ने दर्ज किया कि इस बातचीत के बाद कुछ बाक़ी नहीं रहा।",
+  "This is the day's work at the keyboard, not the meetings held that day — a mentor who wrote nothing up appears here as empty.":
+    "यह उस दिन कीबोर्ड पर हुआ काम है, उस दिन हुई बैठकें नहीं — जिस मेंटर ने कुछ नहीं लिखा, वह यहाँ ख़ाली दिखता है।",
+  "This list fills once a PTM day is in the diary for a centre, or a meeting is recorded there.":
+    "जैसे ही किसी केंद्र के लिए बैठक-दिवस डायरी में आता है, या वहाँ बैठक दर्ज होती है, यह सूची भरने लगती है।",
+  "This record belongs to another centre.":
+    "यह रिकॉर्ड किसी दूसरे केंद्र का है।",
+  "Time":
+    "समय",
+  "Title":
+    "शीर्षक",
+  "To":
+    "तक",
+  "Video Call":
+    "वीडियो कॉल",
+  "What happened when you called or visited":
+    "फ़ोन या मुलाक़ात पर क्या हुआ",
+  "What was planned":
+    "क्या तय था",
+  "Who attended":
+    "कौन आया",
+  "Who came":
+    "कौन आया",
+  "Who came, and on what number":
+    "कौन आया, और कितने",
+  "Written up by":
+    "किसने लिखा",
+  "Yes — something was promised":
+    "हाँ — कुछ वादा हुआ है",
+  "day after →":
+    "अगला दिन →",
+  "interaction":
+    "बातचीत",
+  "neither parent":
+    "माता-पिता में से कोई नहीं",
+  "next day":
+    "अगले दिन",
+  "none recorded":
+    "कुछ दर्ज नहीं",
+  "on her own":
+    "अकेली",
+  "on his own":
+    "अकेले",
+  "same day":
+    "उसी दिन",
+  "{a} neutral · {b} resistant":
+    "{a} सामान्य · {b} अनिच्छुक",
+  "{how} on {d}":
+    "{d} को {how}",
+  "{n} centre":
+    "{n} केंद्र",
+  "{n} centres":
+    "{n} केंद्र",
+  "{n} children":
+    "{n} बच्चे",
+  "{n} days later":
+    "{n} दिन बाद",
+  "{n} needed none":
+    "{n} को ज़रूरत नहीं थी",
+  "{n} of 5":
+    "5 में से {n}",
+  "{pct}% ({present} of {marked} days)":
+    "{pct}% ({marked} में से {present} दिन)",
+  "{s} of meetings":
+    "बैठकों का {s}",
+  "{who} (me)":
+    "{who} (मैं)",
 };
 
 export default hi;

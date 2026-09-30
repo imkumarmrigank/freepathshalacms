@@ -2,9 +2,11 @@
 import { useActionState } from "react";
 import { closeFollowUp } from "../actions";
 import { FormMessage } from "@/components/form";
+import { useT } from "@/components/LocaleProvider";
 
 export default function CloseFollowUp({ id, status }: { id: number; status: string }) {
-  const [state, action] = useActionState(closeFollowUp, null);
+
+  const t = useT();  const [state, action] = useActionState(closeFollowUp, null);
   const open = status === "pending";
 
   return (
@@ -14,7 +16,7 @@ export default function CloseFollowUp({ id, status }: { id: number; status: stri
       <label className="field">
         <span>{open ? "How did the follow-up go?" : "Add to the note"}</span>
         <textarea className="textarea" name="follow_up_notes" rows={2}
-          placeholder="What happened when you called or visited" />
+          placeholder={t("What happened when you called or visited")} />
       </label>
       <div className="flex gap-2">
         {open ? (

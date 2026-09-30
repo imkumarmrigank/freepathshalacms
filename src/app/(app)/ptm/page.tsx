@@ -12,6 +12,8 @@ import { fmtDate, fullName, titleCase } from "@/lib/format";
 import { isGlobalRole } from "@/lib/roles";
 import Pager from "@/components/Pager";
 import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
+import { getT } from "@/lib/i18n";
+import { engagementLabel, parentLabel } from "@/lib/ptm-meta";
 
 const TONE: Record<string, string> = { attentive: "ok", neutral: "warn", resistant: "bad" };
 
@@ -19,6 +21,7 @@ export default async function PtmPage({
   searchParams,
 }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const user = await requireFeature("ptm");
+  const t = await getT();
   const sp = await searchParams;
   const [centers, classes, session] = await Promise.all([
     centersForUser(user), listClasses(), currentSession(),
@@ -71,7 +74,7 @@ export default async function PtmPage({
 
   return (
     <>
-      <PageHeader title="PTM interactions"
+      <PageHeader title={t("PTM interactions")}
         subtitle={`${total} interaction${total === 1 ? "" : "s"} in ${session?.name ?? "this session"}`}
         right={
           <>
@@ -86,18 +89,19 @@ export default async function PtmPage({
         centers={isGlobalRole(user.role) ? centers : []}
         classes={classes}
         current={sp}
-        searchPlaceholder="Search student or mentor"
-        extra={[{ name: "engagement", label: "All engagement",
-          options: ["attentive", "neutral", "resistant"].map((v) => ({ value: v, label: titleCase(v) })) }]}
+        searchPlaceholder={t("Search student or mentor")}
+        extra={[{ name: "engagement", label: t("All engagement"),
+          options: ["attentive", "neutral", "resistant"]
+            .map((v) => ({ value: v, label: t(engagementLabel(v)) })) }]}
       />
 
       <Card className="mt-4 overflow-hidden" pad={false}>
         {rows.length === 0 ? (
-          <Empty title="No interactions recorded"
-            hint="Record what was discussed with a parent, and the follow-up it needs."
+          <Empty title={t("No interactions recorded")}
+            hint={t("Record what was discussed with a parent, and the follow-up it needs.")}
             action={
               <Link href="/ptm/new" className="btn btn-primary btn-sm">
-                <IconPlus className="h-3.5 w-3.5" /> Record Parent Interaction
+                <IconPlus className="h-3.5 w-3.5" /> {t("Record Parent Interaction")}
               </Link>
             } />
         ) : (
@@ -105,8 +109,8 @@ export default async function PtmPage({
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>Date</th><th>Student</th><th>Class</th><th>Mentor</th>
-                  <th>Parent</th><th>Engagement</th><th>Follow-up</th>
+                  <th>{t("Date")}</th><th>{t("Student")}</th><th>{t("Class")}</th><th>{t("Mentor")}</th>
+                  <th>{t("Parent")}</th><th>{t("Engagement")}</th><th>{t("Follow-up")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -130,16 +134,18 @@ export default async function PtmPage({
                         </div>
                       </div>
                     </td>
-                    <td className="text-[var(--muted)]">{r.class_name ?? "—"}</td>
+                    <td className="text-[var(--muted)]">
+                      {r.class_name ? t(r.class_name) : "—"}
+                    </td>
                     <td className="text-[var(--muted)]">{r.mentor ?? "—"}</td>
-                    <td className="capitalize text-[var(--muted)]">{r.parent_present}</td>
-                    <td><Badge tone={TONE[r.engagement]}>{titleCase(r.engagement)}</Badge></td>
+                    <td className="text-[var(--muted)]">{t(parentLabel(r.parent_present))}</td>
+                    <td><Badge tone={TONE[r.engagement]}>{t(engagementLabel(r.engagement))}</Badge></td>
                     <td>
                       {!r.follow_up_required
                         ? <span className="text-[var(--faint)]">—</span>
                         : r.follow_up_status === "pending"
-                          ? <Badge tone="warn">Pending</Badge>
-                          : <Badge tone="ok">{titleCase(r.follow_up_status)}</Badge>}
+                          ? <Badge tone="warn">{t("Pending")}</Badge>
+                          : <Badge tone="ok">{t(titleCase(r.follow_up_status))}</Badge>}
                     </td>
                   </tr>
                 ))}
@@ -148,7 +154,7 @@ export default async function PtmPage({
           </div>
         )}
         <Pager page={pg.page} pages={win.pages} first={win.first} last={win.last}
-          total={total} unit="interaction" />
+          total={total} unit={t("interaction")} />
       </Card>
     </>
   );

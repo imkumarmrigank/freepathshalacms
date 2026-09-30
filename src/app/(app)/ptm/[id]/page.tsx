@@ -9,6 +9,7 @@ import {
 } from "@/lib/ptm-meta";
 import CloseFollowUp from "./CloseFollowUp";
 import { isGlobalRole } from "@/lib/roles";
+import { getT } from "@/lib/i18n";
 
 const TONE: Record<string, string> = { attentive: "ok", neutral: "warn", resistant: "bad" };
 
@@ -16,6 +17,7 @@ export default async function InteractionPage({
   params, searchParams,
 }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string }> }) {
   const user = await requireFeature("ptm");
+  const t = await getT();
   const { id } = await params;
   const { created } = await searchParams;
 
@@ -47,31 +49,32 @@ export default async function InteractionPage({
   );
   if (!row) notFound();
   if (!canTouchCenter(user, row.center_id))
-    return <Alert kind="bad">This record belongs to another centre.</Alert>;
+    return <Alert kind="bad">{t("This record belongs to another centre.")}</Alert>;
 
   const name = `${row.student_first} ${row.student_last ?? ""}`.trim();
 
   return (
     <>
-      {created && <div className="mb-5"><Alert kind="ok">Interaction recorded.</Alert></div>}
+      {created && <div className="mb-5"><Alert kind="ok">{t("Interaction recorded.")}</Alert></div>}
 
       <PageHeader
         title={name}
-        subtitle={`${row.enrollment_no} · ${row.class_name ?? "—"} · ${row.center_name}`}
-        back={{ href: "/ptm", label: "PTM interactions" }}
-        right={<Link href={`/students/${row.student_id}`} className="btn btn-ghost btn-sm">Student profile</Link>}
+        subtitle={`${row.enrollment_no} · ${row.class_name ? t(row.class_name) : "—"}`
+          + ` · ${row.center_name}`}
+        back={{ href: "/ptm", label: t("PTM interactions") }}
+        right={<Link href={`/students/${row.student_id}`} className="btn btn-ghost btn-sm">{t("Student profile")}</Link>}
       />
 
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">
           <Card>
-            <h2 className="mb-3 text-[15px] font-semibold">Concerns discussed</h2>
+            <h2 className="mb-3 text-[15px] font-semibold">{t("Concerns discussed")}</h2>
             {row.concern_tags?.length ? (
               <div className="mb-4 flex flex-wrap gap-1.5">
-                {row.concern_tags.map((t) => <Badge key={t} tone="warn" dot={false}>{t}</Badge>)}
+                {row.concern_tags.map((c) => <Badge key={c} tone="warn" dot={false}>{t(c)}</Badge>)}
               </div>
             ) : (
-              <p className="mb-4 text-[13px] text-[var(--muted)]">None recorded.</p>
+              <p className="mb-4 text-[13px] text-[var(--muted)]">{t("None recorded.")}</p>
             )}
 
             <h2 className="mb-3 text-[15px] font-semibold">Discussion</h2>
@@ -99,7 +102,7 @@ export default async function InteractionPage({
             )}
             {row.support_needed && (
               <>
-                <h3 className="mb-2 mt-5 text-[14px] font-semibold">Support needed from the team</h3>
+                <h3 className="mb-2 mt-5 text-[14px] font-semibold">{t("Support needed from the team")}</h3>
                 <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-[var(--muted)]">
                   {row.support_needed}
                 </p>
@@ -109,17 +112,21 @@ export default async function InteractionPage({
 
           <Card>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-[15px] font-semibold">Follow-up</h2>
+              <h2 className="text-[15px] font-semibold">{t("Follow-up")}</h2>
               {!row.follow_up_required
-                ? <Badge tone="mute">Not required</Badge>
+                ? <Badge tone="mute">{t("Not required")}</Badge>
                 : row.follow_up_status === "pending"
-                  ? <Badge tone="warn">Pending</Badge>
-                  : <Badge tone={row.follow_up_status === "done" ? "ok" : "mute"}>{titleCase(row.follow_up_status)}</Badge>}
+                  ? <Badge tone="warn">{t("Pending")}</Badge>
+                  : <Badge tone={row.follow_up_status === "done" ? "ok" : "mute"}>
+                      {t(titleCase(row.follow_up_status))}
+                    </Badge>}
             </div>
             <p className="mt-2 text-[14px] text-[var(--muted)]">
               {row.follow_up_required
-                ? `${titleCase(row.follow_up_mode ?? "follow-up")} on ${fmtDate(row.follow_up_date)}`
-                : "The mentor recorded that nothing was left outstanding after this conversation."}
+                ? t("{how} on {d}", {
+                    how: t(row.follow_up_mode ? modeLabel(row.follow_up_mode) : "follow-up"),
+                    d: fmtDate(row.follow_up_date) })
+                : t("The mentor recorded that nothing was left outstanding after this conversation.")}
             </p>
             {row.follow_up_notes && (
               <p className="mt-3 whitespace-pre-wrap text-[14px] text-[var(--muted)]">{row.follow_up_notes}</p>
@@ -131,20 +138,21 @@ export default async function InteractionPage({
         </div>
 
         <Card>
-          <h2 className="mb-3 text-[15px] font-semibold">Details</h2>
+          <h2 className="mb-3 text-[15px] font-semibold">{t("Details")}</h2>
           <dl className="space-y-2.5 text-[13px]">
             {[
-              ["Date", fmtDate(row.interaction_date)],
-              ["Mode", modeLabel(row.mode)],
-              ["Who attended", parentLabel(row.parent_present)],
-              ["Mentor", row.mentor ?? "—"],
-              ["Attendance", pct(row.attendance_pct)],
-              ["Marks", pct(row.marks_pct)],
-              ["Follow-up owner", row.follow_up_owner ?? "—"],
-              ["Assigned to", row.assignee ?? row.mentor ?? "—"],
-              ["Confidence", row.confidence === null ? "—" : `${row.confidence} of 5`],
-              ["Part of", row.meeting_title ?? "Ad-hoc interaction"],
-              ["Recorded", fmtDateTime(row.created_at)],
+              [t("Date"), fmtDate(row.interaction_date)],
+              [t("Mode"), t(modeLabel(row.mode))],
+              [t("Who attended"), t(parentLabel(row.parent_present))],
+              [t("Mentor"), row.mentor ?? "—"],
+              [t("Attendance"), pct(row.attendance_pct)],
+              [t("Marks"), pct(row.marks_pct)],
+              [t("Follow-up owner"), row.follow_up_owner ? t(row.follow_up_owner) : "—"],
+              [t("Assigned to"), row.assignee ?? row.mentor ?? "—"],
+              [t("Confidence"),
+                row.confidence === null ? "—" : t("{n} of 5", { n: row.confidence })],
+              [t("Part of"), row.meeting_title ?? t("Ad-hoc interaction")],
+              [t("Recorded"), fmtDateTime(row.created_at)],
             ].map(([k, v]) => (
               <div key={k} className="flex justify-between gap-3">
                 <dt className="text-[var(--muted)]">{k}</dt>
@@ -152,15 +160,17 @@ export default async function InteractionPage({
               </div>
             ))}
             <div className="flex justify-between gap-3">
-              <dt className="text-[var(--muted)]">Engagement</dt>
-              <dd><Badge tone={TONE[row.engagement]}>{engagementLabel(row.engagement)}</Badge></dd>
+              <dt className="text-[var(--muted)]">{t("Engagement")}</dt>
+              <dd><Badge tone={TONE[row.engagement]}>
+                {t(engagementLabel(row.engagement))}
+              </Badge></dd>
             </div>
             {row.follow_up_priority && (
               <div className="flex justify-between gap-3">
-                <dt className="text-[var(--muted)]">Priority</dt>
+                <dt className="text-[var(--muted)]">{t("Priority")}</dt>
                 <dd>
                   <Badge tone={PRIORITY_TONE[row.follow_up_priority]}>
-                    {priorityLabel(row.follow_up_priority)}
+                    {t(priorityLabel(row.follow_up_priority))}
                   </Badge>
                 </dd>
               </div>

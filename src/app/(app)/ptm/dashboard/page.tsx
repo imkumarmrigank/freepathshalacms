@@ -14,6 +14,8 @@ import {
   ptmAbsentees, ptmByCentre, ptmCommitments, ptmConcerns, ptmDay, ptmDayCoverage,
   ptmInteractionsOn, ptmMissedDays, ptmPeople, ptmPerDay, ptmScheduled, ptmWrittenOn,
 } from "@/lib/ptm-dashboard";
+import { getT } from "@/lib/i18n";
+import type { T } from "@/lib/locale";
 
 export const metadata = { title: "PTM dashboard · Pehchaan" };
 
@@ -31,7 +33,7 @@ function addDays(iso: string, n: number) {
 const WHO_CAME = [
   { key: "mother", label: "Mother", color: SERIES[0] },
   { key: "father", label: "Father", color: SERIES[1] },
-  { key: "both", label: "Both parents", color: SERIES[2] },
+  { key: "both", label: "Both Parents", color: SERIES[2] },
   { key: "guardian", label: "Guardian", color: SERIES[3] },
 ];
 
@@ -40,11 +42,12 @@ const WHO_CAME = [
  * fortnight means the record is being reconstructed from memory, and the
  * office should know that when it reads it.
  */
-function lateness(days: number) {
-  if (days <= 0) return { label: "same day", tone: "text-[12px] text-[var(--faint)]" };
-  if (days === 1) return { label: "next day", tone: "text-[12px] text-[var(--faint)]" };
-  if (days <= 3) return { label: `${days} days later`, tone: "text-[12px] text-[var(--muted)]" };
-  return { label: `${days} days later`, tone: "text-[12px] font-medium text-[var(--warn)]" };
+function lateness(days: number, t: T) {
+  if (days <= 0) return { label: t("same day"), tone: "text-[12px] text-[var(--faint)]" };
+  if (days === 1) return { label: t("next day"), tone: "text-[12px] text-[var(--faint)]" };
+  const label = t("{n} days later", { n: days });
+  if (days <= 3) return { label, tone: "text-[12px] text-[var(--muted)]" };
+  return { label, tone: "text-[12px] font-medium text-[var(--warn)]" };
 }
 
 const ENGAGEMENT_TONE: Record<string, string> = {
@@ -60,6 +63,7 @@ export default async function PtmDashboardPage({
   searchParams,
 }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const user = await requireFeature("ptm");
+  const t = await getT();
   const sp = await searchParams;
   const centerId = resolveCenterId(user, sp.center);
   const now = today();
@@ -114,14 +118,14 @@ export default async function PtmDashboardPage({
   /** A count as a share of the day's meetings, for the line under a card. */
   const share = (v: number) => (held ? `${Math.round((v / held) * 100)}%` : "—");
   const engagementParts = [
-    { label: "Attentive", value: n(summary?.attentive) },
-    { label: "Neutral", value: n(summary?.neutral) },
-    { label: "Resistant", value: n(summary?.resistant) },
+    { label: t("Attentive"), value: n(summary?.attentive) },
+    { label: t("Neutral"), value: n(summary?.neutral) },
+    { label: t("Resistant"), value: n(summary?.resistant) },
   ].filter((p) => p.value > 0);
 
   return (
     <>
-      <PageHeader title="PTM dashboard"
+      <PageHeader title={t("PTM dashboard")}
         subtitle={chosen
           ? `${chosen.name}${chosen.role === "mentor" ? "" : ` (${ROLE_LABEL[chosen.role as Role]})`}`
             + "'s meetings, and what the parents they saw are raising"
@@ -146,24 +150,26 @@ export default async function PtmDashboardPage({
       <Filters
         centers={isGlobalRole(user.role) ? centers : []}
         current={sp}
-        extra={[{ name: "days", label: "Last 30 days", options: [
-          { value: "7", label: "Concerns: last 7 days" },
-          { value: "30", label: "Concerns: last 30 days" },
-          { value: "90", label: "Concerns: last 90 days" },
+        extra={[{ name: "days", label: t("Last 30 days"), options: [
+          { value: "7", label: t("Concerns: last 7 days") },
+          { value: "30", label: t("Concerns: last 30 days") },
+          { value: "90", label: t("Concerns: last 90 days") },
         ] }]}
       />
 
       {/* ------------------------------------------------- today's diary */}
-      <div className="label-cap mb-2.5 mt-5">PTM days in the diary today · {fmtDate(now)}</div>
+      <div className="label-cap mb-2.5 mt-5">
+        {t("PTM days in the diary today")} · {fmtDate(now)}
+      </div>
       <Card pad={false}>
         {scheduled.length === 0 ? (
-          <Empty title="No PTM day scheduled for today"
-            hint="Meetings can still be recorded — a PTM day only sets the expectation." />
+          <Empty title={t("No PTM day scheduled for today")}
+            hint={t("Meetings can still be recorded — a PTM day only sets the expectation.")} />
         ) : (
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
-                <tr><th>Centre</th><th>Class</th><th>Time</th><th>How</th><th>Recorded so far</th><th>Status</th></tr>
+                <tr><th>{t("Centre")}</th><th>{t("Class")}</th><th>{t("Time")}</th><th>{t("How")}</th><th>{t("Recorded so far")}</th><th>{t("Status")}</th></tr>
               </thead>
               <tbody>
                 {scheduled.map((m) => (
@@ -178,12 +184,14 @@ export default async function PtmDashboardPage({
                     <td className="text-[var(--muted)]">{modeLabel(m.mode)}</td>
                     <td className="tabular-nums">
                       {m.held === 0
-                        ? <Badge tone="warn">Nothing recorded yet</Badge>
-                        : <>{m.held} of {m.roll}
-                            <span className="text-[12px] text-[var(--muted)]"> children</span></>}
+                        ? <Badge tone="warn">{t("Nothing recorded yet")}</Badge>
+                        : <>{m.held} {t("of {n}", { n: m.roll })}
+                            <span className="text-[12px] text-[var(--muted)]">
+                              {" "}{t("children")}
+                            </span></>}
                     </td>
                     <td><Badge tone={m.status === "cancelled" ? "bad" : m.status === "completed" ? "ok" : "info"}>
-                      {titleCase(m.status)}
+                      {t(titleCase(m.status))}
                     </Badge></td>
                   </tr>
                 ))}
@@ -203,15 +211,16 @@ export default async function PtmDashboardPage({
       </div>
       <Card pad={false}>
         {notWrittenUp.length === 0 ? (
-          <Empty title="Every PTM day was written up"
-            hint={`No day in the diary over the last ${days} days passed without a meeting recorded against it.`} />
+          <Empty title={t("Every PTM day was written up")}
+            hint={t("No day in the diary over the last {n} days passed without a meeting "
+              + "recorded against it.", { n: days })} />
         ) : (
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>Date</th><th>Centre</th><th>Class</th><th>What was planned</th>
-                  <th>Children expected</th><th>Marked as</th><th></th>
+                  <th>{t("Date")}</th><th>{t("Centre")}</th><th>{t("Class")}</th><th>{t("What was planned")}</th>
+                  <th>{t("Children expected")}</th><th>{t("Marked as")}</th><th></th>
                 </tr>
               </thead>
               <tbody>
@@ -239,7 +248,8 @@ export default async function PtmDashboardPage({
                       {/* a day the centre closed off as done, with nothing behind
                           it, is worse than one still sitting open */}
                       <Badge tone={m.status === "completed" ? "bad" : "warn"}>
-                        {m.status === "completed" ? "Completed, nothing recorded" : "Nothing recorded"}
+                        {m.status === "completed"
+                          ? t("Completed, nothing recorded") : t("Nothing recorded")}
                       </Badge>
                     </td>
                     <td className="whitespace-nowrap">
@@ -263,35 +273,46 @@ export default async function PtmDashboardPage({
         {day < addDays(now, -1) && (
           <Link href={link({ day: addDays(day, 1) })}
             className="text-[12px] font-normal text-[var(--brand)] hover:underline">
-            day after →
+            {t("day after →")}
           </Link>
         )}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Meetings held" value={held}
-          hint={held ? `${n(summary?.centres)} centre${n(summary?.centres) === 1 ? "" : "s"} · ${n(summary?.children)} children` : "none recorded"} />
+        <StatCard label={t("Meetings held")} value={held}
+          hint={held
+            ? `${n(summary?.centres) === 1
+                ? t("{n} centre", { n: n(summary?.centres) })
+                : t("{n} centres", { n: n(summary?.centres) })}`
+              + ` · ${t("{n} children", { n: n(summary?.children) })}`
+            : t("none recorded")} />
         {/* who actually turned up, one card each: a centre where only mothers
             ever come is a different problem from one where nobody does */}
-        <StatCard label="Both parents came" value={n(summary?.both_parents)}
-          hint={held ? `${share(n(summary?.both_parents))} of meetings` : "—"} />
-        <StatCard label="Mother came" value={n(summary?.mother)}
-          hint={held ? `${share(n(summary?.mother))} of meetings · on her own` : "—"} />
-        <StatCard label="Father came" value={n(summary?.father)}
-          hint={held ? `${share(n(summary?.father))} of meetings · on his own` : "—"} />
+        <StatCard label={t("Both parents came")} value={n(summary?.both_parents)}
+          hint={held ? t("{s} of meetings", { s: share(n(summary?.both_parents)) }) : "—"} />
+        <StatCard label={t("Mother came")} value={n(summary?.mother)}
+          hint={held
+            ? `${t("{s} of meetings", { s: share(n(summary?.mother)) })} · ${t("on her own")}`
+            : "—"} />
+        <StatCard label={t("Father came")} value={n(summary?.father)}
+          hint={held
+            ? `${t("{s} of meetings", { s: share(n(summary?.father)) })} · ${t("on his own")}`
+            : "—"} />
         {n(summary?.guardian) > 0 && (
-          <StatCard label="Guardian came" value={n(summary?.guardian)}
-            hint={`${share(n(summary?.guardian))} of meetings · neither parent`} />
+          <StatCard label={t("Guardian came")} value={n(summary?.guardian)}
+            hint={`${t("{s} of meetings", { s: share(n(summary?.guardian)) })}`
+              + ` · ${t("neither parent")}`} />
         )}
-        <StatCard label="Parents engaged" value={n(summary?.attentive)}
-          hint={`${n(summary?.neutral)} neutral · ${n(summary?.resistant)} resistant`}
+        <StatCard label={t("Parents engaged")} value={n(summary?.attentive)}
+          hint={t("{a} neutral · {b} resistant",
+            { a: n(summary?.neutral), b: n(summary?.resistant) })}
           tone={held && n(summary?.resistant) > n(summary?.attentive) ? "warn" : "default"} />
-        <StatCard label="Follow-ups promised" value={n(summary?.follow_ups)}
-          hint={`${n(summary?.no_follow_up)} needed none`} />
+        <StatCard label={t("Follow-ups promised")} value={n(summary?.follow_ups)}
+          hint={t("{n} needed none", { n: n(summary?.no_follow_up) })} />
         {/* the mentor's own reading of how the family is going, 1 to 5,
             averaged over the meetings where it was rated */}
-        <StatCard label="Confidence in progress"
-          value={confidence === null ? "—" : `${confidence.toFixed(1)} of 5`}
+        <StatCard label={t("Confidence in progress")}
+          value={confidence === null ? "—" : t("{n} of 5", { n: confidence.toFixed(1) })}
           hint={confidence === null
             ? "not rated in any meeting"
             : `across ${n(summary?.rated)} of ${held} meeting${held === 1 ? "" : "s"}`}
@@ -301,7 +322,7 @@ export default async function PtmDashboardPage({
 
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
         <ChartFrame title={`Meetings by centre · ${fmtDate(day)}`}
-          subtitle="Meetings held, against the children on each centre's roll"
+          subtitle={t("Meetings held, against the children on each centre's roll")}
           empty={byCentre.length === 0}
           table={{ head: ["Centre", "Meetings", "Children seen", "On the roll", "Share of roll",
             "Parents engaged", "Follow-ups", "Confidence"],
@@ -317,7 +338,7 @@ export default async function PtmDashboardPage({
         </ChartFrame>
 
         <ChartFrame title="Meetings over the last fortnight"
-          subtitle="Each day's meetings, by who came to them"
+          subtitle={t("Each day's meetings, by who came to them")}
           series={WHO_CAME}
           empty={perDay.every((d) => d.n === 0)}
           table={{ head: ["Day", "Mother", "Father", "Both parents", "Guardian", "Meetings"],
@@ -358,20 +379,22 @@ export default async function PtmDashboardPage({
       )}
 
       {/* ------------------------------------------- the meetings themselves */}
-      <div className="label-cap mb-2.5 mt-6">Every meeting on {fmtDate(day)}</div>
+      <div className="label-cap mb-2.5 mt-6">
+        {t("Every meeting on {d}", { d: fmtDate(day) })}
+      </div>
       <Card pad={false}>
         {rows.length === 0 ? (
-          <Empty title="No meetings recorded that day"
-            hint="Pick another day above, or open All interactions." />
+          <Empty title={t("No meetings recorded that day")}
+            hint={t("Pick another day above, or open All interactions.")} />
         ) : (
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>Student</th><th>Centre</th><th>Class</th>
-                  <th>Who came, and on what number</th>
-                  <th>How it went</th><th>Concerns</th><th>Follow-up</th>
-                  <th>Written up</th>
+                  <th>{t("Student")}</th><th>{t("Centre")}</th><th>{t("Class")}</th>
+                  <th>{t("Who came, and on what number")}</th>
+                  <th>{t("How it went")}</th><th>{t("Concerns")}</th><th>{t("Follow-up")}</th>
+                  <th>{t("Written up")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -404,8 +427,8 @@ export default async function PtmDashboardPage({
                     </td>
                     <td className="whitespace-nowrap text-[12.5px]">
                       {fmtDate(r.written_on)}
-                      <div className={lateness(r.days_later).tone}>
-                        {lateness(r.days_later).label}
+                      <div className={lateness(r.days_later, t).tone}>
+                        {lateness(r.days_later, t).label}
                       </div>
                     </td>
                   </tr>
@@ -429,15 +452,15 @@ export default async function PtmDashboardPage({
       </div>
       <Card pad={false}>
         {writtenToday.length === 0 ? (
-          <Empty title="Nothing was entered on this day"
-            hint="This is the day's work at the keyboard, not the meetings held that day — a mentor who wrote nothing up appears here as empty." />
+          <Empty title={t("Nothing was entered on this day")}
+            hint={t("This is the day's work at the keyboard, not the meetings held that day — a mentor who wrote nothing up appears here as empty.")} />
         ) : (
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>Student</th><th>Centre</th><th>Class</th>
-                  <th>Who came</th><th>Written up by</th><th>Meeting was on</th>
+                  <th>{t("Student")}</th><th>{t("Centre")}</th><th>{t("Class")}</th>
+                  <th>{t("Who came")}</th><th>{t("Written up by")}</th><th>{t("Meeting was on")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -458,8 +481,8 @@ export default async function PtmDashboardPage({
                         className="hover:text-[var(--brand)]">
                         {fmtDate(r.interaction_date)}
                       </Link>
-                      <div className={lateness(r.days_later).tone}>
-                        {lateness(r.days_later).label}
+                      <div className={lateness(r.days_later, t).tone}>
+                        {lateness(r.days_later, t).label}
                       </div>
                     </td>
                   </tr>
@@ -482,19 +505,20 @@ export default async function PtmDashboardPage({
       </div>
       <Card pad={false}>
         {coverage.expected === 0 ? (
-          <Empty title="Nobody was expected that day"
-            hint="This list fills once a PTM day is in the diary for a centre, or a meeting is recorded there." />
+          <Empty title={t("Nobody was expected that day")}
+            hint={t("This list fills once a PTM day is in the diary for a centre, or a meeting is recorded there.")} />
         ) : missed.length === 0 ? (
-          <Empty title="Every family expected that day was seen"
-            hint={`All ${coverage.expected} of them. Pick another day above to check that one.`} />
+          <Empty title={t("Every family expected that day was seen")}
+            hint={t("All {n} of them. Pick another day above to check that one.",
+              { n: coverage.expected })} />
         ) : (
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>Student</th>
-                  {!centerId && <th>Centre</th>}
-                  <th>Class</th><th>Parents</th><th>Phone</th><th>Last sat down with</th><th></th>
+                  <th>{t("Student")}</th>
+                  {!centerId && <th>{t("Centre")}</th>}
+                  <th>{t("Class")}</th><th>{t("Parents")}</th><th>{t("Phone")}</th><th>{t("Last sat down with")}</th><th></th>
                 </tr>
               </thead>
               <tbody>
@@ -524,7 +548,7 @@ export default async function PtmDashboardPage({
                             <span className="text-[12px] text-[var(--muted)]">
                               {" "}· {r.met_this_session} this session
                             </span></>
-                        : <Badge tone="warn">Never met</Badge>}
+                        : <Badge tone="warn">{t("Never met")}</Badge>}
                     </td>
                     <td className="whitespace-nowrap">
                       <Link href={`/ptm/new?student=${r.student_id}`} className="btn btn-ghost btn-sm">

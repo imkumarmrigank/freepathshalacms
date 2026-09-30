@@ -5,9 +5,11 @@ import { Alert, Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { fmtDate, titleCase } from "@/lib/format";
 import ScheduleForm from "./ScheduleForm";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
+import { getT } from "@/lib/i18n";
 
 export default async function MeetingsPage() {
   const user = await requireFeature("ptm");
+  const t = await getT();
   const [centers, classes, session] = await Promise.all([
     centersForUser(user), listClasses(), currentSession(),
   ]);
@@ -32,22 +34,22 @@ export default async function MeetingsPage() {
 
   return (
     <>
-      <PageHeader title="Scheduled PTMs" subtitle={`Session ${session.name}`}
+      <PageHeader title={t("Scheduled PTMs")} subtitle={`Session ${session.name}`}
         back={{ href: "/ptm", label: "PTM interactions" }} />
 
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <Card pad={false}>
             {meetings.length === 0 ? (
-              <Empty title="No PTMs scheduled"
-                hint="Schedule a PTM day so mentors can log each parent conversation against it." />
+              <Empty title={t("No PTMs scheduled")}
+                hint={t("Schedule a PTM day so mentors can log each parent conversation against it.")} />
             ) : (
               <div className="overflow-x-auto">
                 <table className="tbl">
                   <thead>
-                    <tr><th>Date</th><th>Title</th><th>Class</th>
-                      {!centerId && <th>Centre</th>}
-                      <th>Recorded</th><th>Status</th></tr>
+                    <tr><th>{t("Date")}</th><th>{t("Title")}</th><th>{t("Class")}</th>
+                      {!centerId && <th>{t("Centre")}</th>}
+                      <th>{t("Recorded")}</th><th>{t("Status")}</th></tr>
                   </thead>
                   <tbody>
                     {meetings.map((m) => (
