@@ -1,5 +1,5 @@
 "use client";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { FormMessage } from "@/components/form";
 import type { HolidayRow } from "@/lib/calendar";
 import { useT } from "@/components/LocaleProvider";
@@ -19,6 +19,7 @@ export default function WorkingCentres({ holiday, centres }: {
 }) {
   const t = useT();
   const [openState, open] = useActionState(openCentreOnHoliday, null);
+  const [picked, setPicked] = useState<number[]>([]);
   const [closeState, close] = useActionState(closeCentreOnHoliday, null);
 
   // a holiday posted to one centre has no "other centres" to except
@@ -67,29 +68,58 @@ export default function WorkingCentres({ holiday, centres }: {
       )}
 
       {closed.length > 0 && (
-        <form action={open} className="flex flex-wrap items-end gap-2">
+        <form action={open}>
           <input type="hidden" name="event_id" value={holiday.id} />
-          <label className="min-w-[11rem]">
-            <span className="mb-1 block text-[12px] font-medium text-[var(--muted)]">
-              {t("Centre that is working")}
+
+          <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+            <span className="text-[12px] font-medium text-[var(--muted)]">
+              {t("Centres that are working")}
             </span>
-            <select className="select w-auto" name="center_id" defaultValue="" required>
-              <option value="" disabled>{t("Select centre")}</option>
-              {closed.map((c) => (
-                <option key={c.id} value={c.id}>{c.code} · {c.name}</option>
-              ))}
-            </select>
-          </label>
-          <label className="min-w-[12rem] flex-1">
-            <span className="mb-1 block text-[12px] font-medium text-[var(--muted)]">
-              {t("Why (optional)")}
-            </span>
-            <input className="input" name="reason"
-              placeholder={t("Catching up on missed lessons")} />
-          </label>
-          <button className="btn btn-primary btn-sm mb-[1px] h-[38px]" type="submit">
-            {t("Make it a working day")}
-          </button>
+            <button type="button"
+              onClick={() => setPicked(picked.length === closed.length
+                ? [] : closed.map((c) => c.id))}
+              className="text-[12px] text-[var(--brand)] hover:underline">
+              {picked.length === closed.length ? t("Clear all") : t("Select all")}
+            </button>
+          </div>
+
+          {/* Checkboxes rather than a multi-select: picking four centres out of
+              fourteen should not need a held-down key, least of all on a phone. */}
+          <div className="mb-3 grid gap-x-4 gap-y-1.5 rounded-[9px] border
+            border-[var(--border)] bg-white p-3 sm:grid-cols-2 lg:grid-cols-3">
+            {closed.map((c) => (
+              <label key={c.id} className="flex items-center gap-2 text-[13px]">
+                <input type="checkbox" name="center_id" value={c.id} className="h-4 w-4"
+                  checked={picked.includes(c.id)}
+                  onChange={(e) => setPicked(e.target.checked
+                    ? [...picked, c.id]
+                    : picked.filter((id) => id !== c.id))} />
+                <span className="truncate">
+                  <span className="font-mono text-[11.5px] text-[var(--faint)]">{c.code}</span>
+                  {" "}{c.name}
+                </span>
+              </label>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="min-w-[12rem] flex-1">
+              <span className="mb-1 block text-[12px] font-medium text-[var(--muted)]">
+                {t("Why (optional)")}
+              </span>
+              <input className="input" name="reason"
+                placeholder={t("Catching up on missed lessons")} />
+            </label>
+            <button className="btn btn-primary btn-sm mb-[1px] h-[38px]" type="submit"
+              disabled={picked.length === 0}>
+              {picked.length <= 1
+                ? t("Make it a working day")
+                : t("Make it a working day for {n} centres", { n: picked.length })}
+            </button>
+          </div>
+          <p className="mt-1.5 text-[12px] text-[var(--faint)]">
+            {t("The reason is recorded against every centre you tick.")}
+          </p>
         </form>
       )}
     </>

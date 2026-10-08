@@ -137,10 +137,15 @@ export async function openCentreOnHoliday(_prev: unknown, form: FormData) {
     return { error: "Only a mentor or an administrator can change a holiday." };
 
   const eventId = Number(form.get("event_id"));
-  const centerId = Number(form.get("center_id"));
-  if (!eventId || !centerId) return { error: "Pick a centre." };
-  if (!canTouchCenter(user, centerId))
-    return { error: "That centre is not one of yours." };
+  // One centre or several — a festival the whole district works through is
+  // not eleven separate decisions.
+  const centerIds = [...new Set(form.getAll("center_id")
+    .map((v) => Number(v))
+    .filter((n) => Number.isFinite(n) && n > 0))];
+  if (!eventId || centerIds.length === 0) return { error: "Pick at least one centre." };
+  const notYours = centerIds.filter((id) => !canTouchCenter(user, id));
+  if (notYours.length > 0)
+    return { error: "One of those centres is not yours." };
 
   const event = await one<{ center_id: number | null; affects_attendance: boolean }>(
     "SELECT center_id, affects_attendance FROM calendar_events WHERE id = $1", [eventId]);
@@ -150,13 +155,18 @@ export async function openCentreOnHoliday(_prev: unknown, form: FormData) {
 
   await query(
     `INSERT INTO calendar_event_exceptions (event_id, center_id, reason, created_by)
-     VALUES ($1,$2,$3,$4) ON CONFLICT (event_id, center_id) DO NOTHING`,
-    [eventId, centerId, str(form, "reason"), user.uid]);
+     SELECT $1, c, $3, $4 FROM unnest($2::bigint[]) AS c
+     ON CONFLICT (event_id, center_id) DO NOTHING`,
+    [eventId, centerIds, str(form, "reason"), user.uid]);
 
   revalidatePath("/calendar");
   revalidatePath("/manage/holidays");
   revalidatePath("/attendance");
-  return { ok: "That centre will be working." };
+  return {
+    ok: centerIds.length === 1
+      ? "That centre will be working."
+      : `Those ${centerIds.length} centres will be working.`,
+  };
 }
 
 /** Puts a centre back on the holiday. */

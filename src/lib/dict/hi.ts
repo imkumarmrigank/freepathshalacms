@@ -1244,6 +1244,16 @@ const hi: Record<string, string> = {
     "उस दिन किसी को अनुपस्थित नहीं किया जाता, और रात की प्रक्रिया उस दिन को छोड़ देती है।",
   "Add the holiday":
     "छुट्टी जोड़ें",
+  "Centres that are working":
+    "कार्यरत केंद्र",
+  "Select all":
+    "सभी चुनें",
+  "Clear all":
+    "सभी हटाएँ",
+  "Make it a working day for {n} centres":
+    "{n} केंद्रों के लिए कार्य दिवस बनाएँ",
+  "The reason is recorded against every centre you tick.":
+    "आप जिन-जिन केंद्रों को चुनेंगे, कारण उन सबके साथ दर्ज होगा।",
 };
 
 export default hi;
