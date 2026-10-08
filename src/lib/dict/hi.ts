@@ -1144,6 +1144,106 @@ const hi: Record<string, string> = {
     "बैठकों का {s}",
   "{who} (me)":
     "{who} (मैं)",
+
+  /* --- the holiday list -------------------------------------------------- */
+  "Holidays":
+    "छुट्टियाँ",
+  "The year {y} · every holiday and closure, in date order":
+    "वर्ष {y} · हर छुट्टी और बंदी, तारीख़ के क्रम में",
+  "Holidays listed":
+    "सूचीबद्ध छुट्टियाँ",
+  "Days off":
+    "छुट्टी के दिन",
+  "counting every day of a run":
+    "लगातार दिनों को गिनते हुए",
+  "Still to come":
+    "अभी आनी हैं",
+  "from today":
+    "आज से",
+  "With a centre working":
+    "जिनमें कोई केंद्र खुला",
+  "a centre opens while the rest are shut":
+    "एक केंद्र खुला रहता है, बाक़ी बंद",
+  "No holidays listed for {y}":
+    "{y} के लिए कोई छुट्टी दर्ज नहीं",
+  "Add them with the form beside this, and they apply to every centre unless you name one.":
+    "बग़ल के फ़ॉर्म से जोड़ें; जब तक कोई केंद्र न चुनें, वे हर केंद्र पर लागू होती हैं।",
+  "A holiday closes the register for that day and stops the nightly auto-absent. A centre marked as working keeps its register open.":
+    "छुट्टी उस दिन का रजिस्टर बंद कर देती है और रात की स्वतः-अनुपस्थिति रोक देती है। जो केंद्र कार्यरत दर्ज है, उसका रजिस्टर खुला रहता है।",
+  "A holiday with a centre named beside it was posted for that centre only.":
+    "जिस छुट्टी के साथ केंद्र का नाम है, वह केवल उसी केंद्र के लिए है।",
+  "means the centre is shut for a reason other than a holiday.":
+    "का अर्थ है कि केंद्र छुट्टी के अलावा किसी कारण से बंद है।",
+  "to {d}":
+    "{d} तक",
+  "{n} days":
+    "{n} दिन",
+  "only":
+    "केवल",
+  "every centre":
+    "हर केंद्र",
+  "register stays open":
+    "रजिस्टर खुला रहता है",
+  "{n} centre working":
+    "{n} केंद्र कार्यरत",
+  "{n} centres working":
+    "{n} केंद्र कार्यरत",
+  "Who is working":
+    "कौन कार्यरत है",
+  "Remove {title} from the list":
+    "{title} को सूची से हटाएँ",
+  "Remove":
+    "हटाएँ",
+  "This holiday was posted for one centre only, so there is nothing to lift. Remove it to make that centre work.":
+    "यह छुट्टी केवल एक केंद्र के लिए है, इसलिए हटाने को कुछ नहीं। उस केंद्र को कार्यरत करने के लिए इसे हटा दें।",
+  "Working that day":
+    "उस दिन कार्यरत",
+  "Put back on holiday":
+    "फिर से छुट्टी पर रखें",
+  "Every centre is on holiday that day.":
+    "उस दिन हर केंद्र छुट्टी पर है।",
+  "Centre that is working":
+    "कार्यरत केंद्र",
+  "Why (optional)":
+    "कारण (वैकल्पिक)",
+  "Catching up on missed lessons":
+    "छूटे हुए पाठ पूरे करने के लिए",
+  "Make it a working day":
+    "इसे कार्य दिवस बनाएँ",
+  "Add a holiday":
+    "छुट्टी जोड़ें",
+  "It goes on the calendar for session {s} and closes the register that day.":
+    "यह सत्र {s} के कैलेंडर में जुड़ेगी और उस दिन रजिस्टर बंद कर देगी।",
+  "It goes on the calendar and closes the register that day.":
+    "यह कैलेंडर में जुड़ेगी और उस दिन रजिस्टर बंद कर देगी।",
+  "What is it *":
+    "क्या है *",
+  "Independence Day":
+    "स्वतंत्रता दिवस",
+  "Kind *":
+    "प्रकार *",
+  "Centre closed":
+    "केंद्र बंद",
+  "Applies to":
+    "किस पर लागू",
+  "Leave on every centre and lift it for one afterwards":
+    "हर केंद्र पर रहने दें, बाद में किसी एक के लिए हटा दें",
+  "Date *":
+    "तारीख़ *",
+  "Last day":
+    "आख़िरी दिन",
+  "For a run of days":
+    "लगातार कई दिनों के लिए",
+  "It runs for more than a day":
+    "यह एक से अधिक दिन चलती है",
+  "Note":
+    "टिप्पणी",
+  "Declared by the district administration":
+    "ज़िला प्रशासन द्वारा घोषित",
+  "Nobody is marked absent on the day, and the nightly close-out skips it.":
+    "उस दिन किसी को अनुपस्थित नहीं किया जाता, और रात की प्रक्रिया उस दिन को छोड़ देती है।",
+  "Add the holiday":
+    "छुट्टी जोड़ें",
 };
 
 export default hi;

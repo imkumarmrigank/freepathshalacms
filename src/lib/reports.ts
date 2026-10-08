@@ -108,6 +108,8 @@ export async function runReport(
     case "audit-visits":                 return auditVisitsReport(scoped, period);
     case "audit-suggestions":            return auditSuggestionsReport(scoped, period);
     case "audit-ratings":                return auditRatingsReport(scoped, period);
+    case "age-gender-mix":               return ageGenderMix(scoped);
+    case "absent-with-reason":           return absentWithReason(scoped, period);
     case "audit-reports":                return auditReportsFiled(scoped, period);
     case "sports-visits":                return sportsVisits(scoped, period);
     case "sports-teacher-days":          return sportsTeacherDays(scoped, period);
@@ -2636,5 +2638,136 @@ async function auditReportsFiled(p: ReportParams, period: string): Promise<Repor
       staff: r.staff_present == null ? "" : `${r.staff_present} of ${r.staff_on_roll ?? "—"}`,
       weakest: r.weakest ?? "", suggestions: r.suggestions, summary: r.summary ?? "",
     })),
+  };
+}
+
+/**
+ * The children on the roll by age and by sex.
+ *
+ * Age is taken on the day the report is run, from the date of birth, and
+ * bucketed the way the centres think about children rather than year by year:
+ * under six is pre-school, six to ten is primary, and so on. A child with no
+ * date of birth is counted and said so, because a row that silently drops
+ * children is worse than one that admits to a gap.
+ */
+async function ageGenderMix(p: ReportParams): Promise<ReportResult> {
+  const params: unknown[] = [p.sessionId];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND s.center_id = $${params.length}`; }
+  if (p.classId) { params.push(p.classId); where += ` AND e.class_level_id = $${params.length}`; }
+
+  const rows = await query<ReportRow>(
+    `WITH on_roll AS (
+       SELECT s.id, s.gender, s.dob, ce.name AS center_name,
+              CASE
+                WHEN s.dob IS NULL THEN NULL
+                ELSE date_part('year', age(CURRENT_DATE, s.dob))::int
+              END AS years
+         FROM students s
+         JOIN centers ce ON ce.id = s.center_id
+         JOIN enrollments e ON e.student_id = s.id AND e.session_id = $1
+                           AND e.status = 'active'
+        WHERE s.status = 'active' ${where}
+     ), banded AS (
+       SELECT center_name,
+              CASE
+                WHEN years IS NULL   THEN 'Date of birth not recorded'
+                WHEN years < 6       THEN 'Under 6'
+                WHEN years BETWEEN 6 AND 10  THEN '6 to 10'
+                WHEN years BETWEEN 11 AND 14 THEN '11 to 14'
+                WHEN years BETWEEN 15 AND 18 THEN '15 to 18'
+                ELSE 'Over 18'
+              END AS band,
+              CASE
+                WHEN years IS NULL THEN 9
+                WHEN years < 6 THEN 0
+                WHEN years BETWEEN 6 AND 10 THEN 1
+                WHEN years BETWEEN 11 AND 14 THEN 2
+                WHEN years BETWEEN 15 AND 18 THEN 3
+                ELSE 4
+              END AS seq,
+              lower(COALESCE(gender, '')) AS g,
+              years
+         FROM on_roll
+     )
+     SELECT center_name, band,
+            count(*) FILTER (WHERE g = 'female')::int AS girls,
+            count(*) FILTER (WHERE g = 'male')::int   AS boys,
+            count(*) FILTER (WHERE g NOT IN ('male','female'))::int AS not_recorded,
+            count(*)::int AS children,
+            round(avg(years), 1) AS average_age
+       FROM banded
+      GROUP BY center_name, band, seq
+      ORDER BY center_name, seq`,
+    params,
+  );
+
+  return {
+    title: "Children by age and sex",
+    subtitle: `On the roll today · ${rows.reduce((n, r) => n + Number(r.children), 0)} children`,
+    columns: [
+      { key: "center_name", label: "Centre", width: 18 },
+      { key: "band", label: "Age", width: 22 },
+      { key: "girls", label: "Girls", numeric: true },
+      { key: "boys", label: "Boys", numeric: true },
+      { key: "not_recorded", label: "Sex not recorded", numeric: true, width: 16 },
+      { key: "children", label: "Children", numeric: true },
+      { key: "average_age", label: "Average age", numeric: true, width: 12 },
+    ],
+    rows,
+  };
+}
+
+/**
+ * Every absence in the period with the reason the teacher gave for it.
+ *
+ * One row a child a day, named, so the row can be acted on — the counted
+ * version is the attendance summary. An absence with no reason is listed as
+ * such rather than left out: those are the ones worth chasing.
+ */
+async function absentWithReason(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND a.center_id = $${params.length}`; }
+  if (p.classId) { params.push(p.classId); where += ` AND a.class_level_id = $${params.length}`; }
+
+  const rows = await query<ReportRow>(
+    `SELECT to_char(a.att_date, 'YYYY-MM-DD') AS att_date,
+            ce.name AS center_name,
+            cl.name AS class_name,
+            trim(st.first_name || ' ' || COALESCE(st.last_name, '')) AS student,
+            st.enrollment_no,
+            CASE a.status WHEN 'leave' THEN 'On leave' ELSE 'Absent' END AS marked,
+            COALESCE(a.reason, 'No reason given') AS reason,
+            a.remarks,
+            u.name AS marked_by,
+            st.primary_phone AS phone
+       FROM student_attendance a
+       JOIN students st ON st.id = a.student_id
+       JOIN centers ce ON ce.id = a.center_id
+       LEFT JOIN class_levels cl ON cl.id = a.class_level_id
+       LEFT JOIN users u ON u.id = a.marked_by
+      WHERE a.att_date BETWEEN $1 AND $2
+        AND a.status IN ('absent', 'leave') ${where}
+      ORDER BY a.att_date DESC, ce.code, cl.sequence, st.first_name`,
+    params,
+  );
+
+  return {
+    title: "Absent children, with the reason",
+    subtitle: `${period} · ${rows.length} absence${rows.length === 1 ? "" : "s"}`,
+    columns: [
+      { key: "att_date", label: "Date", width: 12 },
+      { key: "center_name", label: "Centre", width: 16 },
+      { key: "class_name", label: "Class", width: 12 },
+      { key: "student", label: "Child", width: 22 },
+      { key: "enrollment_no", label: "Enrolment no.", width: 16 },
+      { key: "marked", label: "Marked as", width: 10 },
+      { key: "reason", label: "Reason", width: 22 },
+      { key: "remarks", label: "Remarks", width: 28 },
+      { key: "marked_by", label: "Marked by", width: 18 },
+      { key: "phone", label: "Phone", width: 12 },
+    ],
+    rows,
   };
 }

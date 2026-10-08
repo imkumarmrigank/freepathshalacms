@@ -148,6 +148,8 @@ const MENU: Node[] = [
           { href: "/manage/classes", label: "Classes", roles: ["super_admin", "admin"] },
           { href: "/manage/sessions", label: "Sessions", roles: ["super_admin", "admin"] },
           { href: "/manage/working-days", label: "Working days", roles: ["super_admin", "admin"] },
+          { href: "/manage/holidays", label: "Holidays",
+            roles: ["super_admin", "admin", "mentor"] },
           { href: "/manage/syllabus", label: "Syllabus", roles: ["super_admin", "admin"] },
           { href: "/manage/manual", label: "Training manuals", roles: ["super_admin", "admin"] },
         ],

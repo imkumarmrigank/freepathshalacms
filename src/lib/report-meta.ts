@@ -51,6 +51,15 @@ export const REPORTS: ReportMeta[] = [
     roles: ["super_admin", "admin"],
   },
   {
+    key: "age-gender-mix",
+    label: "Children by age and sex",
+    group: "Students",
+    description:
+      "Who is on the roll today, counted by age band and by sex, centre by centre — "
+      + "with the average age, and the children whose date of birth is missing.",
+    filters: ["center", "class", "session"],
+  },
+  {
     key: "suspended-students",
     label: "Suspended students",
     group: "Students",
@@ -95,6 +104,15 @@ export const REPORTS: ReportMeta[] = [
     description:
       "One row per student for the chosen period: days present, absent, late, on leave, and the attendance percentage.",
     filters: ["dates", "center", "class", "session"],
+  },
+  {
+    key: "absent-with-reason",
+    label: "Absent children, with the reason",
+    group: "Attendance",
+    description:
+      "Every absence in the period, child by child and day by day: the reason the "
+      + "teacher chose, their remarks, who marked it, and the family's phone number.",
+    filters: ["dates", "center", "class"],
   },
   {
     key: "student-attendance-register",

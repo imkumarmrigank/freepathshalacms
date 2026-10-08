@@ -97,6 +97,7 @@ export async function saveEvent(_prev: unknown, form: FormData) {
   }
 
   revalidatePath("/calendar");
+  revalidatePath("/manage/holidays");
   revalidatePath("/dashboard");
   return { ok: id ? "Event updated." : "Event added to the calendar." };
 }
@@ -120,6 +121,7 @@ export async function deleteEvent(_prev: unknown, form: FormData) {
 
   await query("DELETE FROM calendar_events WHERE id = $1", [id]);
   revalidatePath("/calendar");
+  revalidatePath("/manage/holidays");
   return { ok: "Event removed." };
 }
 
@@ -152,6 +154,7 @@ export async function openCentreOnHoliday(_prev: unknown, form: FormData) {
     [eventId, centerId, str(form, "reason"), user.uid]);
 
   revalidatePath("/calendar");
+  revalidatePath("/manage/holidays");
   revalidatePath("/attendance");
   return { ok: "That centre will be working." };
 }
@@ -172,6 +175,7 @@ export async function closeCentreOnHoliday(_prev: unknown, form: FormData) {
     [eventId, centerId]);
 
   revalidatePath("/calendar");
+  revalidatePath("/manage/holidays");
   revalidatePath("/attendance");
   return { ok: "That centre is on holiday again." };
 }

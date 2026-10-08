@@ -84,3 +84,54 @@ export async function holidayOn(date: string, centerId: number | null) {
   );
   return rows[0] ?? null;
 }
+
+/**
+ * Every holiday and closure in a period, with the centres that are working
+ * through each one.
+ *
+ * The calendar shows a month at a time, which is the wrong shape for the
+ * question "what are this year's holidays, and who is open on them?". This is
+ * that list: one row a holiday, in date order, whatever month it falls in.
+ */
+export type HolidayRow = {
+  id: number;
+  title: string;
+  event_type: string;
+  center_id: number | null;
+  center_name: string | null;
+  start_date: string;
+  end_date: string;
+  days: number;
+  description: string | null;
+  affects_attendance: boolean;
+  /** Centres recorded as working through it, as an exception. */
+  open_centres: { id: number; code: string; name: string; reason: string | null }[];
+};
+
+export async function holidaysBetween(from: string, to: string, centerId: number | null) {
+  const params: unknown[] = [from, to];
+  let scope = "";
+  if (centerId) {
+    params.push(centerId);
+    scope = ` AND (e.center_id IS NULL OR e.center_id = $${params.length})`;
+  }
+  return query<HolidayRow>(
+    `SELECT e.id, e.title, e.event_type, e.center_id, c.name AS center_name,
+            to_char(e.start_date, 'YYYY-MM-DD') AS start_date,
+            to_char(e.end_date, 'YYYY-MM-DD')   AS end_date,
+            (e.end_date - e.start_date + 1)     AS days,
+            e.description, e.affects_attendance,
+            COALESCE((
+              SELECT json_agg(json_build_object(
+                       'id', ce.id, 'code', ce.code, 'name', ce.name, 'reason', x.reason)
+                     ORDER BY ce.code)
+                FROM calendar_event_exceptions x
+                JOIN centers ce ON ce.id = x.center_id
+               WHERE x.event_id = e.id), '[]') AS open_centres
+       FROM calendar_events e
+       LEFT JOIN centers c ON c.id = e.center_id
+      WHERE e.event_type IN ('holiday', 'closure')
+        AND e.start_date <= $2 AND e.end_date >= $1 ${scope}
+      ORDER BY e.start_date, e.title`,
+    params);
+}
