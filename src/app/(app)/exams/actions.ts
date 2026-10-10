@@ -333,7 +333,7 @@ export async function setExamStatus(_prev: unknown, form: FormData) {
  */
 export async function createMonthlyExams(_prev: unknown, form: FormData) {
   const user = await requireUser();
-  if (!isGlobalRole(user.role)) return { error: "Only administrators can create bulk monthly exams." };
+  if (!isGlobalRole(user.role)) return { error: "Only administrators can create monthly exams." };
 
   const session = await currentSession();
   if (!session) return { error: "No academic session is open." };
@@ -343,11 +343,10 @@ export async function createMonthlyExams(_prev: unknown, form: FormData) {
   if (!title || !examDate) return { error: "Month and date are required." };
   if (!isMonth(title)) return { error: "Choose the month the test is held in." };
 
-  // All active centres
-  const centers = await query<{ id: number }>("SELECT id FROM centers WHERE is_active ORDER BY code");
+  const centers = await query<{ id: number }>(
+    "SELECT id FROM centers WHERE is_active ORDER BY code");
   if (centers.length === 0) return { error: "No active centres found." };
 
-  // Classes in the template (Nursery, KG, Class 1, Class 2, Class 3)
   const classes = await query<{ id: number; name: string }>(
     `SELECT id, name FROM class_levels
       WHERE lower(name) IN ('nursery','kg','class 1','class 2','class 3')
@@ -355,7 +354,6 @@ export async function createMonthlyExams(_prev: unknown, form: FormData) {
   );
   if (classes.length === 0) return { error: "Template classes (Nursery–Class 3) not found." };
 
-  let written = 0;
   try {
     await tx(async (c) => {
       for (const centre of centers) {
@@ -370,7 +368,6 @@ export async function createMonthlyExams(_prev: unknown, form: FormData) {
               [title, paper.subject, centre.id, session.id, cls.id,
                examDate, paper.max, user.uid],
             );
-            written++;
           }
         }
       }
