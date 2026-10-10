@@ -95,23 +95,29 @@ export function isCoScholastic(subject: string) {
 export type MonthlySubject = { subject: string; max: number };
 
 const NUR_KG_SUBJECTS: MonthlySubject[] = [
-  { subject: "English",  max: 20 },
-  { subject: "Hindi",    max: 20 },
-  { subject: "Maths",    max: 20 },
-  { subject: "EVE",      max: 10 },
-  { subject: "GK",       max: 10 },
-  { subject: "Poem",     max: 10 },
-  { subject: "Drawing",  max: 10 },
+  { subject: "English (Written)", max: 10 },
+  { subject: "English (Oral)",    max: 10 },
+  { subject: "Hindi (Written)",   max: 10 },
+  { subject: "Hindi (Oral)",      max: 10 },
+  { subject: "Maths (Written)",   max: 10 },
+  { subject: "Maths (Oral)",      max: 10 },
+  { subject: "EVE",               max: 10 },
+  { subject: "GK",                max: 10 },
+  { subject: "Poem",              max: 10 },
+  { subject: "Drawing",           max: 10 },
 ];
 
 const CLASS_1_3_SUBJECTS: MonthlySubject[] = [
-  { subject: "English",  max: 30 },
-  { subject: "Hindi",    max: 30 },
-  { subject: "Maths",    max: 30 },
-  { subject: "EVE",      max: 20 },
-  { subject: "GK",       max: 20 },
-  { subject: "Poem",     max: 10 },
-  { subject: "Drawing",  max: 10 },
+  { subject: "English (Written)", max: 20 },
+  { subject: "English (Oral)",    max: 10 },
+  { subject: "Hindi (Written)",   max: 20 },
+  { subject: "Hindi (Oral)",      max: 10 },
+  { subject: "Maths (Written)",   max: 20 },
+  { subject: "Maths (Oral)",      max: 10 },
+  { subject: "EVE",               max: 20 },
+  { subject: "GK",                max: 20 },
+  { subject: "Poem",              max: 10 },
+  { subject: "Drawing",           max: 10 },
 ];
 
 /**
