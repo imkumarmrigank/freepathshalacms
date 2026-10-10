@@ -37,6 +37,7 @@ export default async function ReportsPage({
     sessionId: Number(sp.session) || cur?.id || sessions[0]?.id || 0,
     role: sp.role || null,
     groupBy: sp.groupBy || null,
+    enrollmentStatus: sp.enrollmentStatus || null,
   };
 
   let result: ReportResult | null = null;
@@ -56,6 +57,7 @@ export default async function ReportsPage({
     ...(params.centerId ? { center: String(params.centerId) } : {}),
     ...(params.classId ? { class: String(params.classId) } : {}),
     ...(params.role ? { role: params.role } : {}),
+    ...(params.enrollmentStatus ? { enrollmentStatus: params.enrollmentStatus } : {}),
   }).toString();
 
   // The whole report is already in memory; the table shows it a page at a time.

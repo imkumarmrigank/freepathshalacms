@@ -26,6 +26,8 @@ export type ReportParams = {
   role: string | null;
   /** day, week or month — only the running reports read it */
   groupBy?: string | null;
+  /** active / suspended / graduated / null (= all) */
+  enrollmentStatus?: string | null;
 };
 
 const COUNTED = "('present','late','half_day')";   // counts towards attendance
@@ -484,15 +486,18 @@ async function studentAttendanceRegister(p: ReportParams, period: string): Promi
   let where = "";
   if (p.centerId) { params.push(p.centerId); where += ` AND e.center_id = $${params.length}`; }
   if (p.classId) { params.push(p.classId); where += ` AND e.class_level_id = $${params.length}`; }
+  if (p.enrollmentStatus) { params.push(p.enrollmentStatus); where += ` AND e.status = $${params.length}`; }
 
   const rows = await query<{
     student_id: number; enrollment_no: string; student: string;
-    class_name: string; center_name: string; att_date: string | null; status: string | null;
+    class_name: string; center_name: string; enrollment_status: string;
+    att_date: string | null; att_status: string | null;
   }>(
     `SELECT s.id AS student_id, s.enrollment_no,
             trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
             cl.name AS class_name, ce.name AS center_name,
-            a.att_date, a.status
+            e.status AS enrollment_status,
+            a.att_date, a.status AS att_status
        FROM enrollments e
        JOIN students s ON s.id = e.student_id
        JOIN class_levels cl ON cl.id = e.class_level_id
@@ -507,6 +512,9 @@ async function studentAttendanceRegister(p: ReportParams, period: string): Promi
   const CODE: Record<string, string> = {
     present: "P", absent: "A", late: "L", half_day: "H", leave: "Lv", holiday: "—",
   };
+  const STATUS_LABEL: Record<string, string> = {
+    active: "Active", suspended: "Suspended", graduated: "Passed out",
+  };
 
   const byStudent = new Map<number, ReportRow>();
   for (const r of rows) {
@@ -515,11 +523,12 @@ async function studentAttendanceRegister(p: ReportParams, period: string): Promi
       row = {
         enrollment_no: r.enrollment_no, student: r.student,
         class_name: r.class_name, center_name: r.center_name,
+        enrollment_status: STATUS_LABEL[r.enrollment_status] ?? r.enrollment_status,
       };
       for (const d of dates) row[d] = "";
       byStudent.set(r.student_id, row);
     }
-    if (r.att_date && r.status) row[r.att_date.slice(0, 10)] = CODE[r.status] ?? r.status;
+    if (r.att_date && r.att_status) row[r.att_date.slice(0, 10)] = CODE[r.att_status] ?? r.att_status;
   }
 
   return {
@@ -530,6 +539,7 @@ async function studentAttendanceRegister(p: ReportParams, period: string): Promi
       { key: "student", label: "Student", width: 26 },
       { key: "class_name", label: "Class", width: 12 },
       { key: "center_name", label: "Centre", width: 18 },
+      { key: "enrollment_status", label: "Status", width: 12 },
       ...dates.map((d) => ({ key: d, label: d.slice(8) + "/" + d.slice(5, 7), width: 6 })),
     ],
     rows: [...byStudent.values()],

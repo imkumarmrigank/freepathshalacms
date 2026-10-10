@@ -1,7 +1,7 @@
 "use client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toISODate } from "@/lib/format";
-import { useTransition } from "react";
+import { useTransition, useState } from "react";
 import { REPORTS, REPORT_GROUPS, GROUP_BY, type ReportMeta } from "@/lib/report-meta";
 import { Card } from "@/components/ui";
 
@@ -57,6 +57,7 @@ export default function ReportPicker({
   const router = useRouter();
   const params = useSearchParams();
   const [pending, start] = useTransition();
+  const [pickerOpen, setPickerOpen] = useState(!current.report);
 
   const activeKey = current.report ?? available[0]?.key;
   const active = available.find((r) => r.key === activeKey) ?? available[0];
@@ -75,30 +76,42 @@ export default function ReportPicker({
 
   return (
     <div className={pending ? "opacity-60" : ""}>
-      <Card className="mb-4">
-        <div className="mb-3 text-[13px] font-medium text-[var(--muted)]">Choose a report</div>
-        <div className="space-y-3">
-          {REPORT_GROUPS.filter((g) => available.some((r) => r.group === g)).map((group) => (
-            <div key={group}>
-              <div className="label-cap mb-1.5">{group}</div>
-              <div className="flex flex-wrap gap-2">
-                {available.filter((r) => r.group === group).map((r) => (
-                  <button key={r.key} type="button"
-                    onClick={() => push({ report: r.key })}
-                    className={`btn btn-sm ${r.key === active?.key ? "btn-primary" : "btn-ghost"}`}>
-                    {r.label}
-                  </button>
-                ))}
+      {pickerOpen ? (
+        <Card className="mb-4">
+          <div className="mb-3 text-[13px] font-medium text-[var(--muted)]">Choose a report</div>
+          <div className="space-y-3">
+            {REPORT_GROUPS.filter((g) => available.some((r) => r.group === g)).map((group) => (
+              <div key={group}>
+                <div className="label-cap mb-1.5">{group}</div>
+                <div className="flex flex-wrap gap-2">
+                  {available.filter((r) => r.group === group).map((r) => (
+                    <button key={r.key} type="button"
+                      onClick={() => { push({ report: r.key }); setPickerOpen(false); }}
+                      className={`btn btn-sm ${r.key === active?.key ? "btn-primary" : "btn-ghost"}`}>
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+          {active && (
+            <p className="mt-4 border-t border-[var(--border)] pt-3 text-[13px] text-[var(--muted)]">
+              {active.description}
+            </p>
+          )}
+        </Card>
+      ) : (
+        <div className="mb-4 flex items-center gap-3">
+          <button type="button" className="btn btn-ghost btn-sm"
+            onClick={() => setPickerOpen(true)}>
+            ← All reports
+          </button>
+          {active && (
+            <span className="text-[13px] text-[var(--muted)]">{active.label}</span>
+          )}
         </div>
-        {active && (
-          <p className="mt-4 border-t border-[var(--border)] pt-3 text-[13px] text-[var(--muted)]">
-            {active.description}
-          </p>
-        )}
-      </Card>
+      )}
 
       <Card className="mb-4">
         <div className="flex flex-wrap items-end gap-3">
@@ -186,6 +199,19 @@ export default function ReportPicker({
                 <option value="teacher">Teachers only</option>
                 <option value="center_manager">Centre managers only</option>
                 <option value="rider">Riders only</option>
+              </select>
+            </label>
+          )}
+
+          {uses("enrollmentStatus") && (
+            <label>
+              <span className="mb-1.5 block text-[13px] font-medium text-[var(--muted)]">Student status</span>
+              <select className="select w-auto" value={current.enrollmentStatus ?? ""}
+                onChange={(e) => push({ enrollmentStatus: e.target.value })}>
+                <option value="">All students</option>
+                <option value="active">Active only</option>
+                <option value="suspended">Suspended</option>
+                <option value="graduated">Passed out</option>
               </select>
             </label>
           )}

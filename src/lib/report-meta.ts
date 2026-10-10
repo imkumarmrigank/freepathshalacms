@@ -4,7 +4,9 @@ import type { Role } from "./roles";
 export type ReportFilter =
   | "dates" | "center" | "class" | "session" | "role"
   /** Day, week or month — how the rows of a running report are bucketed. */
-  | "groupBy";
+  | "groupBy"
+  /** active / suspended / graduated / all */
+  | "enrollmentStatus";
 
 /** The buckets a cumulative attendance report can be added up over. */
 export const GROUP_BY = [
@@ -120,7 +122,7 @@ export const REPORTS: ReportMeta[] = [
     group: "Attendance",
     description:
       "The day-by-day register — students down the side, dates across the top. Best for a week or a month.",
-    filters: ["dates", "center", "class", "session"],
+    filters: ["dates", "center", "class", "session", "enrollmentStatus"],
   },
   {
     key: "student-attendance-trend",
