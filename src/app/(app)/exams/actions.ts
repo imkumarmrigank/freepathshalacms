@@ -5,7 +5,7 @@ import { requireUser, canTouchCenter, effectiveTeacherIds } from "@/lib/auth";
 import { one, query, tx } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
-import { isMonth, isSettableExamType } from "@/lib/exam-meta";
+import { isMonth, isSettableExamType, monthlySubjectsFor } from "@/lib/exam-meta";
 import { isCentreType } from "@/lib/centre-meta";
 
 const str = (f: FormData, k: string) => {
@@ -324,6 +324,63 @@ export async function setExamStatus(_prev: unknown, form: FormData) {
   await query("UPDATE exams SET status = $2 WHERE id = $1", [examId, status]);
   revalidatePath(`/exams/${examId}`);
   return { ok: status === "published" ? "Results published." : "Reopened for editing." };
+}
+
+/**
+ * Creates the standard monthly exam set for Nursery, KG and Class 1–3 across
+ * every active centre in one click. The subjects and marks come from the
+ * monthly template in exam-meta.ts. Only super_admin / admin may call this.
+ */
+export async function createMonthlyExams(_prev: unknown, form: FormData) {
+  const user = await requireUser();
+  if (!isGlobalRole(user.role)) return { error: "Only administrators can create bulk monthly exams." };
+
+  const session = await currentSession();
+  if (!session) return { error: "No academic session is open." };
+
+  const title = str(form, "title");
+  const examDate = str(form, "exam_date");
+  if (!title || !examDate) return { error: "Month and date are required." };
+  if (!isMonth(title)) return { error: "Choose the month the test is held in." };
+
+  // All active centres
+  const centers = await query<{ id: number }>("SELECT id FROM centers WHERE is_active ORDER BY code");
+  if (centers.length === 0) return { error: "No active centres found." };
+
+  // Classes in the template (Nursery, KG, Class 1, Class 2, Class 3)
+  const classes = await query<{ id: number; name: string }>(
+    `SELECT id, name FROM class_levels
+      WHERE lower(name) IN ('nursery','kg','class 1','class 2','class 3')
+      ORDER BY sequence`,
+  );
+  if (classes.length === 0) return { error: "Template classes (Nursery–Class 3) not found." };
+
+  let written = 0;
+  try {
+    await tx(async (c) => {
+      for (const centre of centers) {
+        for (const cls of classes) {
+          const subjects = monthlySubjectsFor(cls.name);
+          if (!subjects) continue;
+          for (const paper of subjects) {
+            await c.query(
+              `INSERT INTO exams (title, exam_type, subject, center_id, session_id,
+                  class_level_id, exam_date, max_marks, pass_marks, term_label, created_by)
+               VALUES ($1,'monthly',$2,$3,$4,$5,$6,$7,NULL,$1,$8)`,
+              [title, paper.subject, centre.id, session.id, cls.id,
+               examDate, paper.max, user.uid],
+            );
+            written++;
+          }
+        }
+      }
+    });
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not create the exams." };
+  }
+
+  revalidatePath("/exams");
+  redirect(`/exams?type=monthly`);
 }
 
 export async function deleteExam(_prev: unknown, form: FormData) {

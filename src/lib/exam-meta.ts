@@ -87,6 +87,48 @@ export function isCoScholastic(subject: string) {
 }
 
 /**
+ * Standard monthly exam template from the centre's paper pattern.
+ * Nursery & KG: 7 subjects totalling 100 marks.
+ * Class 1–3: 7 subjects totalling 150 marks.
+ * Keyed by class_level name (lowercase, trimmed).
+ */
+export type MonthlySubject = { subject: string; max: number };
+
+const NUR_KG_SUBJECTS: MonthlySubject[] = [
+  { subject: "English",  max: 20 },
+  { subject: "Hindi",    max: 20 },
+  { subject: "Maths",    max: 20 },
+  { subject: "EVE",      max: 10 },
+  { subject: "GK",       max: 10 },
+  { subject: "Poem",     max: 10 },
+  { subject: "Drawing",  max: 10 },
+];
+
+const CLASS_1_3_SUBJECTS: MonthlySubject[] = [
+  { subject: "English",  max: 30 },
+  { subject: "Hindi",    max: 30 },
+  { subject: "Maths",    max: 30 },
+  { subject: "EVE",      max: 20 },
+  { subject: "GK",       max: 20 },
+  { subject: "Poem",     max: 10 },
+  { subject: "Drawing",  max: 10 },
+];
+
+/**
+ * Returns the subject template for a class, or null if this class is not part
+ * of the monthly exam template (Class 4 and above are not included).
+ */
+export function monthlySubjectsFor(className: string): MonthlySubject[] | null {
+  const n = className.trim().toLowerCase();
+  if (n === "nursery" || n === "nur" || n === "kg") return NUR_KG_SUBJECTS;
+  if (n === "class 1" || n === "class 2" || n === "class 3") return CLASS_1_3_SUBJECTS;
+  return null;
+}
+
+/** The class names covered by the monthly template. */
+export const MONTHLY_TEMPLATE_CLASSES = ["Nursery", "KG", "Class 1", "Class 2", "Class 3"];
+
+/**
  * Behaviour is often written as a word rather than a number — "Good", "G",
  * "Excellent". Where a centre grades it, show the grade; where a centre scores
  * it, show the score out of its maximum.
