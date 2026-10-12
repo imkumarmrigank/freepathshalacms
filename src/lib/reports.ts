@@ -796,7 +796,11 @@ async function studentRoster(p: ReportParams): Promise<ReportResult> {
   const rows = await query<ReportRow>(
     `SELECT s.enrollment_no, trim(s.first_name || ' ' || COALESCE(s.last_name,'')) AS student,
             cl.name AS class_name, e.section, e.roll_no, ce.name AS center_name,
-            s.gender, s.dob::text AS dob, s.father_name, s.mother_name, s.primary_phone,
+            s.gender, s.dob::text AS dob,
+            CASE WHEN s.dob IS NOT NULL
+                 THEN date_part('year', age(s.dob))::int::text END AS age,
+            s.father_name, s.mother_name, s.primary_phone, s.alt_phone,
+            s.address,
             s.admission_date::text AS admission_date, e.source, s.status,
             (SELECT round(100.0 * count(*) FILTER (WHERE a.status IN ${COUNTED})
                     / NULLIF(count(*) FILTER (WHERE a.${MARKED}), 0), 1)
@@ -825,6 +829,9 @@ async function studentRoster(p: ReportParams): Promise<ReportResult> {
       { key: "father_name", label: "Father", width: 22 },
       { key: "mother_name", label: "Mother", width: 22 },
       { key: "primary_phone", label: "Phone", width: 14 },
+      { key: "alt_phone", label: "Alternate No", width: 14 },
+      { key: "age", label: "Age", numeric: true, width: 6 },
+      { key: "address", label: "Address", width: 30 },
       { key: "admission_date", label: "Admitted", width: 13 },
       { key: "source", label: "Admission type", width: 16 },
       { key: "status", label: "Status", width: 12 },
