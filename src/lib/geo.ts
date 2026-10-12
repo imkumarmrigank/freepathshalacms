@@ -16,16 +16,19 @@
 export const BY_HAND_FROM_M = 100;
 
 /**
- * And how far away it stops being offered at all. Past a kilometre nobody is
- * "just outside the centre": they are at home, in the market, in another
- * town. A day's work away from the centre is for the office to enter, with a
- * reason, not for the phone to assert.
+ * Past 500 m the punch is blocked entirely. 100–500 m is genuine edge-case
+ * territory (standing just outside the gate, at a nearby field); 500 m+ is
+ * home, market, or another town. A day that far away is for the centre
+ * manager to enter, with a reason, not for the phone to assert.
  */
-export const BY_HAND_UPTO_M = 1000;
+export const BY_HAND_UPTO_M = 500;
 
 export const GEOFENCE_MIN_M = 20;
-export const GEOFENCE_MAX_M = 70;
-export const GEOFENCE_DEFAULT_M = 70;
+export const GEOFENCE_MAX_M = 100;
+export const GEOFENCE_DEFAULT_M = 100;
+
+/** GPS fix is considered good enough to submit at this accuracy or better. */
+export const GPS_ACCURACY_THRESHOLD_M = 60;
 
 /** Great-circle distance in metres between two WGS-84 points. */
 export function haversineMeters(

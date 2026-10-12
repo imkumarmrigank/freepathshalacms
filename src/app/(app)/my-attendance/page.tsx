@@ -74,6 +74,8 @@ export default async function MyAttendancePage() {
         centerName={center?.name ?? "your centre"}
         radius={center?.geofence_radius_m ?? GEOFENCE_DEFAULT_M}
         hasCoords={center?.latitude != null && center?.longitude != null}
+        centerLat={center?.latitude ?? null}
+        centerLng={center?.longitude ?? null}
       />
 
       <div className="mt-5 grid gap-4 sm:grid-cols-3">
