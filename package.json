@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "rm -rf .next && next build",
+    "build": "rm -rf .next && NEXT_DISABLE_TURBOPACK=1 next build",
     "start": "next start",
     "lint": "eslint",
     "migrate": "node scripts/migrate.mjs",
