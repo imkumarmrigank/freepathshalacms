@@ -67,7 +67,7 @@ export async function unitsFor(
       COALESCE(p.status, 'not_started')                             AS status,
       p.completed_on::text                                          AS completed_on,
       p.remarks,
-      mu.first_name || COALESCE(' ' || mu.last_name, '')            AS marked_by_name,
+      mu.name                                                        AS marked_by_name,
       COUNT(DISTINCT i.id)                                          AS items,
       COUNT(DISTINCT t.item_id)                                     AS ticked
     FROM syllabus_units u
@@ -81,7 +81,7 @@ export async function unitsFor(
     WHERE u.session_id = $1
       AND u.class_level_id = $2
       AND ($4::text IS NULL OR u.subject = $4)
-    GROUP BY u.id, cl.name, p.status, p.completed_on, p.remarks, mu.first_name, mu.last_name
+    GROUP BY u.id, cl.name, p.status, p.completed_on, p.remarks, mu.name
     ORDER BY u.subject, u.month_no
   `, [sessionId, classId, centerId, subject]);
 }
@@ -96,7 +96,7 @@ export async function unitById(unitId: number, centerId: number | null): Promise
       COALESCE(p.status, 'not_started')                             AS status,
       p.completed_on::text                                          AS completed_on,
       p.remarks,
-      mu.first_name || COALESCE(' ' || mu.last_name, '')            AS marked_by_name,
+      mu.name                                                        AS marked_by_name,
       COUNT(DISTINCT i.id)                                          AS items,
       COUNT(DISTINCT t.item_id)                                     AS ticked
     FROM syllabus_units u
@@ -108,7 +108,7 @@ export async function unitById(unitId: number, centerId: number | null): Promise
       ON p.unit_id = u.id AND ($2::int IS NULL OR p.center_id = $2)
     LEFT JOIN users mu ON mu.id = p.marked_by
     WHERE u.id = $1
-    GROUP BY u.id, cl.name, p.status, p.completed_on, p.remarks, mu.first_name, mu.last_name
+    GROUP BY u.id, cl.name, p.status, p.completed_on, p.remarks, mu.name
   `, [unitId, centerId]);
 }
 
@@ -136,7 +136,7 @@ export async function progressFor(unitId: number, centerId: number) {
     marked_by_name: string | null;
   }>(`
     SELECT p.status, p.completed_on::text, p.remarks,
-      u.first_name || COALESCE(' ' || u.last_name, '') AS marked_by_name
+      u.name AS marked_by_name
     FROM syllabus_progress p
     LEFT JOIN users u ON u.id = p.marked_by
     WHERE p.unit_id = $1 AND p.center_id = $2
