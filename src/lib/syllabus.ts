@@ -25,6 +25,7 @@ export type Item = {
   id: number;
   unit_id: number;
   position: number;
+  week_no: number;
   text: string;
   /** only when centerId supplied */
   done: boolean;
@@ -116,15 +117,28 @@ export async function unitById(unitId: number, centerId: number | null): Promise
 export async function itemsFor(unitId: number, centerId: number | null): Promise<Item[]> {
   return query<Item>(`
     SELECT
-      i.id, i.unit_id, i.position, i.text,
+      i.id, i.unit_id, i.position, i.week_no, i.text,
       (t.item_id IS NOT NULL) AS done,
       t.done_on::text         AS done_on
     FROM syllabus_items i
     LEFT JOIN syllabus_item_ticks t
       ON t.item_id = i.id AND ($2::int IS NULL OR t.center_id = $2)
     WHERE i.unit_id = $1
-    ORDER BY i.position, i.id
+    ORDER BY i.week_no, i.position, i.id
   `, [unitId, centerId]);
+}
+
+/** Per-week remarks for a unit at a centre. */
+export async function weekProgressFor(unitId: number, centerId: number) {
+  return query<{ week_no: number; remarks: string | null; marked_by_name: string | null }>(
+    `SELECT w.week_no, w.remarks,
+       u.name AS marked_by_name
+     FROM syllabus_week_progress w
+     LEFT JOIN users u ON u.id = w.marked_by
+     WHERE w.unit_id = $1 AND w.center_id = $2
+     ORDER BY w.week_no`,
+    [unitId, centerId],
+  );
 }
 
 /** Progress for one unit at one centre — returns a single row or null. */

@@ -79,6 +79,30 @@ export async function markMonth(_prev: unknown, form: FormData) {
   return { ok: status === "completed" ? "Marked complete." : "Saved." };
 }
 
+/** Save week-level remarks for a teacher's centre. */
+export async function saveWeekRemarks(_prev: unknown, form: FormData) {
+  const user = await requireUser();
+  if (!canMarkSyllabus(user.role) && !canEditSyllabus(user.role))
+    return { error: "Only the centre's own staff record progress." };
+
+  const unitId = Number(form.get("unit_id"));
+  const weekNo = Number(form.get("week_no"));
+  const centerId = await centreFor(form, user);
+  if (!unitId || !weekNo || !centerId) return { error: "Missing unit, week or centre." };
+
+  await query(
+    `INSERT INTO syllabus_week_progress
+       (unit_id, center_id, week_no, remarks, marked_by, updated_at)
+     VALUES ($1,$2,$3,$4,$5,now())
+     ON CONFLICT (unit_id, center_id, week_no) DO UPDATE
+       SET remarks = EXCLUDED.remarks, marked_by = EXCLUDED.marked_by, updated_at = now()`,
+    [unitId, centerId, weekNo, str(form, "remarks"), user.uid]);
+
+  revalidatePath("/teaching-plans");
+  revalidatePath(`/syllabus/${unitId}`);
+  return { ok: "Saved." };
+}
+
 /* --------------------------------------------------- setting the syllabus */
 
 export async function saveUnit(_prev: unknown, form: FormData) {
