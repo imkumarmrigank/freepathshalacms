@@ -19,7 +19,7 @@ export default async function SyllabusUnitPage({
   const { id } = await params;
   const sp = await searchParams;
 
-  const unit = await unitById(Number(id));
+  const unit = await unitById(Number(id), null);
   if (!unit) notFound();
 
   // an administrator may look at any centre; everyone else sees their own
