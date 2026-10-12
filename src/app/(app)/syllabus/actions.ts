@@ -46,6 +46,7 @@ export async function tickItem(_prev: unknown, form: FormData) {
   const unit = await one<{ unit_id: number }>(
     "SELECT unit_id FROM syllabus_items WHERE id = $1", [itemId]);
   if (unit) revalidatePath(`/syllabus/${unit.unit_id}`);
+  revalidatePath("/teaching-plans");
   return { ok: "Saved." };
 }
 

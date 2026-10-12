@@ -7,9 +7,9 @@ import Filters from "@/components/Filters";
 import Pager from "@/components/Pager";
 import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
 import { fmtDate } from "@/lib/format";
-import NewPlanForm from "./NewPlanForm";
-import { PLAN_LEAD_DAYS } from "@/lib/plan-meta";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
+import { itemsFor, progressFor } from "@/lib/syllabus";
+import MonthWork from "@/app/(app)/syllabus/[id]/MonthWork";
 
 export default async function TeachingPlansPage({
   searchParams,
@@ -57,21 +57,45 @@ export default async function TeachingPlansPage({
   const totalPlans = totalOf(plans);
   const planWin = pageWindow(pg, plans.length, totalPlans);
 
-  // A teacher can only plan for classes they hold this session.
-  const myClasses = isTeaching(user.role)
-    ? await query<{ id: number; name: string }>(
-        `SELECT cl.id, cl.name FROM teacher_classes tc
-           JOIN class_levels cl ON cl.id = tc.class_level_id
-          WHERE tc.user_id = ANY($1::bigint[]) AND tc.session_id = $2 ORDER BY cl.sequence`,
-        [effectiveTeacherIds(user), session.id])
-    : classes;
+  // For teachers: find the first non-completed month per (class × subject) at their centre.
+  type ActiveUnit = {
+    id: number; subject: string; month_no: number; heading: string | null;
+    class_name: string; class_level_id: number; status: string;
+  };
+  let syllabusSection: { unit: ActiveUnit; items: Awaited<ReturnType<typeof itemsFor>>; progress: Awaited<ReturnType<typeof progressFor>> }[] = [];
 
-  const teachers = !isTeaching(user.role)
-    ? await query<{ id: number; name: string }>(
-        `SELECT id, name FROM users WHERE role = 'teacher' AND is_active AND NOT is_test
-          ${centerId ? "AND center_id = $1" : ""} ORDER BY name`,
-        centerId ? [centerId] : [])
-    : [];
+  if (isTeaching(user.role) && user.centerId) {
+    const teacherClassIds = await query<{ id: number }>(
+      `SELECT DISTINCT cl.id FROM teacher_classes tc
+         JOIN class_levels cl ON cl.id = tc.class_level_id
+        WHERE tc.user_id = ANY($1::bigint[]) AND tc.session_id = $2`,
+      [effectiveTeacherIds(user), session.id],
+    );
+    const classIds = teacherClassIds.map((r) => r.id);
+
+    if (classIds.length > 0) {
+      const activeUnits = await query<ActiveUnit>(`
+        SELECT DISTINCT ON (u.class_level_id, u.subject)
+          u.id, u.subject, u.month_no, u.heading,
+          cl.name AS class_name, u.class_level_id,
+          COALESCE(p.status, 'not_started') AS status
+        FROM syllabus_units u
+        JOIN class_levels cl ON cl.id = u.class_level_id
+        LEFT JOIN syllabus_progress p ON p.unit_id = u.id AND p.center_id = $1
+        WHERE u.session_id = $2 AND u.class_level_id = ANY($3::int[])
+          AND COALESCE(p.status, 'not_started') <> 'completed'
+        ORDER BY u.class_level_id, u.subject, u.month_no
+      `, [user.centerId, session.id, classIds]);
+
+      syllabusSection = await Promise.all(
+        activeUnits.map(async (u) => ({
+          unit: u,
+          items: await itemsFor(u.id, user.centerId!),
+          progress: await progressFor(u.id, user.centerId!),
+        })),
+      );
+    }
+  }
 
   return (
     <>
@@ -80,6 +104,53 @@ export default async function TeachingPlansPage({
           ? `Your plans for session ${session.name}`
           : `Plans across ${centerId ? user.centerName ?? "this centre" : "all centres"} · ${session.name}`} />
 
+      {/* ── current syllabus for teachers ── */}
+      {syllabusSection.length > 0 && (
+        <section className="mt-4 space-y-5">
+          <h2 className="text-[15px] font-semibold">Current syllabus</h2>
+          {syllabusSection.map(({ unit, items, progress }) => (
+            <div key={unit.id}>
+              <div className="mb-1 flex flex-wrap items-center gap-2">
+                <span className="text-[13px] font-semibold text-[var(--brand)]">
+                  Month {unit.month_no}
+                </span>
+                <span className="text-[14px] font-medium">{unit.subject}</span>
+                <span className="text-[13px] text-[var(--muted)]">{unit.class_name}</span>
+                {unit.heading && (
+                  <span className="text-[12.5px] text-[var(--muted)]">· {unit.heading}</span>
+                )}
+                <Link href={`/syllabus/${unit.id}?center=${user.centerId}`}
+                  className="ml-auto text-[12px] text-[var(--brand)] underline-offset-2 hover:underline">
+                  Full month view
+                </Link>
+              </div>
+              {items.length === 0 ? (
+                <Card><p className="text-[13px] text-[var(--muted)]">No items added for this month yet.</p></Card>
+              ) : (
+                <MonthWork
+                  unitId={unit.id}
+                  centerId={user.centerId!}
+                  items={items}
+                  mayMark={true}
+                  status={progress?.status ?? "not_started"}
+                  remarks={progress?.remarks ?? null}
+                  completedOn={progress?.completed_on ?? null}
+                />
+              )}
+            </div>
+          ))}
+        </section>
+      )}
+
+      {isTeaching(user.role) && syllabusSection.length === 0 && user.centerId && (
+        <div className="mt-4">
+          <Alert kind="info">
+            No syllabus has been set for your class yet. The administrator will add it shortly.
+          </Alert>
+        </div>
+      )}
+
+      {/* ── teaching plans list ── */}
       <Filters
         centers={isGlobalRole(user.role) ? centers : []}
         classes={classes}
@@ -90,73 +161,58 @@ export default async function TeachingPlansPage({
         ] }]}
       />
 
-      <div className="mt-4 grid gap-5 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <Card pad={false}>
-            {plans.length === 0 ? (
-              <Empty title="No teaching plans yet"
-                hint={isTeaching(user.role) && myClasses.length === 0
-                  ? "You have not been allotted a class yet. Ask your centre manager."
-                  : "Create a plan, list the topics, and tick them off as you teach them."} />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="tbl">
-                  <thead>
-                    <tr><th>Plan</th><th>Class</th><th>Teacher</th><th>Status</th><th>Progress</th><th>Window</th></tr>
-                  </thead>
-                  <tbody>
-                    {plans.map((p) => {
-                      const total = Number(p.total);
-                      const pct = total ? (Number(p.done) / total) * 100 : 0;
-                      return (
-                        <tr key={p.id}>
-                          <td>
-                            <Link href={`/teaching-plans/${p.id}`}
-                              className="font-medium hover:text-[var(--brand)]">{p.title}</Link>
-                            <div className="text-[12px] text-[var(--muted)]">{p.subject ?? "—"}</div>
-                          </td>
-                          <td className="text-[var(--muted)]">{p.class_name}</td>
-                          <td className="text-[var(--muted)]">{p.teacher}</td>
-                          <td>
-                            {p.status === "draft"
-                              ? <Badge tone="warn">Draft</Badge>
-                              : <Badge tone="ok">Submitted</Badge>}
-                          </td>
-                          <td>
-                            {total === 0
-                              ? <Badge tone="mute">No topics</Badge>
-                              : <div className="flex items-center gap-2">
-                                  <Meter value={pct} />
-                                  <span className="whitespace-nowrap text-[12px] text-[var(--muted)]">
-                                    {p.done}/{p.total}
-                                  </span>
-                                </div>}
-                          </td>
-                          <td className="whitespace-nowrap text-[13px] text-[var(--muted)]">
-                            {p.starts_on ? fmtDate(p.starts_on) : "—"}
-                            {p.ends_on ? ` – ${fmtDate(p.ends_on)}` : ""}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            <Pager page={pg.page} pages={planWin.pages} first={planWin.first}
-              last={planWin.last} total={totalPlans} unit="plan" />
-          </Card>
-        </div>
-
-        <NewPlanForm
-          leadDays={PLAN_LEAD_DAYS}
-          classes={myClasses}
-          teachers={teachers}
-          centers={centers}
-          isTeacher={isTeaching(user.role)}
-          isAdmin={isGlobalRole(user.role)}
-        />
-      </div>
+      <Card className="mt-4" pad={false}>
+        {plans.length === 0 ? (
+          <Empty title="No teaching plans yet"
+            hint="Teaching plans are filled in by teachers separately from the syllabus." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="tbl">
+              <thead>
+                <tr><th>Plan</th><th>Class</th><th>Teacher</th><th>Status</th><th>Progress</th><th>Window</th></tr>
+              </thead>
+              <tbody>
+                {plans.map((p) => {
+                  const total = Number(p.total);
+                  const pct = total ? (Number(p.done) / total) * 100 : 0;
+                  return (
+                    <tr key={p.id}>
+                      <td>
+                        <Link href={`/teaching-plans/${p.id}`}
+                          className="font-medium hover:text-[var(--brand)]">{p.title}</Link>
+                        <div className="text-[12px] text-[var(--muted)]">{p.subject ?? "—"}</div>
+                      </td>
+                      <td className="text-[var(--muted)]">{p.class_name}</td>
+                      <td className="text-[var(--muted)]">{p.teacher}</td>
+                      <td>
+                        {p.status === "draft"
+                          ? <Badge tone="warn">Draft</Badge>
+                          : <Badge tone="ok">Submitted</Badge>}
+                      </td>
+                      <td>
+                        {total === 0
+                          ? <Badge tone="mute">No topics</Badge>
+                          : <div className="flex items-center gap-2">
+                              <Meter value={pct} />
+                              <span className="whitespace-nowrap text-[12px] text-[var(--muted)]">
+                                {p.done}/{p.total}
+                              </span>
+                            </div>}
+                      </td>
+                      <td className="whitespace-nowrap text-[13px] text-[var(--muted)]">
+                        {p.starts_on ? fmtDate(p.starts_on) : "—"}
+                        {p.ends_on ? ` – ${fmtDate(p.ends_on)}` : ""}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <Pager page={pg.page} pages={planWin.pages} first={planWin.first}
+          last={planWin.last} total={totalPlans} unit="plan" />
+      </Card>
     </>
   );
 }
