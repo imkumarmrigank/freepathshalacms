@@ -8,6 +8,7 @@ import { fmtDate } from "@/lib/format";
 import { EXAM_TYPE_LABEL, EXAM_TYPES } from "@/lib/exam-meta";
 import NewExamForm from "./NewExamForm";
 import MonthlyExamForm from "./MonthlyExamForm";
+import PromotionalExamForm from "./PromotionalExamForm";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
 import Pager from "@/components/Pager";
 import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
@@ -199,6 +200,9 @@ export default async function ExamsPage({
         <div className="flex flex-col gap-5">
           {isGlobalRole(user.role) && (
             <MonthlyExamForm centerCount={centers.length} />
+          )}
+          {isGlobalRole(user.role) && (
+            <PromotionalExamForm centerCount={centers.length} />
           )}
           <NewExamForm classes={myClasses} centers={centers}
             isAdmin={isGlobalRole(user.role)} isTeacher={isTeaching(user.role)} />

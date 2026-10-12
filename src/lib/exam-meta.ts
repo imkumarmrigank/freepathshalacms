@@ -87,52 +87,93 @@ export function isCoScholastic(subject: string) {
 }
 
 /**
- * Standard monthly exam template from the centre's paper pattern.
- * Nursery & KG: 7 subjects totalling 100 marks.
- * Class 1–3: 7 subjects totalling 150 marks.
+ * Standard exam templates from the centre's paper patterns.
  * Keyed by class_level name (lowercase, trimmed).
  */
-export type MonthlySubject = { subject: string; max: number };
+export type ExamSubject = { subject: string; max: number };
 
-const NUR_KG_SUBJECTS: MonthlySubject[] = [
-  { subject: "English (Written)", max: 10 },
-  { subject: "English (Oral)",    max: 10 },
-  { subject: "Hindi (Written)",   max: 10 },
-  { subject: "Hindi (Oral)",      max: 10 },
-  { subject: "Maths (Written)",   max: 10 },
-  { subject: "Maths (Oral)",      max: 10 },
-  { subject: "EVE",               max: 10 },
-  { subject: "GK",                max: 10 },
-  { subject: "Poem",              max: 10 },
-  { subject: "Drawing",           max: 10 },
+// ── Monthly ──────────────────────────────────────────────────────────────────
+// Nursery & KG: Written+Oral 10+10 each for English/Hindi/Maths → total 100
+// Class 1–4:  Written+Oral 20+10 each for English/Hindi/Maths → total 150
+
+const MONTHLY_NUR_KG: ExamSubject[] = [
+  { subject: "Hindi (Written)",    max: 10 },
+  { subject: "Hindi (Oral)",       max: 10 },
+  { subject: "English (Written)",  max: 10 },
+  { subject: "English (Oral)",     max: 10 },
+  { subject: "Maths (Written)",    max: 10 },
+  { subject: "Maths (Oral)",       max: 10 },
+  { subject: "EVS",                max: 10 },
+  { subject: "GK",                 max: 10 },
+  { subject: "Drawing",            max: 10 },
+  { subject: "Poem",               max: 10 },
 ];
 
-const CLASS_1_3_SUBJECTS: MonthlySubject[] = [
-  { subject: "English (Written)", max: 20 },
-  { subject: "English (Oral)",    max: 10 },
-  { subject: "Hindi (Written)",   max: 20 },
-  { subject: "Hindi (Oral)",      max: 10 },
-  { subject: "Maths (Written)",   max: 20 },
-  { subject: "Maths (Oral)",      max: 10 },
-  { subject: "EVE",               max: 20 },
-  { subject: "GK",                max: 20 },
-  { subject: "Poem",              max: 10 },
-  { subject: "Drawing",           max: 10 },
+const MONTHLY_CLASS_1_4: ExamSubject[] = [
+  { subject: "Hindi (Written)",    max: 20 },
+  { subject: "Hindi (Oral)",       max: 10 },
+  { subject: "English (Written)",  max: 20 },
+  { subject: "English (Oral)",     max: 10 },
+  { subject: "Maths (Written)",    max: 20 },
+  { subject: "Maths (Oral)",       max: 10 },
+  { subject: "EVS",                max: 20 },
+  { subject: "GK",                 max: 20 },
+  { subject: "Drawing",            max: 10 },
+  { subject: "Poem",               max: 10 },
 ];
 
-/**
- * Returns the subject template for a class, or null if this class is not part
- * of the monthly exam template (Class 4 and above are not included).
- */
-export function monthlySubjectsFor(className: string): MonthlySubject[] | null {
+export function monthlySubjectsFor(className: string): ExamSubject[] | null {
   const n = className.trim().toLowerCase();
-  if (n === "nursery" || n === "nur" || n === "kg") return NUR_KG_SUBJECTS;
-  if (n === "class 1" || n === "class 2" || n === "class 3") return CLASS_1_3_SUBJECTS;
+  if (n === "nursery" || n === "nur" || n === "kg") return MONTHLY_NUR_KG;
+  if (n === "class 1" || n === "class 2" || n === "class 3" || n === "class 4")
+    return MONTHLY_CLASS_1_4;
   return null;
 }
 
-/** The class names covered by the monthly template. */
-export const MONTHLY_TEMPLATE_CLASSES = ["Nursery", "KG", "Class 1", "Class 2", "Class 3"];
+export const MONTHLY_TEMPLATE_CLASSES = ["Nursery", "KG", "Class 1", "Class 2", "Class 3", "Class 4"];
+
+// ── Promotional (Final) ───────────────────────────────────────────────────────
+// Nursery & KG: Written+Oral 40+10 for English/Hindi/Maths → total 190
+// Class 1–4:  Written+Oral 50+10 for English/Hindi/Maths → total 260
+
+const PROMO_NUR_KG: ExamSubject[] = [
+  { subject: "Hindi (Written)",    max: 40 },
+  { subject: "Hindi (Oral)",       max: 10 },
+  { subject: "English (Written)",  max: 40 },
+  { subject: "English (Oral)",     max: 10 },
+  { subject: "Maths (Written)",    max: 40 },
+  { subject: "Maths (Oral)",       max: 10 },
+  { subject: "EVS",                max: 10 },
+  { subject: "GK",                 max: 10 },
+  { subject: "Drawing",            max: 10 },
+  { subject: "Poem",               max: 10 },
+];
+
+const PROMO_CLASS_1_4: ExamSubject[] = [
+  { subject: "Hindi (Written)",    max: 50 },
+  { subject: "Hindi (Oral)",       max: 10 },
+  { subject: "English (Written)",  max: 50 },
+  { subject: "English (Oral)",     max: 10 },
+  { subject: "Maths (Written)",    max: 50 },
+  { subject: "Maths (Oral)",       max: 10 },
+  { subject: "EVS",                max: 20 },
+  { subject: "GK",                 max: 20 },
+  { subject: "Drawing",            max: 20 },
+  { subject: "Poem",               max: 20 },
+];
+
+export function promotionalSubjectsFor(className: string): ExamSubject[] | null {
+  const n = className.trim().toLowerCase();
+  if (n === "nursery" || n === "nur" || n === "kg") return PROMO_NUR_KG;
+  if (n === "class 1" || n === "class 2" || n === "class 3" || n === "class 4")
+    return PROMO_CLASS_1_4;
+  return null;
+}
+
+export const PROMOTIONAL_TEMPLATE_CLASSES = ["Nursery", "KG", "Class 1", "Class 2", "Class 3", "Class 4"];
+
+/** @deprecated Use ExamSubject */
+export type MonthlySubject = ExamSubject;
 
 /**
  * Behaviour is often written as a word rather than a number — "Good", "G",

@@ -13,8 +13,8 @@ export default function MonthlyExamForm({
 }) {
   const [state, action] = useActionState(createMonthlyExams, null);
 
-  // 5 classes × 10 papers × all centres
-  const totalSheets = 5 * 10 * centerCount;
+  // 6 classes × 10 papers × all centres
+  const totalSheets = 6 * 10 * centerCount;
 
   return (
     <Card>
@@ -36,16 +36,16 @@ export default function MonthlyExamForm({
             <span className="font-medium text-[var(--text)]">Nursery &amp; KG</span>
             <span className="ml-2 font-semibold text-[var(--brand)]">= 100</span>
             <div className="mt-1 text-[var(--muted)]">
-              English W&nbsp;10 + O&nbsp;10 · Hindi W&nbsp;10 + O&nbsp;10 · Maths W&nbsp;10 + O&nbsp;10
-              · EVE&nbsp;10 · GK&nbsp;10 · Poem&nbsp;10 · Drawing&nbsp;10
+              Hindi W&nbsp;10 + O&nbsp;10 · English W&nbsp;10 + O&nbsp;10 · Maths W&nbsp;10 + O&nbsp;10
+              · EVS&nbsp;10 · GK&nbsp;10 · Drawing&nbsp;10 · Poem&nbsp;10
             </div>
           </div>
           <div>
-            <span className="font-medium text-[var(--text)]">Class 1 – 3</span>
+            <span className="font-medium text-[var(--text)]">Class 1 – 4</span>
             <span className="ml-2 font-semibold text-[var(--brand)]">= 150</span>
             <div className="mt-1 text-[var(--muted)]">
-              English W&nbsp;20 + O&nbsp;10 · Hindi W&nbsp;20 + O&nbsp;10 · Maths W&nbsp;20 + O&nbsp;10
-              · EVE&nbsp;20 · GK&nbsp;20 · Poem&nbsp;10 · Drawing&nbsp;10
+              Hindi W&nbsp;20 + O&nbsp;10 · English W&nbsp;20 + O&nbsp;10 · Maths W&nbsp;20 + O&nbsp;10
+              · EVS&nbsp;20 · GK&nbsp;20 · Drawing&nbsp;10 · Poem&nbsp;10
             </div>
           </div>
         </div>
@@ -66,7 +66,7 @@ export default function MonthlyExamForm({
         {centerCount > 0 && (
           <p className="mb-3 rounded-[9px] bg-[var(--brand-soft)] px-3 py-2 text-[12px] text-[var(--brand)]">
             This will create <strong>{totalSheets}</strong> marks sheets —
-            5 classes × 10 papers × {centerCount} centre{centerCount === 1 ? "" : "s"}.
+            6 classes × 10 papers × {centerCount} centre{centerCount === 1 ? "" : "s"}.
           </p>
         )}
         <Submit>Create monthly exams</Submit>

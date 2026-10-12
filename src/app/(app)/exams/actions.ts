@@ -5,7 +5,7 @@ import { requireUser, canTouchCenter, effectiveTeacherIds } from "@/lib/auth";
 import { one, query, tx } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
-import { isMonth, isSettableExamType, monthlySubjectsFor } from "@/lib/exam-meta";
+import { isMonth, isSettableExamType, monthlySubjectsFor, promotionalSubjectsFor } from "@/lib/exam-meta";
 import { isCentreType } from "@/lib/centre-meta";
 
 const str = (f: FormData, k: string) => {
@@ -349,10 +349,10 @@ export async function createMonthlyExams(_prev: unknown, form: FormData) {
 
   const classes = await query<{ id: number; name: string }>(
     `SELECT id, name FROM class_levels
-      WHERE lower(name) IN ('nursery','kg','class 1','class 2','class 3')
+      WHERE lower(name) IN ('nursery','kg','class 1','class 2','class 3','class 4')
       ORDER BY sequence`,
   );
-  if (classes.length === 0) return { error: "Template classes (Nursery–Class 3) not found." };
+  if (classes.length === 0) return { error: "Template classes (Nursery–Class 4) not found." };
 
   try {
     await tx(async (c) => {
@@ -378,6 +378,59 @@ export async function createMonthlyExams(_prev: unknown, form: FormData) {
 
   revalidatePath("/exams");
   redirect(`/exams?type=monthly`);
+}
+
+/**
+ * Creates the standard promotional (final) exam set for Nursery, KG and
+ * Class 1–4 across every active centre in one click. Only super_admin / admin.
+ */
+export async function createPromotionalExams(_prev: unknown, form: FormData) {
+  const user = await requireUser();
+  if (!isGlobalRole(user.role)) return { error: "Only administrators can create promotional exams." };
+
+  const session = await currentSession();
+  if (!session) return { error: "No academic session is open." };
+
+  const title = str(form, "title");
+  const examDate = str(form, "exam_date");
+  if (!title || !examDate) return { error: "Month and date are required." };
+  if (!isMonth(title)) return { error: "Choose the month the test is held in." };
+
+  const centers = await query<{ id: number }>(
+    "SELECT id FROM centers WHERE is_active ORDER BY code");
+  if (centers.length === 0) return { error: "No active centres found." };
+
+  const classes = await query<{ id: number; name: string }>(
+    `SELECT id, name FROM class_levels
+      WHERE lower(name) IN ('nursery','kg','class 1','class 2','class 3','class 4')
+      ORDER BY sequence`,
+  );
+  if (classes.length === 0) return { error: "Template classes (Nursery–Class 4) not found." };
+
+  try {
+    await tx(async (c) => {
+      for (const centre of centers) {
+        for (const cls of classes) {
+          const subjects = promotionalSubjectsFor(cls.name);
+          if (!subjects) continue;
+          for (const paper of subjects) {
+            await c.query(
+              `INSERT INTO exams (title, exam_type, subject, center_id, session_id,
+                  class_level_id, exam_date, max_marks, pass_marks, term_label, created_by)
+               VALUES ($1,'promotional',$2,$3,$4,$5,$6,$7,NULL,$1,$8)`,
+              [title, paper.subject, centre.id, session.id, cls.id,
+               examDate, paper.max, user.uid],
+            );
+          }
+        }
+      }
+    });
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not create the exams." };
+  }
+
+  revalidatePath("/exams");
+  redirect(`/exams?type=promotional`);
 }
 
 export async function deleteExam(_prev: unknown, form: FormData) {
