@@ -11,6 +11,7 @@ export type UnitRow = {
   month_no: number;
   heading: string | null;
   outcome: string | null;
+  class_name: string;
   /** only when centerId supplied */
   status: "not_started" | "in_progress" | "completed";
   completed_on: string | null;
@@ -62,6 +63,7 @@ export async function unitsFor(
     SELECT
       u.id, u.session_id, u.class_level_id, u.subject,
       u.month_no, u.heading, u.outcome,
+      COALESCE(cl.name, u.class_level_id::text)                     AS class_name,
       COALESCE(p.status, 'not_started')                             AS status,
       p.completed_on::text                                          AS completed_on,
       p.remarks,
@@ -69,6 +71,7 @@ export async function unitsFor(
       COUNT(DISTINCT i.id)                                          AS items,
       COUNT(DISTINCT t.item_id)                                     AS ticked
     FROM syllabus_units u
+    LEFT JOIN class_levels cl ON cl.id = u.class_level_id
     LEFT JOIN syllabus_items i    ON i.unit_id = u.id
     LEFT JOIN syllabus_item_ticks t
       ON t.item_id = i.id AND ($3::int IS NULL OR t.center_id = $3)
@@ -78,7 +81,7 @@ export async function unitsFor(
     WHERE u.session_id = $1
       AND u.class_level_id = $2
       AND ($4::text IS NULL OR u.subject = $4)
-    GROUP BY u.id, p.status, p.completed_on, p.remarks, mu.first_name, mu.last_name
+    GROUP BY u.id, cl.name, p.status, p.completed_on, p.remarks, mu.first_name, mu.last_name
     ORDER BY u.subject, u.month_no
   `, [sessionId, classId, centerId, subject]);
 }
@@ -89,6 +92,7 @@ export async function unitById(unitId: number, centerId: number | null): Promise
     SELECT
       u.id, u.session_id, u.class_level_id, u.subject,
       u.month_no, u.heading, u.outcome,
+      COALESCE(cl.name, u.class_level_id::text)                     AS class_name,
       COALESCE(p.status, 'not_started')                             AS status,
       p.completed_on::text                                          AS completed_on,
       p.remarks,
@@ -96,6 +100,7 @@ export async function unitById(unitId: number, centerId: number | null): Promise
       COUNT(DISTINCT i.id)                                          AS items,
       COUNT(DISTINCT t.item_id)                                     AS ticked
     FROM syllabus_units u
+    LEFT JOIN class_levels cl ON cl.id = u.class_level_id
     LEFT JOIN syllabus_items i    ON i.unit_id = u.id
     LEFT JOIN syllabus_item_ticks t
       ON t.item_id = i.id AND ($2::int IS NULL OR t.center_id = $2)
@@ -103,7 +108,7 @@ export async function unitById(unitId: number, centerId: number | null): Promise
       ON p.unit_id = u.id AND ($2::int IS NULL OR p.center_id = $2)
     LEFT JOIN users mu ON mu.id = p.marked_by
     WHERE u.id = $1
-    GROUP BY u.id, p.status, p.completed_on, p.remarks, mu.first_name, mu.last_name
+    GROUP BY u.id, cl.name, p.status, p.completed_on, p.remarks, mu.first_name, mu.last_name
   `, [unitId, centerId]);
 }
 
