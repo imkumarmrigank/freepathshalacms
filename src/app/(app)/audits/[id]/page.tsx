@@ -75,7 +75,7 @@ export default async function VisitPage({
       />
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Badge tone={visit.status === "submitted" ? "ok" : "info"}>
+        <Badge tone={visit.status === "submitted" ? "ok" : visit.status === "missed" ? "bad" : "info"}>
           {VISIT_STATUS_LABEL[visit.status]}
         </Badge>
         {visit.overall && (
@@ -88,7 +88,19 @@ export default async function VisitPage({
         {visit.score_pct != null && <Mark pct={visit.score_pct} />}
       </div>
 
-      {visit.status !== "submitted" && (
+      {visit.missed_reason && (
+        <p className="mt-3 rounded-[9px] bg-[var(--bad-soft,#fef2f2)] px-3.5 py-2.5 text-[13px] text-[var(--bad)]">
+          <strong>Missed:</strong> {visit.missed_reason}
+        </p>
+      )}
+      {visit.reschedule_count > 0 && (
+        <p className="mt-3 rounded-[9px] bg-[var(--info-soft,#eff6ff)] px-3.5 py-2.5 text-[13px] text-[var(--muted)]">
+          Rescheduled {visit.reschedule_count} time{visit.reschedule_count === 1 ? "" : "s"}.
+          {visit.reschedule_reason && <> Last reason: {visit.reschedule_reason}</>}
+        </p>
+      )}
+
+      {visit.status !== "submitted" && visit.status !== "missed" && (
         <p className="mt-3 rounded-[9px] bg-[var(--warn-soft)] px-3.5 py-2.5 text-[13px]">
           This report has not been filed yet, so the ratings below may still change.
         </p>

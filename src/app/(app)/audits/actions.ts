@@ -61,6 +61,82 @@ export async function scheduleVisit(_prev: unknown, form: FormData) {
   return { ok: "Visit scheduled." };
 }
 
+/**
+ * Auditor reschedules one of their own upcoming (planned) visits.
+ * The old date and the reason are kept on record so admin can see the history.
+ */
+export async function rescheduleVisit(_prev: unknown, form: FormData) {
+  const user = await requireUser();
+  if (!canConductAudit(user.role))
+    return { error: "Only an auditor can reschedule their own visit." };
+
+  const id = num(form, "visit_id");
+  const newDate = str(form, "scheduled_for");
+  const reason = str(form, "reason");
+
+  if (!id) return { error: "Which visit?" };
+  if (!newDate) return { error: "Pick the new date." };
+  if (!reason) return { error: "Say why you are rescheduling." };
+
+  const v = await one<{ auditor_id: number | null; status: string; scheduled_for: string | null }>(
+    "SELECT auditor_id, status, scheduled_for FROM audit_visits WHERE id = $1", [id]);
+  if (!v) return { error: "That visit is gone." };
+  if (v.auditor_id !== user.uid) return { error: "That visit is assigned to another auditor." };
+  if (v.status !== "planned") return { error: "Only a planned (not yet started) visit can be rescheduled." };
+
+  const tod = today();
+  if (newDate <= tod) return { error: "The new date must be in the future." };
+
+  await query(
+    `UPDATE audit_visits
+        SET scheduled_for      = $2,
+            reschedule_reason  = $3,
+            reschedule_count   = reschedule_count + 1,
+            updated_at         = now()
+      WHERE id = $1`,
+    [id, newDate, reason]);
+
+  revalidatePath("/audits");
+  return { ok: "Visit rescheduled." };
+}
+
+/**
+ * Auditor marks a planned visit as missed and records why.
+ * Only allowed when the visit's scheduled date has passed.
+ * Admin and superadmin can see the reason on the visit record.
+ */
+export async function markVisitMissed(_prev: unknown, form: FormData) {
+  const user = await requireUser();
+  if (!canConductAudit(user.role))
+    return { error: "Only an auditor can mark a visit as missed." };
+
+  const id = num(form, "visit_id");
+  const reason = str(form, "reason");
+
+  if (!id) return { error: "Which visit?" };
+  if (!reason) return { error: "Explain why the visit was missed." };
+
+  const v = await one<{ auditor_id: number | null; status: string; scheduled_for: string | null }>(
+    "SELECT auditor_id, status, scheduled_for FROM audit_visits WHERE id = $1", [id]);
+  if (!v) return { error: "That visit is gone." };
+  if (v.auditor_id !== user.uid) return { error: "That visit is assigned to another auditor." };
+  if (v.status !== "planned") return { error: "Only a planned visit can be marked as missed." };
+  if (v.scheduled_for && v.scheduled_for >= today())
+    return { error: "The visit date has not passed yet — reschedule it instead." };
+
+  await query(
+    `UPDATE audit_visits
+        SET status        = 'missed',
+            missed_reason = $2,
+            missed_at     = now(),
+            updated_at    = now()
+      WHERE id = $1`,
+    [id, reason]);
+
+  revalidatePath("/audits");
+  return { ok: "Visit marked as missed." };
+}
+
 export async function cancelVisit(_prev: unknown, form: FormData) {
   const user = await requireUser();
   if (!canScheduleVisits(user.role))

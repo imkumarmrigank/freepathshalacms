@@ -13,8 +13,11 @@ import {
 } from "@/lib/audits";
 import ScheduleVisit from "./ScheduleVisit";
 import StartVisit from "./StartVisit";
+import RescheduleVisit from "./RescheduleVisit";
+import MissedVisit from "./MissedVisit";
 import { listCenters } from "@/lib/queries";
 import Mark from "@/components/Mark";
+import { today } from "@/lib/format";
 
 export const metadata = { title: "Centre audits · Pehchaan" };
 
@@ -23,7 +26,7 @@ const PRIORITY_TONE: Record<CentrePriority, string> = {
 };
 
 const STATUS_TONE: Record<VisitStatus, string> = {
-  planned: "info", in_progress: "warn", submitted: "ok", cancelled: "mute",
+  planned: "info", in_progress: "warn", submitted: "ok", cancelled: "mute", missed: "bad",
 };
 
 export default async function AuditsPage({
@@ -208,41 +211,65 @@ export default async function AuditsPage({
           <ul>
             {visits.map((v) => (
               <li key={v.id} className="border-t border-[#f1f1f6] first:border-0">
-                <Link href={`/audits/${v.id}`}
-                  className="block px-5 py-4 hover:bg-[#fafafd]">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[14px] font-medium">{v.center_name}</span>
-                    <Badge tone={STATUS_TONE[v.status]}>
-                      {VISIT_STATUS_LABEL[v.status]}
-                    </Badge>
-                    {v.kind === "special" && <Badge tone="warn" dot={false}>Surprise</Badge>}
-                    {v.kind === "follow_up" && <Badge tone="info" dot={false}>Follow-up</Badge>}
-                    <span className="text-[12.5px] text-[var(--muted)]">
-                      {VISIT_KIND_LABEL[v.kind]}
-                      {" · "}
-                      {v.visited_on ? fmtDate(v.visited_on)
-                        : v.scheduled_for ? `due ${fmtDate(v.scheduled_for)}` : "no date"}
-                      {v.auditor_name ? ` · ${v.auditor_name}` : ""}
-                    </span>
-                  </div>
-                  <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-[var(--muted)]">
-                    {v.overall && <span>Found: {OVERALL_LABEL[v.overall]}</span>}
-                    {v.score_pct != null && (
-                      <span>Mark <Mark pct={v.score_pct} size="sm" /></span>
-                    )}
-                    {Number(v.suggestions) > 0 && (
-                      <span>
-                        {v.suggestions} suggestion{Number(v.suggestions) === 1 ? "" : "s"}
-                        {Number(v.open_suggestions) > 0 && `, ${v.open_suggestions} still open`}
+                <div className="px-5 py-4">
+                  <Link href={`/audits/${v.id}`} className="block">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[14px] font-medium">{v.center_name}</span>
+                      <Badge tone={STATUS_TONE[v.status]}>
+                        {VISIT_STATUS_LABEL[v.status]}
+                      </Badge>
+                      {v.kind === "special" && <Badge tone="warn" dot={false}>Surprise</Badge>}
+                      {v.kind === "follow_up" && <Badge tone="info" dot={false}>Follow-up</Badge>}
+                      {v.reschedule_count > 0 && (
+                        <Badge tone="mute" dot={false}>Rescheduled {v.reschedule_count}×</Badge>
+                      )}
+                      <span className="text-[12.5px] text-[var(--muted)]">
+                        {VISIT_KIND_LABEL[v.kind]}
+                        {" · "}
+                        {v.visited_on ? fmtDate(v.visited_on)
+                          : v.scheduled_for ? `due ${fmtDate(v.scheduled_for)}` : "no date"}
+                        {v.auditor_name ? ` · ${v.auditor_name}` : ""}
                       </span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-[var(--muted)]">
+                      {v.overall && <span>Found: {OVERALL_LABEL[v.overall]}</span>}
+                      {v.score_pct != null && (
+                        <span>Mark <Mark pct={v.score_pct} size="sm" /></span>
+                      )}
+                      {Number(v.suggestions) > 0 && (
+                        <span>
+                          {v.suggestions} suggestion{Number(v.suggestions) === 1 ? "" : "s"}
+                          {Number(v.open_suggestions) > 0 && `, ${v.open_suggestions} still open`}
+                        </span>
+                      )}
+                    </div>
+                    {v.missed_reason && (
+                      <p className="mt-1 text-[12.5px] text-[var(--bad)]">
+                        Missed: {v.missed_reason}
+                      </p>
                     )}
-                  </div>
-                  {v.summary && (
-                    <p className="mt-1.5 line-clamp-2 text-[13px] text-[var(--muted)]">
-                      {v.summary}
-                    </p>
+                    {v.reschedule_reason && (
+                      <p className="mt-0.5 text-[12.5px] text-[var(--muted)]">
+                        Last rescheduled: {v.reschedule_reason}
+                      </p>
+                    )}
+                    {v.summary && (
+                      <p className="mt-1.5 line-clamp-2 text-[13px] text-[var(--muted)]">
+                        {v.summary}
+                      </p>
+                    )}
+                  </Link>
+                  {/* Auditor controls for their own planned visits */}
+                  {mine && v.status === "planned" && v.auditor_id === user.uid && (
+                    <div className="mt-2 border-t border-[#f1f1f6] pt-2">
+                      {v.scheduled_for && v.scheduled_for > today() ? (
+                        <RescheduleVisit visitId={v.id} currentDate={v.scheduled_for} />
+                      ) : v.scheduled_for && v.scheduled_for <= today() ? (
+                        <MissedVisit visitId={v.id} />
+                      ) : null}
+                    </div>
                   )}
-                </Link>
+                </div>
               </li>
             ))}
           </ul>

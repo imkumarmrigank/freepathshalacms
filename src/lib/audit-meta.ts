@@ -30,7 +30,7 @@ export function visitIsHiddenFromCentre(kind: VisitKind, status: VisitStatus) {
 
 /* ---------------------------------------------------------------- statuses */
 
-export const VISIT_STATUSES = ["planned", "in_progress", "submitted", "cancelled"] as const;
+export const VISIT_STATUSES = ["planned", "in_progress", "submitted", "cancelled", "missed"] as const;
 export type VisitStatus = (typeof VISIT_STATUSES)[number];
 
 export const VISIT_STATUS_LABEL: Record<VisitStatus, string> = {
@@ -38,6 +38,7 @@ export const VISIT_STATUS_LABEL: Record<VisitStatus, string> = {
   in_progress: "In progress",
   submitted: "Filed",
   cancelled: "Cancelled",
+  missed: "Missed",
 };
 
 /* ------------------------------------------------------- the centre's state */
@@ -245,6 +246,8 @@ export type VisitRow = {
   children_present: number | null; children_on_roll: number | null;
   staff_present: number | null; staff_on_roll: number | null;
   suggestions: number; open_suggestions: number;
+  reschedule_reason: string | null; reschedule_count: number;
+  missed_reason: string | null; missed_at: string | null;
 };
 
 export type RatingRow = {

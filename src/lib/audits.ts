@@ -96,7 +96,9 @@ const VISIT_COLS = `
   v.children_present, v.children_on_roll, v.staff_present, v.staff_on_roll,
   (SELECT count(*) FROM audit_suggestions s WHERE s.visit_id = v.id) AS suggestions,
   (SELECT count(*) FROM audit_suggestions s
-    WHERE s.visit_id = v.id AND s.status IN ('open','in_progress','done')) AS open_suggestions`;
+    WHERE s.visit_id = v.id AND s.status IN ('open','in_progress','done')) AS open_suggestions,
+  v.reschedule_reason, v.reschedule_count,
+  v.missed_reason, v.missed_at::text AS missed_at`;
 
 export async function listVisits(user: SessionUser, opts: {
   centerId?: number | null; status?: VisitStatus | null; auditorId?: number | null;
