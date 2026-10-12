@@ -159,14 +159,14 @@ export type Feature =
 /** One explicit list per role — no inference, so a gate is read, not deduced. */
 const FEATURES: Record<Role, Feature[]> = {
   super_admin: [
-    "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
+    "students", "attendance", "timetable", "exams", "progressReports",
     "calendar", "ptm", "followUps", "supplies", "statistics", "reports",
     "staff", "centres", "coverage", "counselling", "teacherRemarks", "messages",
     "audits", "auditReports", "leaveApprovals", "centreFeedbackReports", "syllabus",
     "sports",
   ],
   admin: [
-    "students", "attendance", "timetable", "teachingPlans", "exams", "progressReports",
+    "students", "attendance", "timetable", "exams", "progressReports",
     "calendar", "ptm", "followUps", "supplies", "statistics", "reports",
     "staff", "centres", "coverage", "counselling", "teacherRemarks", "messages",
     "audits", "auditReports", "leaveApprovals", "centreFeedbackReports", "syllabus",
