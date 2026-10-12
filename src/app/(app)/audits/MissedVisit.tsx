@@ -10,7 +10,7 @@ const init = { error: null as string | null, ok: false };
 export default function MissedVisit({ visitId }: Props) {
   const [state, action, pending] = useActionState(
     async (_prev: typeof init, fd: FormData) => {
-      const res = await markVisitMissed(fd);
+      const res = await markVisitMissed(null, fd);
       if (res.error) return { error: res.error, ok: false };
       return { error: null, ok: true };
     },
