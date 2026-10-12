@@ -129,6 +129,7 @@ const MENU: Node[] = [
       { href: "/statistics", label: "Statistics", feature: "statistics" },
       { href: "/statistics/trends", label: "Trends", feature: "statistics" },
       { href: "/reports", label: "Reports", feature: "reports" },
+      { href: "/data", label: "Data explorer", roles: ["super_admin"] },
     ],
   },
 
