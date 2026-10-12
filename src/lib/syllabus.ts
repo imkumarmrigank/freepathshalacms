@@ -127,15 +127,20 @@ export async function itemsFor(unitId: number, centerId: number | null): Promise
   `, [unitId, centerId]);
 }
 
-/** Per-unit progress for one centre. */
-export async function progressFor(centerId: number, sessionId: number) {
-  return query<{ unit_id: number; status: string; completed_on: string | null; remarks: string | null }>(
-    `SELECT unit_id, status, completed_on::text, remarks
-      FROM syllabus_progress
-      WHERE center_id = $1
-        AND unit_id IN (SELECT id FROM syllabus_units WHERE session_id = $2)`,
-    [centerId, sessionId],
-  );
+/** Progress for one unit at one centre — returns a single row or null. */
+export async function progressFor(unitId: number, centerId: number) {
+  return one<{
+    status: string;
+    completed_on: string | null;
+    remarks: string | null;
+    marked_by_name: string | null;
+  }>(`
+    SELECT p.status, p.completed_on::text, p.remarks,
+      u.first_name || COALESCE(' ' || u.last_name, '') AS marked_by_name
+    FROM syllabus_progress p
+    LEFT JOIN users u ON u.id = p.marked_by
+    WHERE p.unit_id = $1 AND p.center_id = $2
+  `, [unitId, centerId]);
 }
 
 /** Summary per centre for admins (how far each centre has got). */
