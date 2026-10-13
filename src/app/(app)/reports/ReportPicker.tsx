@@ -215,6 +215,19 @@ export default function ReportPicker({
               </select>
             </label>
           )}
+
+          {uses("term") && (
+            <label>
+              <span className="mb-1.5 block text-[13px] font-medium text-[var(--muted)]">Term</span>
+              <select className="select w-auto" value={current.term ?? ""}
+                onChange={(e) => push({ term: e.target.value })}>
+                <option value="">All terms</option>
+                <option value="1">Term 1 (Apr–Jun)</option>
+                <option value="2">Term 2 (Jul–Oct)</option>
+                <option value="3">Term 3 (Nov–Jan)</option>
+              </select>
+            </label>
+          )}
         </div>
       </Card>
     </div>

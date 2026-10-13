@@ -6,7 +6,9 @@ export type ReportFilter =
   /** Day, week or month — how the rows of a running report are bucketed. */
   | "groupBy"
   /** active / suspended / graduated / all */
-  | "enrollmentStatus";
+  | "enrollmentStatus"
+  /** 1 / 2 / 3 / all — syllabus term */
+  | "term";
 
 /** The buckets a cumulative attendance report can be added up over. */
 export const GROUP_BY = [
@@ -349,7 +351,7 @@ export const REPORTS: ReportMeta[] = [
     description:
       "How far each centre has got through the syllabus, unit by unit: status, topics covered, "
       + "percentage done and the date completed. Filter by term to see where things stand mid-term.",
-    filters: ["session", "center", "class"],
+    filters: ["session", "center", "class", "term"],
     roles: ["super_admin", "admin", "center_manager"],
   },
   {

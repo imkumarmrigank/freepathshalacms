@@ -28,6 +28,8 @@ export type ReportParams = {
   groupBy?: string | null;
   /** active / suspended / graduated / null (= all) */
   enrollmentStatus?: string | null;
+  /** 1 / 2 / 3 / null (= all terms) */
+  term?: number | null;
 };
 
 const COUNTED = "('present','late','half_day')";   // counts towards attendance
@@ -2813,6 +2815,7 @@ async function syllabusProgress(p: ReportParams): Promise<ReportResult> {
   let where = "";
   if (p.centerId) { params.push(p.centerId); where += ` AND c.id = $${params.length}`; }
   if (p.classId) { params.push(p.classId); where += ` AND u.class_level_id = $${params.length}`; }
+  if (p.term) { params.push(p.term); where += ` AND u.term_no = $${params.length}`; }
 
   const rows = await query<{
     center_name: string; class_name: string; subject: string;

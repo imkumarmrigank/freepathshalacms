@@ -38,6 +38,7 @@ export default async function ReportsPage({
     role: sp.role || null,
     groupBy: sp.groupBy || null,
     enrollmentStatus: sp.enrollmentStatus || null,
+    term: Number(sp.term) || null,
   };
 
   let result: ReportResult | null = null;
@@ -58,6 +59,7 @@ export default async function ReportsPage({
     ...(params.classId ? { class: String(params.classId) } : {}),
     ...(params.role ? { role: params.role } : {}),
     ...(params.enrollmentStatus ? { enrollmentStatus: params.enrollmentStatus } : {}),
+    ...(params.term ? { term: String(params.term) } : {}),
   }).toString();
 
   // The whole report is already in memory; the table shows it a page at a time.
@@ -95,7 +97,8 @@ export default async function ReportsPage({
         sessions={sessions}
         showCenter={isGlobalRole(user.role)}
         current={{ ...sp, report: reportKey, from: params.from, to: params.to,
-          session: String(params.sessionId) }}
+          session: String(params.sessionId),
+          ...(params.term ? { term: String(params.term) } : {}) }}
       />
 
       {error && <Alert kind="bad">{error}</Alert>}
