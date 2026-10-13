@@ -30,7 +30,7 @@ export default async function ManageSyllabusPage({
     <>
       <PageHeader
         title="Set the syllabus"
-        subtitle={`What every centre teaches in ${className}, month by month`}
+        subtitle={`What every centre teaches in ${className}, term by term`}
         back={{ href: "/syllabus", label: "Syllabus" }}
       />
 

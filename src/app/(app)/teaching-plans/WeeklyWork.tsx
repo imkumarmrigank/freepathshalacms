@@ -13,7 +13,9 @@ export default function WeeklyWork({
   weekNo,
   items,
   subject,
+  termNo,
   monthNo,
+  monthLabel,
   className,
   existingRemarks,
 }: {
@@ -22,7 +24,9 @@ export default function WeeklyWork({
   weekNo: number;
   items: Item[];
   subject: string;
+  termNo: number;
   monthNo: number;
+  monthLabel: string;
   className: string;
   existingRemarks: WeekRemark | null;
 }) {
@@ -62,7 +66,7 @@ export default function WeeklyWork({
             <span className="mx-2 text-[var(--muted)]">·</span>
             <span className="text-[13px] text-[var(--muted)]">{className}</span>
             <span className="mx-2 text-[var(--muted)]">·</span>
-            <span className="text-[12px] text-[var(--muted)]">Month {monthNo}, Week {weekNo}</span>
+            <span className="text-[12px] text-[var(--muted)]">T{termNo} · {monthLabel}, Week {weekNo}</span>
           </div>
           <span className="text-[12px] text-[var(--muted)]">
             {doneCount} of {weekItems.length} taught

@@ -9,18 +9,8 @@ import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
 import { fmtDate } from "@/lib/format";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
 import { itemsFor, weekProgressFor } from "@/lib/syllabus";
+import { currentPosition, MONTH_LABELS } from "@/lib/term-calendar";
 import WeeklyWork from "./WeeklyWork";
-
-/** Given a session start date, return the current {monthNo, weekNo} (both 1-based, capped 1–4). */
-function currentWeekInSession(sessionStartDate: string): { monthNo: number; weekNo: number } {
-  const start = new Date(sessionStartDate);
-  const now = new Date();
-  const daysElapsed = Math.max(0, Math.floor((now.getTime() - start.getTime()) / 86_400_000));
-  const weeksElapsed = Math.floor(daysElapsed / 7);          // 0-based total weeks
-  const monthNo = Math.min(4, Math.floor(weeksElapsed / 4) + 1);
-  const weekNo  = Math.min(4, (weeksElapsed % 4) + 1);
-  return { monthNo, weekNo };
-}
 
 export default async function TeachingPlansPage({
   searchParams,
@@ -70,7 +60,7 @@ export default async function TeachingPlansPage({
 
   // ── Weekly syllabus section (teachers only, at their centre) ──
   type ActiveUnit = {
-    id: number; subject: string; month_no: number; heading: string | null;
+    id: number; subject: string; term_no: number; month_no: number; heading: string | null;
     class_name: string; class_level_id: number;
   };
   let weeklySections: {
@@ -80,9 +70,13 @@ export default async function TeachingPlansPage({
     weekRemarks: Awaited<ReturnType<typeof weekProgressFor>>;
   }[] = [];
 
-  const { monthNo: curMonth, weekNo: curWeek } = currentWeekInSession(session.start_date);
+  const pos = currentPosition(session.start_date);
+  const isTeaching_ = pos.phase === "teaching";
+  const curTerm  = isTeaching_ ? pos.term    : 0;
+  const curMonth = isTeaching_ ? pos.monthNo : 0;
+  const curWeek  = isTeaching_ ? pos.weekNo  : 0;
 
-  if (isTeaching(user.role) && user.centerId) {
+  if (isTeaching(user.role) && user.centerId && isTeaching_) {
     const teacherClassIds = await query<{ id: number }>(
       `SELECT DISTINCT cl.id FROM teacher_classes tc
          JOIN class_levels cl ON cl.id = tc.class_level_id
@@ -92,14 +86,14 @@ export default async function TeachingPlansPage({
     const classIds = teacherClassIds.map((r) => r.id);
 
     if (classIds.length > 0) {
-      // Find all units for current month in teacher's classes
       const units = await query<ActiveUnit>(`
-        SELECT u.id, u.subject, u.month_no, u.heading, cl.name AS class_name, u.class_level_id
+        SELECT u.id, u.subject, u.term_no, u.month_no, u.heading, cl.name AS class_name, u.class_level_id
         FROM syllabus_units u
         JOIN class_levels cl ON cl.id = u.class_level_id
-        WHERE u.session_id = $1 AND u.class_level_id = ANY($2::int[]) AND u.month_no = $3
+        WHERE u.session_id = $1 AND u.class_level_id = ANY($2::int[])
+          AND u.term_no = $3 AND u.month_no = $4
         ORDER BY cl.sequence, u.subject
-      `, [session.id, classIds, curMonth]);
+      `, [session.id, classIds, curTerm, curMonth]);
 
       weeklySections = await Promise.all(
         units.map(async (u) => ({
@@ -117,7 +111,11 @@ export default async function TeachingPlansPage({
       <PageHeader
         title="Teaching plans"
         subtitle={isTeaching(user.role)
-          ? `${session.name} · Month ${curMonth}, Week ${curWeek}`
+          ? pos.phase === "teaching"
+            ? `${session.name} · Term ${curTerm} · ${MONTH_LABELS[curTerm]?.[curMonth] ?? `Month ${curMonth}`}, Week ${curWeek}`
+            : pos.phase === "revision"
+            ? `${session.name} · ${pos.label}`
+            : `${session.name} · Year end`
           : `Plans across ${centerId ? user.centerName ?? "this centre" : "all centres"} · ${session.name}`}
       />
 
@@ -125,7 +123,7 @@ export default async function TeachingPlansPage({
       {weeklySections.length > 0 && (
         <section className="mt-4">
           <h2 className="mb-2 text-[15px] font-semibold">
-            This week's syllabus — Month {curMonth}, Week {curWeek}
+            This week's syllabus — Term {curTerm} · {MONTH_LABELS[curTerm]?.[curMonth] ?? `Month ${curMonth}`}, Week {curWeek}
           </h2>
           <p className="mb-4 text-[13px] text-[var(--muted)]">
             Tick each topic as you teach it. Add remarks at the end of the week.
@@ -143,7 +141,9 @@ export default async function TeachingPlansPage({
                   weekNo={weekNo}
                   items={items}
                   subject={unit.subject}
+                  termNo={unit.term_no}
                   monthNo={unit.month_no}
+                  monthLabel={MONTH_LABELS[unit.term_no]?.[unit.month_no] ?? `Month ${unit.month_no}`}
                   className={unit.class_name}
                   existingRemarks={existingRemark}
                 />

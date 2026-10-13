@@ -5,6 +5,7 @@ import { Alert, Badge, Card, PageHeader } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { canEditSyllabus, canMarkSyllabus } from "@/lib/roles";
 import { itemsFor, progressFor, unitById } from "@/lib/syllabus";
+import { MONTH_LABELS } from "@/lib/term-calendar";
 import MonthWork from "./MonthWork";
 
 export const metadata = { title: "Syllabus month · Pehchaan" };
@@ -41,7 +42,7 @@ export default async function SyllabusUnitPage({
   return (
     <>
       <PageHeader
-        title={`${unit.subject} — Month ${unit.month_no}`}
+        title={`${unit.subject} — T${unit.term_no} · ${MONTH_LABELS[unit.term_no]?.[unit.month_no] ?? `Month ${unit.month_no}`}`}
         subtitle={`${unit.class_name}${unit.heading ? ` · ${unit.heading}` : ""}`}
         back={{ href: "/syllabus", label: "Syllabus" }}
         right={canEditSyllabus(user.role)

@@ -3,9 +3,10 @@ import { useActionState, useState } from "react";
 import { Badge, Card, Field } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
 import { deleteUnit, saveItems, saveUnit } from "../../syllabus/actions";
+import { TERM_LABELS, MONTH_LABELS } from "@/lib/term-calendar";
 
 type Unit = {
-  id: number; subject: string; month_no: number;
+  id: number; subject: string; term_no: number; month_no: number;
   heading: string | null; outcome: string | null; items: number;
 };
 
@@ -22,7 +23,7 @@ export function UnitEditor({ unit, lines }: { unit: Unit; lines: string[] }) {
         className="flex w-full items-center justify-between gap-3 px-5 py-3.5 text-left">
         <span className="flex flex-wrap items-center gap-2">
           <span className="text-[13px] font-semibold text-[var(--brand)]">
-            Month {unit.month_no}
+            T{unit.term_no} M{unit.month_no} · {MONTH_LABELS[unit.term_no]?.[unit.month_no] ?? ""}
           </span>
           <span className="text-[14px] font-medium">{unit.subject}</span>
           {unit.heading && (
@@ -38,13 +39,23 @@ export function UnitEditor({ unit, lines }: { unit: Unit; lines: string[] }) {
           <form action={saveHead}>
             <FormMessage state={headState} />
             <input type="hidden" name="unit_id" value={unit.id} />
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-4">
               <Field label="Subject *">
                 <input className="input" name="subject" defaultValue={unit.subject} required />
               </Field>
-              <Field label="Month *">
-                <input className="input" type="number" min={1} max={12} name="month_no"
-                  defaultValue={unit.month_no} required />
+              <Field label="Term *">
+                <select className="select" name="term_no" defaultValue={unit.term_no} required>
+                  {[1,2,3].map((t) => (
+                    <option key={t} value={t}>{TERM_LABELS[t]}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Month *" hint="1–3 within the term">
+                <select className="select" name="month_no" defaultValue={unit.month_no} required>
+                  {[1,2,3].map((m) => (
+                    <option key={m} value={m}>Month {m}</option>
+                  ))}
+                </select>
               </Field>
               <Field label="Heading" hint="Unit 1, पाठ 1–2">
                 <input className="input" name="heading" defaultValue={unit.heading ?? ""} />
@@ -101,7 +112,7 @@ export function NewUnit({ sessionId, classId, subjects }: {
         <FormMessage state={state} />
         <input type="hidden" name="session_id" value={sessionId} />
         <input type="hidden" name="class_level_id" value={classId} />
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-4">
           <Field label="Subject *">
             <input className="input" name="subject" list="syllabus-subjects" required
               placeholder="English" />
@@ -109,9 +120,19 @@ export function NewUnit({ sessionId, classId, subjects }: {
               {subjects.map((s) => <option key={s} value={s} />)}
             </datalist>
           </Field>
-          <Field label="Month *" hint="1 is the first month of the session">
-            <input className="input" type="number" min={1} max={12} name="month_no"
-              required defaultValue={1} />
+          <Field label="Term *">
+            <select className="select" name="term_no" required defaultValue={1}>
+              {[1,2,3].map((t) => (
+                <option key={t} value={t}>{TERM_LABELS[t]}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Month *" hint="1–3 within the term">
+            <select className="select" name="month_no" required defaultValue={1}>
+              {[1,2,3].map((m) => (
+                <option key={m} value={m}>Month {m}</option>
+              ))}
+            </select>
           </Field>
           <Field label="Heading">
             <input className="input" name="heading" placeholder="Unit 1" />

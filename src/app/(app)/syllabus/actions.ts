@@ -114,31 +114,36 @@ export async function saveUnit(_prev: unknown, form: FormData) {
   const sessionId = Number(form.get("session_id"));
   const classId = Number(form.get("class_level_id"));
   const subject = str(form, "subject");
+  const termNo  = Number(form.get("term_no"));
   const monthNo = Number(form.get("month_no"));
 
-  // an edit already knows its class and session; only a new month needs them
   if (!subject) return { error: "The subject is required." };
   if (!id && (!sessionId || !classId))
     return { error: "Session and class are required." };
-  if (!Number.isInteger(monthNo) || monthNo < 1 || monthNo > 12)
-    return { error: "The month must be between 1 and 12." };
+  if (!Number.isInteger(termNo) || termNo < 1 || termNo > 3)
+    return { error: "The term must be 1, 2 or 3." };
+  if (!Number.isInteger(monthNo) || monthNo < 1 || monthNo > 3)
+    return { error: "The month within the term must be 1, 2 or 3." };
 
   if (id) {
     await query(
-      `UPDATE syllabus_units SET subject=$2, month_no=$3, heading=$4, outcome=$5, updated_at=now()
+      `UPDATE syllabus_units
+          SET subject=$2, term_no=$3, month_no=$4, heading=$5, outcome=$6, updated_at=now()
         WHERE id=$1`,
-      [id, subject, monthNo, str(form, "heading"), str(form, "outcome")]);
+      [id, subject, termNo, monthNo, str(form, "heading"), str(form, "outcome")]);
   } else {
     const clash = await one<{ id: number }>(
       `SELECT id FROM syllabus_units
-        WHERE session_id=$1 AND class_level_id=$2 AND subject=$3 AND month_no=$4`,
-      [sessionId, classId, subject, monthNo]);
-    if (clash) return { error: `Month ${monthNo} of ${subject} is already set for this class.` };
+        WHERE session_id=$1 AND class_level_id=$2 AND subject=$3 AND term_no=$4 AND month_no=$5`,
+      [sessionId, classId, subject, termNo, monthNo]);
+    if (clash)
+      return { error: `Term ${termNo} Month ${monthNo} of ${subject} is already set for this class.` };
     await query(
       `INSERT INTO syllabus_units
-         (session_id, class_level_id, subject, month_no, heading, outcome, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-      [sessionId, classId, subject, monthNo, str(form, "heading"), str(form, "outcome"), user.uid]);
+         (session_id, class_level_id, subject, term_no, month_no, heading, outcome, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [sessionId, classId, subject, termNo, monthNo,
+       str(form, "heading"), str(form, "outcome"), user.uid]);
   }
   revalidatePath("/manage/syllabus");
   revalidatePath("/syllabus");

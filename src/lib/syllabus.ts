@@ -8,6 +8,7 @@ export type UnitRow = {
   session_id: number;
   class_level_id: number;
   subject: string;
+  term_no: number;
   month_no: number;
   heading: string | null;
   outcome: string | null;
@@ -63,7 +64,7 @@ export async function unitsFor(
   return query<UnitRow>(`
     SELECT
       u.id, u.session_id, u.class_level_id, u.subject,
-      u.month_no, u.heading, u.outcome,
+      u.term_no, u.month_no, u.heading, u.outcome,
       COALESCE(cl.name, u.class_level_id::text)                     AS class_name,
       COALESCE(p.status, 'not_started')                             AS status,
       p.completed_on::text                                          AS completed_on,
@@ -83,7 +84,7 @@ export async function unitsFor(
       AND u.class_level_id = $2
       AND ($4::text IS NULL OR u.subject = $4)
     GROUP BY u.id, cl.name, p.status, p.completed_on, p.remarks, mu.name
-    ORDER BY u.subject, u.month_no
+    ORDER BY u.subject, u.term_no, u.month_no
   `, [sessionId, classId, centerId, subject]);
 }
 
@@ -92,7 +93,7 @@ export async function unitById(unitId: number, centerId: number | null): Promise
   return one<UnitRow>(`
     SELECT
       u.id, u.session_id, u.class_level_id, u.subject,
-      u.month_no, u.heading, u.outcome,
+      u.term_no, u.month_no, u.heading, u.outcome,
       COALESCE(cl.name, u.class_level_id::text)                     AS class_name,
       COALESCE(p.status, 'not_started')                             AS status,
       p.completed_on::text                                          AS completed_on,

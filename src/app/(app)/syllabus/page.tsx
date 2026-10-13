@@ -7,6 +7,7 @@ import { canEditSyllabus, isGlobalRole } from "@/lib/roles";
 import { centreProgress, subjectsFor, unitsFor } from "@/lib/syllabus";
 import { fmtDate } from "@/lib/format";
 import { Alert } from "@/components/ui";
+import { TERM_LABELS, MONTH_LABELS, currentPosition } from "@/lib/term-calendar";
 
 export const metadata = { title: "Syllabus · Pehchaan" };
 
@@ -47,7 +48,7 @@ export default async function SyllabusPage({
     <>
       <PageHeader
         title="Syllabus"
-        subtitle={`What is to be taught in ${className}, month by month`}
+        subtitle={`What is to be taught in ${className}, term by term`}
         right={canEditSyllabus(user.role)
           ? <Link href="/manage/syllabus" className="btn btn-ghost">Set the syllabus</Link>
           : null}
@@ -85,7 +86,7 @@ export default async function SyllabusPage({
                         className="block px-5 py-4 hover:bg-[#fafafd]">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-[13px] font-semibold text-[var(--brand)]">
-                            Month {u.month_no}
+                            T{u.term_no} M{u.month_no} · {MONTH_LABELS[u.term_no]?.[u.month_no] ?? ""}
                           </span>
                           <span className="text-[14px] font-medium">{u.subject}</span>
                           {u.heading && (
@@ -125,7 +126,7 @@ export default async function SyllabusPage({
               <div className="border-b border-[var(--border)] px-5 py-3">
                 <h2 className="text-[14px] font-semibold">How far each centre has got</h2>
                 <p className="text-[12.5px] text-[var(--muted)]">
-                  {units.length} month{units.length === 1 ? "" : "s"} in {className}
+                  {units.length} unit{units.length === 1 ? "" : "s"} in {className}
                   {subject ? ` ${subject}` : ""}. Pick a centre above to see its months.
                 </p>
               </div>
