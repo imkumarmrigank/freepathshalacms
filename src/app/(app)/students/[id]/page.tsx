@@ -19,6 +19,7 @@ import SiblingMark from "@/components/SiblingMark";
 import TransportMark from "@/components/TransportMark";
 import { siblingMark } from "@/lib/siblings";
 import EnrollmentControls from "./EnrollmentControls";
+import TransportCard from "./TransportCard";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
 import { getT } from "@/lib/i18n";
 import { engagementLabel, parentLabel } from "@/lib/ptm-meta";
@@ -306,6 +307,9 @@ export default async function StudentPage({
               </div>
             </dl>
           </Card>
+
+          <TransportCard studentId={student.id} mode={student.transport_mode}
+            readOnly={!canEditStudents(user.role)} />
 
           {can(user.role, "counselling") && (
             <FlagForCounselling studentId={student.id} flag={flag}

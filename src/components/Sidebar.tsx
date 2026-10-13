@@ -122,7 +122,13 @@ const MENU: Node[] = [
   },
 
   { href: "/calendar", label: "Calendar", icon: IconCal, feature: "calendar" },
-  { href: "/supplies", label: "Supplies", icon: IconBox, feature: "supplies" },
+  {
+    label: "Supplies", icon: IconBox, feature: "supplies", children: [
+      { href: "/supplies", label: "Stock overview", feature: "supplies" },
+      { href: "/supplies/distribute", label: "Distribute to students",
+        roles: ["super_admin", "admin"] },
+    ],
+  },
 
   {
     label: "Insights", icon: IconChart, children: [

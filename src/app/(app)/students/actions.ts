@@ -185,6 +185,25 @@ export async function updateStudent(_prev: unknown, form: FormData) {
   return { ok: "Saved." };
 }
 
+/** Quick update for just the transport_mode field without re-submitting the full form. */
+export async function setTransportMode(_prev: unknown, form: FormData) {
+  const user = await requireUser();
+  const id = Number(form.get("id"));
+  const mode = str(form, "transport_mode") ?? null;
+  if (mode && !["rickshaw", "cycle", "walk"].includes(mode))
+    return { error: "Invalid mode." };
+  const existing = await one<{ center_id: number }>(
+    "SELECT center_id FROM students WHERE id = $1", [id],
+  );
+  if (!existing) return { error: "Student not found." };
+  if (!canTouchCenter(user, existing.center_id))
+    return { error: "This student belongs to another centre." };
+  await query("UPDATE students SET transport_mode = $1 WHERE id = $2", [mode, id]);
+  revalidatePath(`/students/${id}`);
+  revalidatePath("/students");
+  return { ok: mode ? `Updated to ${mode}.` : "Cleared." };
+}
+
 /** Move a student to a different class inside the same session (correction / mid-session shift). */
 export async function changeClass(_prev: unknown, form: FormData) {
   const user = await requireUser();

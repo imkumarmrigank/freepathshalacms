@@ -6,7 +6,7 @@ import { FormMessage, Submit } from "@/components/form";
 import DocUpload from "../new/DocUpload";
 import {
   BLOOD_GROUPS, CATEGORIES, COUNTRIES, GUARDIAN_KINDS, NATIONALITIES,
-  OCCUPATIONS, QUALIFICATIONS, RELIGIONS, STATES, TRANSPORT_MODES,
+  OCCUPATIONS, QUALIFICATIONS, RELIGIONS, STATES,
 } from "@/lib/admission-meta";
 import type { Student } from "@/lib/types";
 import { useT } from "@/components/LocaleProvider";
@@ -105,14 +105,6 @@ export default function EditStudent({ s, readOnly, canDrop }:
           <Pick label={t("Category")} name="category" value={d(s.category)} options={CATEGORIES} />
           <Field label={t("Medium of study")}>
             <input className="input" name="medium" defaultValue={d(s.medium)} />
-          </Field>
-          <Field label={t("Mode of Transportation")}>
-            <select className="select" name="transport_mode" defaultValue={d(s.transport_mode)}>
-              <option value="">Not recorded</option>
-              {TRANSPORT_MODES.map((t2) => (
-                <option key={t2.value} value={t2.value}>{t2.label}</option>
-              ))}
-            </select>
           </Field>
           <Field label={t("APAAR ID")}>
             <input className="input" name="apaar_id" defaultValue={d(s.apaar_id)} />
