@@ -22,30 +22,35 @@ declare global {
 }
 
 function makePool() {
-  const connectionString = process.env.DATABASE_URL;
+  let connectionString = process.env.DATABASE_URL;
   if (!connectionString) throw new Error("DATABASE_URL is not set");
+
+  // Bake the timezone into the connection string so no extra round-trip is
+  // needed on every new connection. options=-c+TimeZone=... is the Postgres
+  // wire-protocol way to set a startup parameter.
+  if (!connectionString.includes("options=")) {
+    const sep = connectionString.includes("?") ? "&" : "?";
+    connectionString += `${sep}options=-c+TimeZone%3DAsia%2FKolkata`;
+  }
 
   const pool = new Pool({
     connectionString,
     ssl: { rejectUnauthorized: false },
-    max: Number(process.env.PG_POOL_MAX ?? 5),
-    // Neon closes idle connections on its side, and a sleeping Render instance
-    // wakes with sockets that are already dead. Recycle ours well before that so
-    // we rarely hand out a corpse, and keep the survivors alive.
-    idleTimeoutMillis: 10_000,
+    // Keep a small pool — Neon's pooler handles fan-out on its side, and fewer
+    // local slots means less memory pressure on the Hostinger process.
+    max: Number(process.env.PG_POOL_MAX ?? 3),
+    // 60 s keeps connections alive across normal bursts of page views so SSL
+    // re-handshakes (≈ 150 ms each on cross-region links) happen rarely.
+    // Previously 10 s was too short: connections died between clicks, and
+    // Neon suspended its compute, adding a 400-600 ms wake-up penalty.
+    idleTimeoutMillis: 60_000,
     keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
     connectionTimeoutMillis: 15_000,
   });
 
-  // The centres are in India, the server is in Singapore and Neon runs in
-  // Ohio on GMT — three clocks, and three different answers to "what is
-  // today". Every connection is put on India's, so CURRENT_DATE and now()
-  // mean what a teacher marking the register means.
-  pool.on("connect", (client) => {
-    client.query("SET TIME ZONE 'Asia/Kolkata'").catch(() => {
-      // a failed SET must not take the connection down; the app still works,
-      // it is only the date boundary that would drift
-    });
+  pool.on("connect", () => {
+    // Timezone is set via the connection string; nothing more to do here.
   });
 
   // Without this, an error on an *idle* client is an unhandled 'error' event on
