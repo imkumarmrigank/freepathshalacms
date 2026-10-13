@@ -73,52 +73,89 @@ export default async function SyllabusPage({
         </Card>
       ) : (
         <>
-          {/* ------------------------------------------ one centre's months */}
-          {centerId && (
-            <Card className="mt-4" pad={false}>
-              <ul>
-                {units.map((u) => {
-                  const pct = Number(u.items) > 0
-                    ? Math.round((Number(u.ticked) / Number(u.items)) * 100) : 0;
-                  return (
-                    <li key={u.id} className="border-t border-[#f1f1f6] first:border-0">
-                      <Link href={`/syllabus/${u.id}?center=${centerId}`}
-                        className="block px-5 py-4 hover:bg-[#fafafd]">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-[13px] font-semibold text-[var(--brand)]">
-                            T{u.term_no} M{u.month_no} · {MONTH_LABELS[u.term_no]?.[u.month_no] ?? ""}
-                          </span>
-                          <span className="text-[14px] font-medium">{u.subject}</span>
-                          {u.heading && (
-                            <span className="text-[13px] text-[var(--muted)]">{u.heading}</span>
-                          )}
-                          <Badge tone={TONE[u.status]}>{LABEL[u.status]}</Badge>
-                          {u.status === "completed" && u.completed_on && (
-                            <span className="text-[12px] text-[var(--muted)]">
-                              {fmtDate(u.completed_on)}
-                              {u.marked_by_name ? ` · ${u.marked_by_name}` : ""}
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-1.5 flex items-center gap-3">
-                          <span className="h-1.5 w-40 overflow-hidden rounded-full bg-[#ececf3]">
-                            <span className="block h-full rounded-full bg-[var(--brand)]"
-                              style={{ width: `${pct}%` }} />
-                          </span>
-                          <span className="text-[12px] tabular-nums text-[var(--muted)]">
-                            {u.ticked} of {u.items} covered
-                          </span>
-                        </div>
-                        {u.outcome && (
-                          <p className="mt-1 text-[12.5px] text-[var(--muted)]">{u.outcome}</p>
-                        )}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </Card>
-          )}
+          {/* ------------------------------------------ one centre's view, grouped by term */}
+          {centerId && (() => {
+            const pos = currentPosition(session.start_date);
+            const curTerm = pos.phase === "teaching" ? pos.term : pos.phase === "revision" ? pos.termJustFinished : 3;
+            // Group units by term_no
+            const byTerm = new Map<number, typeof units>();
+            for (const u of units) {
+              const arr = byTerm.get(u.term_no) ?? [];
+              arr.push(u);
+              byTerm.set(u.term_no, arr);
+            }
+            return Array.from(byTerm.entries()).map(([termNo, termUnits]) => {
+              const totalItems = termUnits.reduce((s, u) => s + Number(u.items), 0);
+              const tickedItems = termUnits.reduce((s, u) => s + Number(u.ticked), 0);
+              const termPct = totalItems > 0 ? Math.round((tickedItems / totalItems) * 100) : 0;
+              const allDone = termUnits.every((u) => u.status === "completed");
+              const isCurrent = termNo === curTerm;
+              return (
+                <div key={termNo} className="mt-4">
+                  {/* Term header */}
+                  <div className="mb-1 flex flex-wrap items-center gap-3 px-1">
+                    <h2 className="text-[14px] font-semibold text-[var(--fg)]">
+                      {TERM_LABELS[termNo]}
+                    </h2>
+                    {isCurrent && (
+                      <span className="rounded-full bg-[var(--brand)] px-2 py-0.5 text-[11px] font-medium text-white">
+                        Current
+                      </span>
+                    )}
+                    {allDone && (
+                      <Badge tone="ok">All done</Badge>
+                    )}
+                    <span className="ml-auto text-[12px] text-[var(--muted)]">
+                      {tickedItems} of {totalItems} topics covered · {termPct}%
+                    </span>
+                  </div>
+                  <Card pad={false}>
+                    <ul>
+                      {termUnits.map((u) => {
+                        const pct = Number(u.items) > 0
+                          ? Math.round((Number(u.ticked) / Number(u.items)) * 100) : 0;
+                        return (
+                          <li key={u.id} className="border-t border-[#f1f1f6] first:border-0">
+                            <Link href={`/syllabus/${u.id}?center=${centerId}`}
+                              className="block px-5 py-4 hover:bg-[#fafafd]">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-[13px] font-semibold text-[var(--brand)]">
+                                  {MONTH_LABELS[u.term_no]?.[u.month_no] ?? `Month ${u.month_no}`}
+                                </span>
+                                <span className="text-[14px] font-medium">{u.subject}</span>
+                                {u.heading && (
+                                  <span className="text-[13px] text-[var(--muted)]">{u.heading}</span>
+                                )}
+                                <Badge tone={TONE[u.status]}>{LABEL[u.status]}</Badge>
+                                {u.status === "completed" && u.completed_on && (
+                                  <span className="text-[12px] text-[var(--muted)]">
+                                    {fmtDate(u.completed_on)}
+                                    {u.marked_by_name ? ` · ${u.marked_by_name}` : ""}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="mt-1.5 flex items-center gap-3">
+                                <span className="h-1.5 w-40 overflow-hidden rounded-full bg-[#ececf3]">
+                                  <span className="block h-full rounded-full bg-[var(--brand)]"
+                                    style={{ width: `${pct}%` }} />
+                                </span>
+                                <span className="text-[12px] tabular-nums text-[var(--muted)]">
+                                  {u.ticked} of {u.items} covered
+                                </span>
+                              </div>
+                              {u.outcome && (
+                                <p className="mt-1 text-[12.5px] text-[var(--muted)]">{u.outcome}</p>
+                              )}
+                            </Link>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </Card>
+                </div>
+              );
+            });
+          })()}
 
           {/* --------------------------------- every centre, for an admin */}
           {!centerId && centres.length > 0 && (
