@@ -795,7 +795,7 @@ async function studentRoster(p: ReportParams): Promise<ReportResult> {
 
   const rows = await query<ReportRow>(
     `SELECT s.enrollment_no, trim(s.first_name || ' ' || COALESCE(s.last_name,'')) AS student,
-            cl.name AS class_name, e.section, e.roll_no, ce.name AS center_name,
+            cl.name AS class_name, e.section, s.transport_mode, ce.name AS center_name,
             s.gender, s.dob::text AS dob,
             CASE WHEN s.dob IS NOT NULL
                  THEN date_part('year', age(s.dob))::int::text END AS age,
@@ -822,7 +822,7 @@ async function studentRoster(p: ReportParams): Promise<ReportResult> {
       { key: "student", label: "Student", width: 26 },
       { key: "class_name", label: "Class", width: 12 },
       { key: "section", label: "Section", width: 9 },
-      { key: "roll_no", label: "Roll", numeric: true },
+      { key: "transport_mode", label: "Transport", width: 12 },
       { key: "center_name", label: "Centre", width: 18 },
       { key: "gender", label: "Gender", width: 10 },
       { key: "dob", label: "Date of birth", width: 14 },
