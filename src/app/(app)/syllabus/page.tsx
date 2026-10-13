@@ -71,28 +71,27 @@ export default async function SyllabusPage({
               ? "Set it up under Set the syllabus."
               : "An administrator sets this up."} />
         </Card>
-      ) : (
-        <>
-          {/* ------------------------------------------ one centre's view, grouped by term */}
-          {centerId && (() => {
-            const pos = currentPosition(session.start_date);
-            const curTerm = pos.phase === "teaching" ? pos.term : pos.phase === "revision" ? pos.termJustFinished : 3;
-            // Group units by term_no
-            const byTerm = new Map<number, typeof units>();
-            for (const u of units) {
-              const arr = byTerm.get(u.term_no) ?? [];
-              arr.push(u);
-              byTerm.set(u.term_no, arr);
-            }
-            return Array.from(byTerm.entries()).map(([termNo, termUnits]) => {
+      ) : (() => {
+        const pos = currentPosition(session.start_date);
+        const curTerm = pos.phase === "teaching" ? pos.term
+          : pos.phase === "revision" ? pos.termJustFinished : 3;
+        const byTerm = new Map<number, typeof units>();
+        for (const u of units) {
+          const arr = byTerm.get(u.term_no) ?? [];
+          arr.push(u);
+          byTerm.set(u.term_no, arr);
+        }
+        return (
+          <>
+            {/* ---- Term-grouped units (shown for everyone) ---- */}
+            {Array.from(byTerm.entries()).map(([termNo, termUnits]) => {
               const totalItems = termUnits.reduce((s, u) => s + Number(u.items), 0);
               const tickedItems = termUnits.reduce((s, u) => s + Number(u.ticked), 0);
               const termPct = totalItems > 0 ? Math.round((tickedItems / totalItems) * 100) : 0;
-              const allDone = termUnits.every((u) => u.status === "completed");
+              const allDone = termUnits.length > 0 && termUnits.every((u) => u.status === "completed");
               const isCurrent = termNo === curTerm;
               return (
                 <div key={termNo} className="mt-4">
-                  {/* Term header */}
                   <div className="mb-1 flex flex-wrap items-center gap-3 px-1">
                     <h2 className="text-[14px] font-semibold text-[var(--fg)]">
                       {TERM_LABELS[termNo]}
@@ -102,22 +101,24 @@ export default async function SyllabusPage({
                         Current
                       </span>
                     )}
-                    {allDone && (
-                      <Badge tone="ok">All done</Badge>
+                    {allDone && <Badge tone="ok">All done</Badge>}
+                    {centerId && totalItems > 0 && (
+                      <span className="ml-auto text-[12px] text-[var(--muted)]">
+                        {tickedItems} of {totalItems} topics covered · {termPct}%
+                      </span>
                     )}
-                    <span className="ml-auto text-[12px] text-[var(--muted)]">
-                      {tickedItems} of {totalItems} topics covered · {termPct}%
-                    </span>
                   </div>
                   <Card pad={false}>
                     <ul>
                       {termUnits.map((u) => {
                         const pct = Number(u.items) > 0
                           ? Math.round((Number(u.ticked) / Number(u.items)) * 100) : 0;
+                        const href = centerId
+                          ? `/syllabus/${u.id}?center=${centerId}`
+                          : `/syllabus/${u.id}`;
                         return (
                           <li key={u.id} className="border-t border-[#f1f1f6] first:border-0">
-                            <Link href={`/syllabus/${u.id}?center=${centerId}`}
-                              className="block px-5 py-4 hover:bg-[#fafafd]">
+                            <Link href={href} className="block px-5 py-4 hover:bg-[#fafafd]">
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="text-[13px] font-semibold text-[var(--brand)]">
                                   {MONTH_LABELS[u.term_no]?.[u.month_no] ?? `Month ${u.month_no}`}
@@ -126,23 +127,29 @@ export default async function SyllabusPage({
                                 {u.heading && (
                                   <span className="text-[13px] text-[var(--muted)]">{u.heading}</span>
                                 )}
-                                <Badge tone={TONE[u.status]}>{LABEL[u.status]}</Badge>
-                                {u.status === "completed" && u.completed_on && (
-                                  <span className="text-[12px] text-[var(--muted)]">
-                                    {fmtDate(u.completed_on)}
-                                    {u.marked_by_name ? ` · ${u.marked_by_name}` : ""}
-                                  </span>
+                                {centerId && (
+                                  <>
+                                    <Badge tone={TONE[u.status]}>{LABEL[u.status]}</Badge>
+                                    {u.status === "completed" && u.completed_on && (
+                                      <span className="text-[12px] text-[var(--muted)]">
+                                        {fmtDate(u.completed_on)}
+                                        {u.marked_by_name ? ` · ${u.marked_by_name}` : ""}
+                                      </span>
+                                    )}
+                                  </>
                                 )}
                               </div>
-                              <div className="mt-1.5 flex items-center gap-3">
-                                <span className="h-1.5 w-40 overflow-hidden rounded-full bg-[#ececf3]">
-                                  <span className="block h-full rounded-full bg-[var(--brand)]"
-                                    style={{ width: `${pct}%` }} />
-                                </span>
-                                <span className="text-[12px] tabular-nums text-[var(--muted)]">
-                                  {u.ticked} of {u.items} covered
-                                </span>
-                              </div>
+                              {centerId && (
+                                <div className="mt-1.5 flex items-center gap-3">
+                                  <span className="h-1.5 w-40 overflow-hidden rounded-full bg-[#ececf3]">
+                                    <span className="block h-full rounded-full bg-[var(--brand)]"
+                                      style={{ width: `${pct}%` }} />
+                                  </span>
+                                  <span className="text-[12px] tabular-nums text-[var(--muted)]">
+                                    {u.ticked} of {u.items} covered
+                                  </span>
+                                </div>
+                              )}
                               {u.outcome && (
                                 <p className="mt-1 text-[12.5px] text-[var(--muted)]">{u.outcome}</p>
                               )}
@@ -154,66 +161,65 @@ export default async function SyllabusPage({
                   </Card>
                 </div>
               );
-            });
-          })()}
+            })}
 
-          {/* --------------------------------- every centre, for an admin */}
-          {!centerId && centres.length > 0 && (
-            <Card className="mt-4" pad={false}>
-              <div className="border-b border-[var(--border)] px-5 py-3">
-                <h2 className="text-[14px] font-semibold">How far each centre has got</h2>
-                <p className="text-[12.5px] text-[var(--muted)]">
-                  {units.length} unit{units.length === 1 ? "" : "s"} in {className}
-                  {subject ? ` ${subject}` : ""}. Pick a centre above to see its months.
-                </p>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-[13.5px]">
-                  <thead>
-                    <tr className="text-left text-[12px] uppercase tracking-[0.05em] text-[var(--faint)]">
-                      <th className="px-5 py-2.5 font-medium">Centre</th>
-                      <th className="px-3 py-2.5 text-right font-medium">Done</th>
-                      <th className="px-3 py-2.5 text-right font-medium">Under way</th>
-                      <th className="px-5 py-2.5 font-medium">Progress</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {centres.map((c) => {
-                      const pct = c.months > 0
-                        ? Math.round((Number(c.completed) / Number(c.months)) * 100) : 0;
-                      return (
-                        <tr key={c.center_id} className="border-t border-[#f1f1f6]">
-                          <td className="px-5 py-2.5">
-                            <Link href={`/syllabus?center=${c.center_id}&class=${classId}${
-                              subject ? `&subject=${encodeURIComponent(subject)}` : ""}`}
-                              className="font-medium hover:text-[var(--brand)]">
-                              {c.center_name}
-                            </Link>
-                          </td>
-                          <td className="px-3 py-2.5 text-right tabular-nums">
-                            {c.completed} / {c.months}
-                          </td>
-                          <td className="px-3 py-2.5 text-right tabular-nums">{c.in_progress}</td>
-                          <td className="px-5 py-2.5">
-                            <span className="inline-flex items-center gap-2">
-                              <span className="h-1.5 w-28 overflow-hidden rounded-full bg-[#ececf3]">
-                                <span className="block h-full rounded-full"
-                                  style={{ width: `${pct}%`,
-                                    background: pct >= 75 ? "var(--ok)" : pct >= 40 ? "#eab308" : "var(--warn)" }} />
+            {/* ---- Per-centre comparison table for admins (no centre selected) ---- */}
+            {!centerId && centres.length > 0 && (
+              <Card className="mt-6" pad={false}>
+                <div className="border-b border-[var(--border)] px-5 py-3">
+                  <h2 className="text-[14px] font-semibold">How far each centre has got</h2>
+                  <p className="text-[12.5px] text-[var(--muted)]">
+                    Pick a centre above to see its progress month by month.
+                  </p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[13.5px]">
+                    <thead>
+                      <tr className="text-left text-[12px] uppercase tracking-[0.05em] text-[var(--faint)]">
+                        <th className="px-5 py-2.5 font-medium">Centre</th>
+                        <th className="px-3 py-2.5 text-right font-medium">Done</th>
+                        <th className="px-3 py-2.5 text-right font-medium">Under way</th>
+                        <th className="px-5 py-2.5 font-medium">Progress</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {centres.map((c) => {
+                        const pct = c.months > 0
+                          ? Math.round((Number(c.completed) / Number(c.months)) * 100) : 0;
+                        return (
+                          <tr key={c.center_id} className="border-t border-[#f1f1f6]">
+                            <td className="px-5 py-2.5">
+                              <Link href={`/syllabus?center=${c.center_id}&class=${classId}${
+                                subject ? `&subject=${encodeURIComponent(subject)}` : ""}`}
+                                className="font-medium hover:text-[var(--brand)]">
+                                {c.center_name}
+                              </Link>
+                            </td>
+                            <td className="px-3 py-2.5 text-right tabular-nums">
+                              {c.completed} / {c.months}
+                            </td>
+                            <td className="px-3 py-2.5 text-right tabular-nums">{c.in_progress}</td>
+                            <td className="px-5 py-2.5">
+                              <span className="inline-flex items-center gap-2">
+                                <span className="h-1.5 w-28 overflow-hidden rounded-full bg-[#ececf3]">
+                                  <span className="block h-full rounded-full"
+                                    style={{ width: `${pct}%`,
+                                      background: pct >= 75 ? "var(--ok)" : pct >= 40 ? "#eab308" : "var(--warn)" }} />
+                                </span>
+                                <span className="text-[12px] tabular-nums text-[var(--muted)]">{pct}%</span>
                               </span>
-                              <span className="text-[12px] tabular-nums text-[var(--muted)]">{pct}%</span>
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          )}
-        </>
-      )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
+          </>
+        );
+      })()}
     </>
   );
 }
