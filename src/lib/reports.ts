@@ -487,7 +487,12 @@ async function studentAttendanceRegister(p: ReportParams, period: string): Promi
   let where = "";
   if (p.centerId) { params.push(p.centerId); where += ` AND e.center_id = $${params.length}`; }
   if (p.classId) { params.push(p.classId); where += ` AND e.class_level_id = $${params.length}`; }
-  if (p.enrollmentStatus) { params.push(p.enrollmentStatus); where += ` AND e.status = $${params.length}`; }
+  if (p.enrollmentStatus) {
+    params.push(p.enrollmentStatus); where += ` AND e.status = $${params.length}`;
+    // keep student record consistent: an "active" enrollment filter should
+    // only show students whose student record is also active
+    if (p.enrollmentStatus === "active") where += ` AND s.status = 'active'`;
+  }
 
   const rows = await query<{
     student_id: number; enrollment_no: string; student: string;
@@ -505,7 +510,7 @@ async function studentAttendanceRegister(p: ReportParams, period: string): Promi
        JOIN centers ce ON ce.id = e.center_id
        LEFT JOIN student_attendance a
          ON a.enrollment_id = e.id AND a.att_date BETWEEN $2 AND $3
-      WHERE e.session_id = $1 ${where}
+      WHERE e.session_id = $1 AND NOT s.is_test ${where}
       ORDER BY ce.code, cl.sequence, student`,
     params,
   );
