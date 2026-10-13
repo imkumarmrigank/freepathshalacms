@@ -49,7 +49,8 @@ export default async function PtmPage({
     center_name: string; class_name: string | null;
     follow_up_required: boolean; follow_up_status: string;
     flag_status: string | null; flag_urgency: string | null; flag_on: string | null;
-    sibling_count: number; sibling_names: string | null; total_rows: string;
+    sibling_count: number; sibling_names: string | null; transport_mode: string | null;
+    total_rows: string;
   }>(
     `SELECT count(*) OVER () AS total_rows,
             i.id, i.interaction_date, s.first_name, s.last_name, s.enrollment_no, s.transport_mode,
