@@ -16,6 +16,7 @@ import DropoutControl from "./DropoutControl";
 import FlagForCounselling, { type OpenFlag } from "./FlagForCounselling";
 import FlagMark from "@/components/FlagMark";
 import SiblingMark from "@/components/SiblingMark";
+import TransportMark from "@/components/TransportMark";
 import { siblingMark } from "@/lib/siblings";
 import EnrollmentControls from "./EnrollmentControls";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
@@ -148,7 +149,8 @@ export default async function StudentPage({
       <PageHeader
         title={<>{fullName(student)}
           <FlagMark status={flag?.status} urgency={flag?.urgency} raisedOn={flag?.raised_on} />
-          <SiblingMark count={sib.n} names={sib.names} /></>}
+          <SiblingMark count={sib.n} names={sib.names} />
+          <TransportMark mode={student.transport_mode} /></>}
         subtitle={`${student.enrollment_no} · ${student.center_name}${
           currentEnr ? ` · ${currentEnr.class_name}` : ""}`}
         back={{ href: "/students", label: t("Students") }}

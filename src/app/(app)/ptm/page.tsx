@@ -6,6 +6,7 @@ import { Avatar, Badge, Card, Empty, PageHeader } from "@/components/ui";
 import Filters from "@/components/Filters";
 import FlagMark from "@/components/FlagMark";
 import SiblingMark from "@/components/SiblingMark";
+import TransportMark from "@/components/TransportMark";
 import { SIBLING_COLS, SIBLING_JOIN } from "@/lib/siblings";
 import { IconPlus } from "@/components/icons";
 import { fmtDate, fullName, titleCase } from "@/lib/format";
@@ -51,7 +52,7 @@ export default async function PtmPage({
     sibling_count: number; sibling_names: string | null; total_rows: string;
   }>(
     `SELECT count(*) OVER () AS total_rows,
-            i.id, i.interaction_date, s.first_name, s.last_name, s.enrollment_no,
+            i.id, i.interaction_date, s.first_name, s.last_name, s.enrollment_no, s.transport_mode,
             u.name AS mentor, i.parent_present, i.engagement, ce.name AS center_name,
             cl.name AS class_name, i.follow_up_required, i.follow_up_status,
             cf.status AS flag_status, cf.urgency AS flag_urgency,
@@ -129,6 +130,7 @@ export default async function PtmPage({
                             {fullName(r)}
                             <FlagMark status={r.flag_status} urgency={r.flag_urgency} raisedOn={r.flag_on} />
                             <SiblingMark count={r.sibling_count} names={r.sibling_names} />
+                            <TransportMark mode={r.transport_mode} />
                           </div>
                           <div className="font-mono text-[11px] text-[var(--faint)]">{r.enrollment_no}</div>
                         </div>

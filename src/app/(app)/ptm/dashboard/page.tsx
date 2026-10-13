@@ -5,6 +5,7 @@ import { Badge, Card, Empty, PageHeader, StatCard } from "@/components/ui";
 import Filters from "@/components/Filters";
 import FlagMark from "@/components/FlagMark";
 import SiblingMark from "@/components/SiblingMark";
+import TransportMark from "@/components/TransportMark";
 import { ChartFrame, HBarChart, StackedBarChart } from "@/components/charts";
 import { SERIES } from "@/lib/chart-palette";
 import { fmtDate, today, titleCase } from "@/lib/format";
@@ -404,6 +405,7 @@ export default async function PtmDashboardPage({
                       <Link href={`/ptm/${r.id}`} className="font-medium hover:underline">{r.student}</Link>
                       <FlagMark status={r.flag_status} urgency={r.flag_urgency} raisedOn={r.flag_on} />
                       <SiblingMark count={r.sibling_count} names={r.sibling_names} />
+                      <TransportMark mode={r.transport_mode} />
                       <div className="font-mono text-[11px] text-[var(--faint)]">{r.enrollment_no}</div>
                     </td>
                     <td className="text-[var(--muted)]">{r.center_name}</td>
@@ -529,6 +531,7 @@ export default async function PtmDashboardPage({
                         className="font-medium hover:text-[var(--brand)]">{r.student}</Link>
                       <FlagMark status={r.flag_status} urgency={r.flag_urgency} raisedOn={r.flag_on} />
                       <SiblingMark count={r.sibling_count} names={r.sibling_names} />
+                      <TransportMark mode={r.transport_mode} />
                       <div className="font-mono text-[11px] text-[var(--faint)]">{r.enrollment_no}</div>
                     </td>
                     {!centerId && <td className="text-[var(--muted)]">{r.center_name}</td>}

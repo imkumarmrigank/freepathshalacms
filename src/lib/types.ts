@@ -39,6 +39,7 @@ export type Student = {
   udise: boolean | null;
   rte_application_no: string | null;
   apaar_id: string | null;
+  transport_mode: string | null;
   aadhaar_number: string | null;
   aadhaar_media_id: number | null;
 

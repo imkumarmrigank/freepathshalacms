@@ -152,6 +152,7 @@ export async function updateStudent(_prev: unknown, form: FormData) {
     ["guardian_aadhaar_number", digits("guardian_aadhaar_number")],
     ["guardian_aadhaar_media_id", media("guardian_aadhaar_media_id")],
     ["guardian_income", money("guardian_income")],
+    ["transport_mode", str(form, "transport_mode") || null],
   ];
   for (const [col, val] of extra) {
     values.push(val);

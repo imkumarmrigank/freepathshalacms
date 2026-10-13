@@ -10,6 +10,7 @@ import {
 } from "@/lib/attendance-meta";
 import FlagMark from "@/components/FlagMark";
 import SiblingMark from "@/components/SiblingMark";
+import TransportMark from "@/components/TransportMark";
 import { useT } from "@/components/LocaleProvider";
 
 export type Row = {
@@ -19,7 +20,7 @@ export type Row = {
   status: string | null;
   reason: string | null;
   flag_status: string | null; flag_urgency: string | null; flag_on: string | null;
-  sibling_count: number; sibling_names: string | null;
+  sibling_count: number; sibling_names: string | null; transport_mode: string | null;
 };
 
 const OPTIONS = MARK_OPTIONS;
@@ -176,6 +177,7 @@ export default function AttendanceSheet({
                           {r.first_name} {r.last_name ?? ""}
                           <FlagMark status={r.flag_status} urgency={r.flag_urgency} raisedOn={r.flag_on} />
                           <SiblingMark count={r.sibling_count} names={r.sibling_names} />
+                          <TransportMark mode={r.transport_mode} />
                         </Link>
                         <div className="font-mono text-[11px] text-[var(--faint)]">
                           {r.enrollment_no}

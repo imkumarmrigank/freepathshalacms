@@ -43,3 +43,7 @@ export const IconMenu = s("M4 7h16M4 12h16M4 17h16");
 export const IconClose = s("M6 6l12 12M18 6L6 18");
 export const IconClipboard = s("M9 3h6a1 1 0 0 1 1 1v1H8V4a1 1 0 0 1 1-1M8 5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 12h6M9 16h4");
 export const IconFlag = s("M4 21V4M4 5h11l-1.5 3L15 11H4");
+// transport mode icons
+export const IconRickshaw = s("M5 17a2 2 0 1 0 4 0 2 2 0 0 0-4 0M15 17a2 2 0 1 0 4 0 2 2 0 0 0-4 0M3 17H1v-4l3-6h12l3 5h2v5h-2M6 17h9M13 7l2 5");
+export const IconCycle = s("M5 17a3 3 0 1 0 6 0 3 3 0 0 0-6 0M13 17a3 3 0 1 0 6 0 3 3 0 0 0-6 0M8 17V9l4-2 2 3h4M8 9l-2-4M6 5h4");
+export const IconWalk = s("M13 4a1 1 0 1 0 2 0 1 1 0 0 0-2 0M6 20l4-4 2-7 3 3 3 4M10.5 9l3.5 1 1 5");

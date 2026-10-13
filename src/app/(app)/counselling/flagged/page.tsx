@@ -5,6 +5,7 @@ import { centersForUser, listClasses, resolveCenterId } from "@/lib/queries";
 import { Badge, Card, Empty, PageHeader, StatCard } from "@/components/ui";
 import Filters from "@/components/Filters";
 import SiblingMark from "@/components/SiblingMark";
+import TransportMark from "@/components/TransportMark";
 import { SIBLING_COLS, SIBLING_JOIN } from "@/lib/siblings";
 import Pager from "@/components/Pager";
 import SortHeader, { sortFrom } from "@/components/SortHeader";
@@ -29,7 +30,7 @@ type Row = {
   outcome: string | null; closed_on: string | null; days_open: string;
   steps: number; trail: Step[] | null;
   times_flagged: number; nth: number;
-  sibling_count: number; sibling_names: string | null; total_rows: string;
+  sibling_count: number; sibling_names: string | null; transport_mode: string | null; total_rows: string;
 };
 
 const TIMES_FLAGGED =
@@ -107,7 +108,7 @@ export default async function FlaggedStudentsPage({
   const [rows, tallyRows] = await Promise.all([
     query<Row>(
       `SELECT count(*) OVER () AS total_rows,
-              f.id, f.student_id, s.first_name, s.last_name, s.enrollment_no,
+              f.id, f.student_id, s.first_name, s.last_name, s.enrollment_no, s.transport_mode,
               ce.name AS center_name, cl.name AS class_name,
               f.reasons, f.note, f.urgency, f.status, f.raised_on, f.picked_up_on,
               f.outcome, f.closed_on,
@@ -248,6 +249,7 @@ export default async function FlaggedStudentsPage({
                         {[r.first_name, r.last_name].filter(Boolean).join(" ")}
                       </Link>
                       <SiblingMark count={r.sibling_count} names={r.sibling_names} />
+                      <TransportMark mode={r.transport_mode} />
                       {r.times_flagged > 1 && (
                         <span className="ml-1.5 align-middle">
                           <Badge tone="warn">{r.times_flagged}× flagged</Badge>

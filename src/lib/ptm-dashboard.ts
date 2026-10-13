@@ -184,11 +184,11 @@ export function ptmInteractionsOn(day: string, centerId: number | null, mentorId
     follow_up_status: string; discussion: string | null;
     parent_name: string | null; phone: string | null;
     flag_status: string | null; flag_urgency: string | null; flag_on: string | null;
-    sibling_count: number; sibling_names: string | null;
+    sibling_count: number; sibling_names: string | null; transport_mode: string | null;
     written_on: string; days_later: number;
   }>(
     `SELECT i.id, i.student_id, trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
-            s.enrollment_no, cl.name AS class_name, ce.name AS center_name,
+            s.enrollment_no, s.transport_mode, cl.name AS class_name, ce.name AS center_name,
             u.name AS mentor, i.parent_present, i.engagement, i.concern_tags,
             i.follow_up_required, i.follow_up_date, i.follow_up_status, i.discussion,
             ${PARENT_NAME}, ${PHONE},
@@ -271,13 +271,13 @@ export function ptmAbsentees(day: string, centerId: number | null, limit = 200) 
     guardian_name: string | null; phone: string | null; last_met: string | null;
     met_this_session: number; flag_status: string | null; flag_urgency: string | null;
     flag_on: string | null; sibling_count: number; sibling_names: string | null;
-    total_rows: string;
+    transport_mode: string | null; total_rows: string;
   }>(
     `${EXPECTED_ON_DAY(centerId)}
      SELECT count(*) OVER () AS total_rows,
             s.id AS student_id,
             trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
-            s.enrollment_no, cl.name AS class_name, ce.name AS center_name,
+            s.enrollment_no, s.transport_mode, cl.name AS class_name, ce.name AS center_name,
             NULLIF(s.father_name, '') AS father_name,
             NULLIF(s.mother_name, '') AS mother_name,
             NULLIF(s.guardian_name, '') AS guardian_name,

@@ -8,7 +8,7 @@ import DocUpload from "./DocUpload";
 import { saveDraft, submitAdmission, type AdmissionPayload } from "./actions";
 import {
   BLOOD_GROUPS, CATEGORIES, COUNTRIES, GENDERS, GUARDIAN_KINDS, NATIONALITIES,
-  OCCUPATIONS, QUALIFICATIONS, RELIGIONS, STATES, STEPS, maskAadhaar,
+  OCCUPATIONS, QUALIFICATIONS, RELIGIONS, STATES, STEPS, TRANSPORT_MODES, maskAadhaar,
 } from "@/lib/admission-meta";
 
 type Ref = { id: number; name: string; code?: string; defaultSection?: string };
@@ -552,6 +552,16 @@ export default function AdmissionWizard({
             {(errors.class_level_id || errors.center_id) && (
               <p className="text-[12px] text-[var(--bad)]">Please choose a class and a centre.</p>
             )}
+            <label className="field">
+              <span>Mode of Transportation</span>
+              <select className="select" name="transport_mode" value={v("transport_mode")}
+                onChange={(e) => set("transport_mode", e.target.value)}>
+                <option value="">Select Mode</option>
+                {TRANSPORT_MODES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </label>
             <YesNo label="UDISE" value={(data.udise as boolean) ?? null}
               onChange={(x) => set("udise", x)} />
             <Text label="RTE Application Number" name="rte_application_no"

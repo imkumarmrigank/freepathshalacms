@@ -48,6 +48,14 @@ export const STATES = [
 
 export const COUNTRIES = ["India", "Other"] as const;
 
+export const TRANSPORT_MODES = [
+  { value: "rickshaw", label: "By Rickshaw" },
+  { value: "cycle",    label: "By Cycle" },
+  { value: "walk",     label: "By Walk" },
+] as const;
+
+export type TransportMode = (typeof TRANSPORT_MODES)[number]["value"];
+
 /** Which parent cards the family step shows. */
 export const GUARDIAN_KINDS = [
   { key: "mother", label: "Mother" },
