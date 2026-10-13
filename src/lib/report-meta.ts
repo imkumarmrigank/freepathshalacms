@@ -343,6 +343,16 @@ export const REPORTS: ReportMeta[] = [
     filters: ["center", "class", "session"],
   },
   {
+    key: "syllabus-progress",
+    label: "Syllabus progress",
+    group: "Teaching",
+    description:
+      "How far each centre has got through the syllabus, unit by unit: status, topics covered, "
+      + "percentage done and the date completed. Filter by term to see where things stand mid-term.",
+    filters: ["session", "center", "class"],
+    roles: ["super_admin", "admin", "center_manager"],
+  },
+  {
     key: "audit-reports",
     label: "Filed audit reports",
     group: "Centre audits",

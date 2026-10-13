@@ -119,6 +119,7 @@ export async function runReport(
     case "sports-attendance":            return sportsAttendance(scoped, period);
     case "sports-marks":                 return sportsMarks(scoped, period);
     case "sports-talent":                return sportsTalent(scoped);
+    case "syllabus-progress":            return syllabusProgress(scoped);
     default: throw new Error("Unknown report.");
   }
 }
@@ -2786,5 +2787,90 @@ async function absentWithReason(p: ReportParams, period: string): Promise<Report
       { key: "phone", label: "Phone", width: 12 },
     ],
     rows,
+  };
+}
+
+/* -------------------------------------------------------------- syllabus */
+
+async function syllabusProgress(p: ReportParams): Promise<ReportResult> {
+  const TERM_LABEL: Record<number, string> = {
+    1: "Term 1 (Apr–Jun)",
+    2: "Term 2 (Jul–Oct)",
+    3: "Term 3 (Nov–Jan)",
+  };
+  const MONTH_LABEL: Record<number, Record<number, string>> = {
+    1: { 1: "April", 2: "May", 3: "June" },
+    2: { 1: "August", 2: "September", 3: "October" },
+    3: { 1: "November", 2: "December", 3: "January" },
+  };
+
+  const params: unknown[] = [p.sessionId];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where += ` AND c.id = $${params.length}`; }
+  if (p.classId) { params.push(p.classId); where += ` AND u.class_level_id = $${params.length}`; }
+
+  const rows = await query<{
+    center_name: string; class_name: string; subject: string;
+    term_no: string; month_no: string; status: string;
+    completed_on: string | null; topics: string; ticked: string;
+  }>(
+    `SELECT c.name AS center_name, cl.name AS class_name, u.subject,
+            u.term_no, u.month_no,
+            COALESCE(sp.status, 'not_started') AS status,
+            sp.completed_on::text AS completed_on,
+            COUNT(DISTINCT i.id) AS topics,
+            COUNT(DISTINCT t.item_id) AS ticked
+       FROM centers c
+       CROSS JOIN syllabus_units u
+       JOIN class_levels cl ON cl.id = u.class_level_id
+       LEFT JOIN syllabus_items i ON i.unit_id = u.id
+       LEFT JOIN syllabus_item_ticks t ON t.item_id = i.id AND t.center_id = c.id
+       LEFT JOIN syllabus_progress sp ON sp.unit_id = u.id AND sp.center_id = c.id
+      WHERE u.session_id = $1 AND c.is_active ${where}
+      GROUP BY c.name, c.code, cl.name, cl.sequence, u.subject, u.term_no, u.month_no,
+               sp.status, sp.completed_on
+      ORDER BY c.code, cl.sequence, u.subject, u.term_no, u.month_no`,
+    params,
+  );
+
+  const STATUS_LABEL: Record<string, string> = {
+    not_started: "Not started",
+    in_progress: "Under way",
+    completed: "Completed",
+  };
+
+  return {
+    title: "Syllabus progress",
+    subtitle: "How far each centre has got through the syllabus",
+    columns: [
+      { key: "center_name", label: "Centre", width: 20 },
+      { key: "class_name", label: "Class", width: 12 },
+      { key: "subject", label: "Subject", width: 16 },
+      { key: "term", label: "Term", width: 20 },
+      { key: "month", label: "Month", width: 14 },
+      { key: "status", label: "Status", width: 14 },
+      { key: "topics_covered", label: "Topics covered", numeric: true, width: 15 },
+      { key: "total_topics", label: "Total topics", numeric: true, width: 13 },
+      { key: "pct_done", label: "% done", numeric: true, width: 9 },
+      { key: "completed_on", label: "Completed on", width: 14 },
+    ],
+    rows: rows.map((r) => {
+      const termNo = Number(r.term_no);
+      const monthNo = Number(r.month_no);
+      const topics = Number(r.topics);
+      const ticked = Number(r.ticked);
+      return {
+        center_name: r.center_name,
+        class_name: r.class_name,
+        subject: r.subject,
+        term: TERM_LABEL[termNo] ?? `Term ${termNo}`,
+        month: MONTH_LABEL[termNo]?.[monthNo] ?? `Month ${monthNo}`,
+        status: STATUS_LABEL[r.status] ?? r.status,
+        topics_covered: ticked,
+        total_topics: topics,
+        pct_done: topics > 0 ? Math.round((ticked / topics) * 100) : 0,
+        completed_on: r.completed_on ?? "",
+      };
+    }),
   };
 }

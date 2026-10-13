@@ -3,9 +3,10 @@ import { notFound } from "next/navigation";
 import { requireFeature, canTouchCenter } from "@/lib/auth";
 import { Alert, Badge, Card, PageHeader } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
-import { canEditSyllabus, canMarkSyllabus } from "@/lib/roles";
+import { canEditSyllabus, canMarkSyllabus, isTeaching } from "@/lib/roles";
 import { itemsFor, progressFor, unitById } from "@/lib/syllabus";
-import { MONTH_LABELS } from "@/lib/term-calendar";
+import { MONTH_LABELS, currentPosition } from "@/lib/term-calendar";
+import { currentSession } from "@/lib/queries";
 import MonthWork from "./MonthWork";
 
 export const metadata = { title: "Syllabus month · Pehchaan" };
@@ -30,14 +31,26 @@ export default async function SyllabusUnitPage({
   if (centerId && !canTouchCenter(user, centerId))
     return <Alert kind="bad">That centre is not yours.</Alert>;
 
-  const [items, progress] = await Promise.all([
+  const [items, progress, session] = await Promise.all([
     itemsFor(unit.id, centerId),
     centerId ? progressFor(unit.id, centerId) : Promise.resolve(null),
+    currentSession(),
   ]);
 
   const done = items.filter((i) => i.done_on).length;
   const mayMark = Boolean(centerId)
     && (canMarkSyllabus(user.role) || canEditSyllabus(user.role));
+
+  // For teachers, show items grouped by week; highlight current week if viewing the active month
+  const currentWeekNo = isTeaching(user.role)
+    ? (() => {
+        if (!session) return 0;
+        const pos = currentPosition(session.start_date);
+        return pos.phase === "teaching" && pos.term === unit.term_no && pos.monthNo === unit.month_no
+          ? pos.weekNo
+          : 0; // 0 = group by week but no week highlighted
+      })()
+    : undefined; // undefined = flat list (admin/manager view)
 
   return (
     <>
@@ -85,6 +98,7 @@ export default async function SyllabusUnitPage({
         status={progress?.status ?? "not_started"}
         remarks={progress?.remarks ?? null}
         completedOn={progress?.completed_on ?? null}
+        currentWeekNo={currentWeekNo}
       />
     </>
   );

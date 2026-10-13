@@ -14,7 +14,7 @@ import type { Item } from "@/lib/syllabus";
  * The monthly mark is the deliberate act, so that one keeps its button.
  */
 export default function MonthWork({
-  unitId, centerId, items, mayMark, status, remarks, completedOn,
+  unitId, centerId, items, mayMark, status, remarks, completedOn, currentWeekNo,
 }: {
   unitId: number;
   centerId: number | null;
@@ -23,6 +23,12 @@ export default function MonthWork({
   status: string;
   remarks: string | null;
   completedOn: string | null;
+  /**
+   * undefined = flat list (admin view).
+   * 0         = weekly groups, no highlight.
+   * 1–4       = weekly groups, that week highlighted.
+   */
+  currentWeekNo?: number;
 }) {
   const [state, action] = useActionState(markMonth, null);
   const [pick, setPick] = useState(status);
@@ -48,6 +54,38 @@ export default function MonthWork({
 
   const doneCount = items.filter((i) => ticked[i.id]).length;
 
+  // Build week groups when currentWeekNo is defined (any value incl. 0 = teacher view)
+  const byWeek = currentWeekNo !== undefined
+    ? (() => {
+        const map = new Map<number, Item[]>();
+        for (const item of items) {
+          const arr = map.get(item.week_no) ?? [];
+          arr.push(item);
+          map.set(item.week_no, arr);
+        }
+        return map;
+      })()
+    : null;
+
+  const renderItems = (list: Item[]) => (
+    <ul>
+      {list.map((i) => (
+        <li key={i.id} className="border-t border-[#f1f1f6] first:border-0">
+          <label className={`flex items-start gap-3 px-5 py-3 ${
+            mayMark ? "cursor-pointer hover:bg-[#fafafd]" : ""}`}>
+            <input type="checkbox" className="mt-0.5 h-4 w-4 flex-none accent-[var(--brand)]"
+              checked={Boolean(ticked[i.id])} disabled={!mayMark}
+              onChange={(e) => toggle(i.id, e.target.checked)} />
+            <span className={`text-[13.5px] leading-relaxed ${
+              ticked[i.id] ? "text-[var(--muted)] line-through" : ""}`}>
+              {i.text}
+            </span>
+          </label>
+        </li>
+      ))}
+    </ul>
+  );
+
   return (
     <>
       <Card className="mt-5" pad={false}>
@@ -62,22 +100,33 @@ export default function MonthWork({
         {tickError && (
           <p className="px-5 pt-3 text-[13px] text-[var(--bad)]">{tickError}</p>
         )}
-        <ul>
-          {items.map((i) => (
-            <li key={i.id} className="border-t border-[#f1f1f6] first:border-0">
-              <label className={`flex items-start gap-3 px-5 py-3 ${
-                mayMark ? "cursor-pointer hover:bg-[#fafafd]" : ""}`}>
-                <input type="checkbox" className="mt-0.5 h-4 w-4 flex-none accent-[var(--brand)]"
-                  checked={Boolean(ticked[i.id])} disabled={!mayMark}
-                  onChange={(e) => toggle(i.id, e.target.checked)} />
-                <span className={`text-[13.5px] leading-relaxed ${
-                  ticked[i.id] ? "text-[var(--muted)] line-through" : ""}`}>
-                  {i.text}
-                </span>
-              </label>
-            </li>
-          ))}
-        </ul>
+        {byWeek
+          ? Array.from(byWeek.entries()).map(([weekNo, weekItems]) => {
+              const isCurrent = weekNo === currentWeekNo;
+              const weekDone = weekItems.every((i) => ticked[i.id]);
+              return (
+                <div key={weekNo} className={isCurrent ? "ring-1 ring-inset ring-[var(--brand-light,#e0e7ff)]" : ""}>
+                  <div className={`flex items-center gap-2 px-5 py-2 text-[12px] font-semibold uppercase tracking-wide ${
+                    isCurrent ? "bg-[#f5f7ff] text-[var(--brand)]" : "bg-[#fafafd] text-[var(--muted)]"
+                  }`}>
+                    Week {weekNo}
+                    {isCurrent && (
+                      <span className="rounded-full bg-[var(--brand)] px-1.5 py-0.5 text-[10px] font-medium text-white normal-case tracking-normal">
+                        This week
+                      </span>
+                    )}
+                    {weekDone && (
+                      <span className="rounded-full bg-[#16a34a] px-1.5 py-0.5 text-[10px] font-medium text-white normal-case tracking-normal">
+                        Done
+                      </span>
+                    )}
+                  </div>
+                  {renderItems(weekItems)}
+                </div>
+              );
+            })
+          : renderItems(items)
+        }
       </Card>
 
       {mayMark && (
