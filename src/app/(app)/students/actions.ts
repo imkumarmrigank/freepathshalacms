@@ -166,10 +166,13 @@ export async function updateStudent(_prev: unknown, form: FormData) {
   // Back to active from the dropdown: this year's enrolment has to be active
   // too, or the child shows in the student list but never on the register —
   // the register lists active enrolments, not active students.
+  // 'graduated' here means the year-end run mistakenly graduated them (e.g. class
+  // was the terminal one but the student is returning / was mis-classified) —
+  // distinct from a student who truly left the school for good.
   if (status === "active" && existing.status !== "active") {
     await query(
       `UPDATE enrollments SET status = 'active'
-        WHERE student_id = $1 AND status = 'left'
+        WHERE student_id = $1 AND status IN ('left', 'graduated')
           AND session_id = (SELECT id FROM academic_sessions WHERE is_current
                              ORDER BY sequence DESC LIMIT 1)`,
       [id]);
