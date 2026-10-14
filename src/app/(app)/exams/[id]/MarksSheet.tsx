@@ -104,8 +104,14 @@ export default function MarksSheet({
                       </div>
                     </td>
                     <td className="text-right">
+                      {/* Hidden input carries the marks key for absent students —
+                          disabled inputs are not submitted, so without this the
+                          server never sees m_N and silently skips absent students. */}
+                      {isAbsent && (
+                        <input type="hidden" name={`m_${r.student_id}`} value="" />
+                      )}
                       <input
-                        name={`m_${r.student_id}`}
+                        name={isAbsent ? undefined : `m_${r.student_id}`}
                         className="input w-24 text-right tabular-nums"
                         inputMode="decimal" type="number" min={0} max={maxMarks} step="0.5"
                         disabled={readOnly || isAbsent}
