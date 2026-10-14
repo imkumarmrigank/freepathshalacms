@@ -449,7 +449,7 @@ async function studentAttendanceSummary(p: ReportParams, period: string): Promis
        JOIN centers ce ON ce.id = e.center_id
        LEFT JOIN student_attendance a
          ON a.enrollment_id = e.id AND a.att_date BETWEEN $2 AND $3
-      WHERE e.session_id = $1 ${where}
+      WHERE e.session_id = $1 AND e.status = 'active' AND s.status = 'active' ${where}
       GROUP BY s.enrollment_no, student, cl.name, cl.sequence, ce.name, ce.code
       ORDER BY ce.code, cl.sequence, student`,
     params,
@@ -512,7 +512,7 @@ async function studentAttendanceRegister(p: ReportParams, period: string): Promi
        JOIN centers ce ON ce.id = e.center_id
        LEFT JOIN student_attendance a
          ON a.enrollment_id = e.id AND a.att_date BETWEEN $2 AND $3
-      WHERE e.session_id = $1 AND NOT s.is_test ${where}
+      WHERE e.session_id = $1 ${where}
       ORDER BY ce.code, cl.sequence, student`,
     params,
   );
