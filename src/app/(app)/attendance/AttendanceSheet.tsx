@@ -44,7 +44,7 @@ export default function AttendanceSheet({
   // the new class looked unmarked until the page was reloaded by hand.
   const fromServer: Record<number, string> = useMemo(
     () => Object.fromEntries(
-      rows.map((r) => [r.enrollment_id, r.status ?? (isPast ? "absent" : "present")]),
+      rows.map((r) => [r.enrollment_id, r.status ?? ""]),
     ),
     [rows, isPast],
   );
