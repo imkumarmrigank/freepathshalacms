@@ -20,7 +20,8 @@ export async function GET(req: Request) {
   if (user.role !== "super_admin") return new NextResponse("Forbidden", { status: 403 });
 
   const url = new URL(req.url);
-  const tab = url.searchParams.get("tab") === "staff" ? "staff" : "students";
+  const rawTab = url.searchParams.get("tab");
+  const tab = rawTab === "staff" ? "staff" : rawTab === "enrollments" ? "enrollments" : "students";
   const centerId  = Number(url.searchParams.get("center"))  || null;
   const classId   = Number(url.searchParams.get("class"))   || null;
   const statusFlt = url.searchParams.get("status") || null;
@@ -28,13 +29,59 @@ export async function GET(req: Request) {
   const roleFlt   = url.searchParams.get("role")   || null;
   const activeFlt = url.searchParams.get("active") || null;
   const q         = url.searchParams.get("q")      || null;
+  const period    = url.searchParams.get("period") || "monthly";
+  const fromDate  = url.searchParams.get("from")   || null;
+  const toDate    = url.searchParams.get("to")     || null;
 
   const session = await currentSession();
   const sessionId = Number(url.searchParams.get("session")) || session?.id || null;
 
   let lines: string[];
 
-  if (tab === "students") {
+  if (tab === "enrollments") {
+    const params: unknown[] = [];
+    const conds: string[] = [];
+
+    const trunc = period === "weekly" ? "week" : period === "yearly" ? "year" : "month";
+
+    if (centerId)  { params.push(centerId);  conds.push(`s.center_id = $${params.length}`); }
+    if (classId)   { params.push(classId);   conds.push(`e.class_level_id = $${params.length}`); }
+    if (fromDate)  { params.push(fromDate);  conds.push(`s.admission_date >= $${params.length}`); }
+    if (toDate)    { params.push(toDate);    conds.push(`s.admission_date <= $${params.length}`); }
+    if (statusFlt) { params.push(statusFlt); conds.push(`s.status = $${params.length}`); }
+
+    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+
+    const rows = await query<Record<string, string | null>>(
+      `SELECT date_trunc('${trunc}', s.admission_date)::date::text AS period_start,
+              ce.code AS center_code, ce.name AS center_name,
+              cl.name AS class_name,
+              s.enrollment_no,
+              trim(s.first_name || ' ' || COALESCE(s.last_name,'')) AS student,
+              s.gender, s.status,
+              s.admission_date::text AS admission_date,
+              e.source,
+              sess.name AS session_name
+         FROM students s
+         LEFT JOIN enrollments e ON e.student_id = s.id
+           AND e.id = (SELECT id FROM enrollments WHERE student_id = s.id ORDER BY id DESC LIMIT 1)
+         LEFT JOIN class_levels cl ON cl.id = e.class_level_id
+         LEFT JOIN academic_sessions sess ON sess.id = e.session_id
+         JOIN centers ce ON ce.id = s.center_id
+         ${where}
+         ORDER BY s.admission_date DESC NULLS LAST, ce.code, student`,
+      params,
+    );
+
+    const header = row([
+      "Period Start", "Centre Code", "Centre", "Class", "Session",
+      "Enrolment No", "Student", "Gender", "Admitted", "Source", "Status",
+    ]);
+    lines = [header, ...rows.map((r) => row([
+      r.period_start, r.center_code, r.center_name, r.class_name, r.session_name,
+      r.enrollment_no, r.student, r.gender, r.admission_date, r.source, r.status,
+    ]))];
+  } else if (tab === "students") {
     const params: unknown[] = [];
     const conds: string[] = [];
 

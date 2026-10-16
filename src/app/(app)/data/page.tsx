@@ -13,13 +13,73 @@ const STAFF_ROLES = [
   "mentor", "admin_backup", "rider", "hq_manager",
 ];
 
+const PERIOD_OPTIONS = [
+  { value: "weekly",  label: "Weekly" },
+  { value: "monthly", label: "Monthly" },
+  { value: "yearly",  label: "Yearly" },
+];
+
 export default async function DataExplorerPage({
   searchParams,
 }: { searchParams: Promise<Record<string, string | undefined>> }) {
   await requireRole("super_admin");
   const sp = await searchParams;
 
-  const tab = sp.tab === "staff" ? "staff" : "students";
+  const tab = sp.tab === "staff" ? "staff" : sp.tab === "enrollments" ? "enrollments" : "students";
+
+  // ── Enrollments ───────────────────────────────────────────────────────────
+  let enrollmentRows: Record<string, string | null>[] = [];
+  let enrollmentTotal = 0;
+  const enrollmentPg = pageFrom(sp, 50);
+
+  if (tab === "enrollments") {
+    const params: unknown[] = [];
+    const conds: string[] = [];
+
+    const period  = sp.period || "monthly";
+    const fromDate = sp.from || null;
+    const toDate   = sp.to   || null;
+    const enrCenterId = sp.center ? Number(sp.center) : null;
+    const enrClassId  = sp.class  ? Number(sp.class)  : null;
+
+    // date trunc format for grouping
+    const trunc = period === "weekly" ? "week" : period === "yearly" ? "year" : "month";
+
+    if (enrCenterId) { params.push(enrCenterId); conds.push(`s.center_id = $${params.length}`); }
+    if (enrClassId)  { params.push(enrClassId);  conds.push(`e.class_level_id = $${params.length}`); }
+    if (fromDate)    { params.push(fromDate);     conds.push(`s.admission_date >= $${params.length}`); }
+    if (toDate)      { params.push(toDate);       conds.push(`s.admission_date <= $${params.length}`); }
+    if (sp.status)   { params.push(sp.status);   conds.push(`s.status = $${params.length}`); }
+
+    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+
+    params.push(enrollmentPg.size, enrollmentPg.offset);
+    const rows = await query<Record<string, string | null>>(
+      `SELECT count(*) OVER () AS total_rows,
+              date_trunc('${trunc}', s.admission_date)::date::text AS period_start,
+              ce.code AS center_code, ce.name AS center_name,
+              cl.name AS class_name,
+              s.enrollment_no,
+              trim(s.first_name || ' ' || COALESCE(s.last_name,'')) AS student,
+              s.gender, s.status,
+              s.admission_date::text AS admission_date,
+              e.source,
+              sess.name AS session_name
+         FROM students s
+         LEFT JOIN enrollments e ON e.student_id = s.id
+           AND e.id = (SELECT id FROM enrollments WHERE student_id = s.id ORDER BY id DESC LIMIT 1)
+         LEFT JOIN class_levels cl ON cl.id = e.class_level_id
+         LEFT JOIN academic_sessions sess ON sess.id = e.session_id
+         JOIN centers ce ON ce.id = s.center_id
+         ${where}
+         ORDER BY s.admission_date DESC NULLS LAST, ce.code, student
+         LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params,
+    );
+    enrollmentTotal = totalOf(rows);
+    enrollmentRows = rows;
+  }
+  const enrollmentWin = pageWindow(enrollmentPg, enrollmentRows.length, enrollmentTotal);
 
   const [centers, classes, sessions] = await Promise.all([
     query<{ id: number; name: string; code: string }>(
@@ -130,6 +190,9 @@ export default async function DataExplorerPage({
   if (sp.role)   exportParams.set("role",    sp.role);
   if (sp.active) exportParams.set("active",  sp.active);
   if (sp.q)      exportParams.set("q",       sp.q);
+  if (sp.period) exportParams.set("period",  sp.period);
+  if (sp.from)   exportParams.set("from",    sp.from);
+  if (sp.to)     exportParams.set("to",      sp.to);
 
   return (
     <>
@@ -138,7 +201,7 @@ export default async function DataExplorerPage({
 
       {/* Tab switcher */}
       <div className="mb-4 flex gap-1 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] p-1 w-fit">
-        {(["students", "staff"] as const).map((t) => (
+        {(["students", "staff", "enrollments"] as const).map((t) => (
           <Link key={t} href={`/data?tab=${t}`}
             className={`rounded-[8px] px-4 py-1.5 text-[13px] font-medium capitalize transition-colors
               ${tab === t
@@ -153,21 +216,27 @@ export default async function DataExplorerPage({
       <div className="mb-4 flex flex-wrap items-center gap-2.5">
         <Filters
           centers={centers}
-          classes={tab === "students" ? classes : []}
+          classes={tab !== "staff" ? classes : []}
           sessions={tab === "students" ? sessions : []}
-          searchPlaceholder={tab === "students" ? "Name, enrolment no, phone…" : "Name, email, phone…"}
+          searchPlaceholder={tab === "students" ? "Name, enrolment no, phone…" : tab === "staff" ? "Name, email, phone…" : undefined}
           current={sp}
+          dates={tab === "enrollments"}
           extra={[
             ...(tab === "students" ? [
               { name: "status", label: "All statuses",
                 options: STUDENT_STATUSES.map((s) => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) })) },
               { name: "gender", label: "All genders",
                 options: [{ value: "male", label: "Male" }, { value: "female", label: "Female" }, { value: "other", label: "Other" }] },
-            ] : [
+            ] : tab === "staff" ? [
               { name: "role", label: "All roles",
                 options: STAFF_ROLES.map((r) => ({ value: r, label: r.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) })) },
               { name: "active", label: "All",
                 options: [{ value: "1", label: "Active only" }, { value: "0", label: "Inactive only" }] },
+            ] : [
+              { name: "period", label: "Group by month",
+                options: PERIOD_OPTIONS },
+              { name: "status", label: "All statuses",
+                options: STUDENT_STATUSES.map((s) => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) })) },
             ]),
           ]}
         />
@@ -237,6 +306,51 @@ export default async function DataExplorerPage({
           <Pager page={studentPg.page} pages={studentWin.pages}
             first={studentWin.first} last={studentWin.last}
             total={studentTotal} unit="student" />
+        </Card>
+      )}
+
+      {/* Enrollments table */}
+      {tab === "enrollments" && (
+        <Card pad={false}>
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border)]">
+            <span className="text-[13px] text-[var(--muted)]">
+              {enrollmentTotal} enrollment{enrollmentTotal === 1 ? "" : "s"}
+            </span>
+          </div>
+          {enrollmentRows.length === 0 ? (
+            <Empty title="No enrollments" hint="Adjust the filters above." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="tbl text-[12px]">
+                <thead>
+                  <tr>
+                    <th>Period</th><th>Centre</th><th>Enrolment No</th><th>Student</th>
+                    <th>Class</th><th>Session</th><th>Gender</th>
+                    <th>Admitted</th><th>Source</th><th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {enrollmentRows.map((r, i) => (
+                    <tr key={i}>
+                      <td className="whitespace-nowrap tabular-nums text-[var(--muted)]">{r.period_start ?? "—"}</td>
+                      <td className="whitespace-nowrap">{r.center_code} · {r.center_name}</td>
+                      <td className="whitespace-nowrap font-mono text-[11px]">{r.enrollment_no}</td>
+                      <td className="whitespace-nowrap font-medium">{r.student}</td>
+                      <td className="whitespace-nowrap">{r.class_name}</td>
+                      <td className="whitespace-nowrap">{r.session_name}</td>
+                      <td className="capitalize">{r.gender}</td>
+                      <td className="whitespace-nowrap">{r.admission_date ? fmtDate(r.admission_date) : "—"}</td>
+                      <td className="capitalize">{r.source}</td>
+                      <td className="capitalize">{r.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <Pager page={enrollmentPg.page} pages={enrollmentWin.pages}
+            first={enrollmentWin.first} last={enrollmentWin.last}
+            total={enrollmentTotal} unit="enrollment" />
         </Card>
       )}
 
