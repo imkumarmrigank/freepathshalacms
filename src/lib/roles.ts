@@ -216,9 +216,9 @@ export function canMarkAttendance(role: Role) {
   return role !== "mentor" && role !== "auditor";
 }
 
-/** A mentor may read a student but never change one. */
+/** Mentors and non-teaching roles can edit students; teachers read-only. */
 export function canEditStudents(role: Role) {
-  return role !== "mentor" && !isTeaching(role);
+  return !isTeaching(role);
 }
 
 /**

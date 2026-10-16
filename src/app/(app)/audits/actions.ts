@@ -205,14 +205,13 @@ export async function openVisitAt(_prev: unknown, form: FormData) {
 
 /* ------------------------------------------------------------- the visit */
 
-/** The auditor's own visit, still open for editing. */
+/** The auditor's own visit — editable while open or after submission. */
 async function ownOpenVisit(uid: number, role: Role, visitId: number) {
   if (!canConductAudit(role)) return { error: "Only an auditor fills in a visit." };
   const v = await one<{ id: number; auditor_id: number | null; status: string; center_id: number }>(
     "SELECT id, auditor_id, status, center_id FROM audit_visits WHERE id = $1", [visitId]);
   if (!v) return { error: "That visit is gone." };
   if (v.auditor_id !== uid) return { error: "That visit is assigned to another auditor." };
-  if (v.status === "submitted") return { error: "This report is already filed." };
   if (v.status === "cancelled") return { error: "This visit was cancelled." };
   return { visit: v };
 }

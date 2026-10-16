@@ -5,6 +5,7 @@ import Sidebar from "@/components/Sidebar";
 import MobileNav from "@/components/MobileNav";
 import ChatBubble from "@/components/ChatBubble";
 import Live from "@/app/(app)/messages/Live";
+import BirthdayToast from "@/components/BirthdayToast";
 import { latestMessageId, unreadTotal } from "@/lib/chat";
 import { Avatar } from "@/components/ui";
 import { IconLogout } from "@/components/icons";
@@ -29,9 +30,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // The bubble must be able to light up wherever the reader is, so the live
   // stream belongs to the shell rather than to the messages page. It resumes
   // from the newest message already written, so nothing is replayed.
-  const [unread, since] = await Promise.all([
+  const [unread, since, birthdayKids] = await Promise.all([
     unreadTotal(user.uid),
     latestMessageId(user.uid),
+    query<{ name: string; center_name: string; class_name: string | null }>(
+      `SELECT trim(s.first_name || ' ' || COALESCE(s.last_name,'')) AS name,
+              ce.name AS center_name,
+              cl.name AS class_name
+         FROM students s
+         JOIN centers ce ON ce.id = s.center_id
+         LEFT JOIN enrollments e ON e.student_id = s.id
+           AND e.id = (SELECT id FROM enrollments WHERE student_id = s.id ORDER BY id DESC LIMIT 1)
+         LEFT JOIN class_levels cl ON cl.id = e.class_level_id
+        WHERE s.status = 'active'
+          AND to_char(s.dob, 'MM-DD') = to_char(CURRENT_DATE, 'MM-DD')
+        ORDER BY ce.name, s.first_name`,
+    ),
   ]);
 
   // A stand-in has no home centre — say where they are actually covering.
@@ -126,6 +140,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {/* messages ride along on every page rather than living in a menu */}
       <Live after={since} />
       <ChatBubble unread={unread} />
+      <BirthdayToast kids={birthdayKids} />
     </div>
     </LocaleProvider>
   );

@@ -33,7 +33,7 @@ export default async function VisitPage({
   // screen; everybody else reads the report
   const editing = user.role === "auditor"
     && visit.auditor_id === user.uid
-    && visit.status !== "submitted" && visit.status !== "cancelled";
+    && visit.status !== "cancelled";
 
   const [ratings, suggestions, criteria, outstanding, onRoll] = await Promise.all([
     ratingsFor(visitId),
