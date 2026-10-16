@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
+import { SIBLING_COLS, SIBLING_JOIN } from "@/lib/siblings";
 
 export const dynamic = "force-dynamic";
 
@@ -61,13 +62,15 @@ export async function GET(req: Request) {
               s.gender, s.status,
               s.admission_date::text AS admission_date,
               e.source,
-              sess.name AS session_name
+              sess.name AS session_name,
+              ${SIBLING_COLS}
          FROM students s
          LEFT JOIN enrollments e ON e.student_id = s.id
            AND e.id = (SELECT id FROM enrollments WHERE student_id = s.id ORDER BY id DESC LIMIT 1)
          LEFT JOIN class_levels cl ON cl.id = e.class_level_id
          LEFT JOIN academic_sessions sess ON sess.id = e.session_id
          JOIN centers ce ON ce.id = s.center_id
+         ${SIBLING_JOIN}
          ${where}
          ORDER BY s.admission_date DESC NULLS LAST, ce.code, student`,
       params,
@@ -75,11 +78,11 @@ export async function GET(req: Request) {
 
     const header = row([
       "Period Start", "Centre Code", "Centre", "Class", "Session",
-      "Enrolment No", "Student", "Gender", "Admitted", "Source", "Status",
+      "Enrolment No", "Student", "Siblings", "Gender", "Admitted", "Source", "Status",
     ]);
     lines = [header, ...rows.map((r) => row([
       r.period_start, r.center_code, r.center_name, r.class_name, r.session_name,
-      r.enrollment_no, r.student, r.gender, r.admission_date, r.source, r.status,
+      r.enrollment_no, r.student, r.sibling_names, r.gender, r.admission_date, r.source, r.status,
     ]))];
   } else if (tab === "students") {
     const params: unknown[] = [];
@@ -107,26 +110,28 @@ export async function GET(req: Request) {
               s.father_name, s.mother_name, s.primary_phone, s.alt_phone,
               s.whatsapp_number, s.address, s.city, s.state, s.pincode,
               s.religion, s.category, s.blood_group, s.aadhaar_number,
-              s.admission_date::text AS admission_date, e.source, s.status
+              s.admission_date::text AS admission_date, e.source, s.status,
+              ${SIBLING_COLS}
          FROM students s
          LEFT JOIN enrollments e ON e.student_id = s.id
            ${sessionId ? "AND e.session_id = $1" : "AND e.id = (SELECT id FROM enrollments WHERE student_id = s.id ORDER BY id DESC LIMIT 1)"}
          LEFT JOIN class_levels cl ON cl.id = e.class_level_id
          JOIN centers ce ON ce.id = s.center_id
+         ${SIBLING_JOIN}
          ${where}
          ORDER BY ce.code, cl.sequence NULLS LAST, student`,
       params,
     );
 
     const header = row([
-      "Enrolment No", "Student", "Class", "Section", "Roll No",
+      "Enrolment No", "Student", "Siblings", "Class", "Section", "Roll No",
       "Centre Code", "Centre", "Gender", "DOB", "Age",
       "Father", "Mother", "Phone", "Alt Phone", "WhatsApp",
       "Address", "City", "State", "Pincode", "Religion",
       "Category", "Blood Group", "Aadhaar", "Admitted", "Source", "Status",
     ]);
     lines = [header, ...rows.map((r) => row([
-      r.enrollment_no, r.student, r.class_name, r.section, r.roll_no,
+      r.enrollment_no, r.student, r.sibling_names, r.class_name, r.section, r.roll_no,
       r.center_code, r.center_name, r.gender, r.dob, r.age,
       r.father_name, r.mother_name, r.primary_phone, r.alt_phone, r.whatsapp_number,
       r.address, r.city, r.state, r.pincode, r.religion,

@@ -6,6 +6,8 @@ import Filters from "@/components/Filters";
 import Pager from "@/components/Pager";
 import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
 import { fmtDate } from "@/lib/format";
+import SiblingMark from "@/components/SiblingMark";
+import { SIBLING_COLS, SIBLING_JOIN } from "@/lib/siblings";
 
 const STUDENT_STATUSES = ["active", "inactive", "dropped", "transferred", "graduated", "suspended"];
 const STAFF_ROLES = [
@@ -64,13 +66,15 @@ export default async function DataExplorerPage({
               s.gender, s.status,
               s.admission_date::text AS admission_date,
               e.source,
-              sess.name AS session_name
+              sess.name AS session_name,
+              ${SIBLING_COLS}
          FROM students s
          LEFT JOIN enrollments e ON e.student_id = s.id
            AND e.id = (SELECT id FROM enrollments WHERE student_id = s.id ORDER BY id DESC LIMIT 1)
          LEFT JOIN class_levels cl ON cl.id = e.class_level_id
          LEFT JOIN academic_sessions sess ON sess.id = e.session_id
          JOIN centers ce ON ce.id = s.center_id
+         ${SIBLING_JOIN}
          ${where}
          ORDER BY s.admission_date DESC NULLS LAST, ce.code, student
          LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -124,12 +128,14 @@ export default async function DataExplorerPage({
               s.father_name, s.mother_name, s.primary_phone, s.alt_phone,
               s.whatsapp_number, s.address, s.city, s.state, s.pincode,
               s.religion, s.category, s.blood_group, s.aadhaar_number,
-              s.admission_date::text AS admission_date, e.source, s.status
+              s.admission_date::text AS admission_date, e.source, s.status,
+              ${SIBLING_COLS}
          FROM students s
          LEFT JOIN enrollments e ON e.student_id = s.id
            ${sessionId ? "AND e.session_id = $1" : "AND e.id = (SELECT id FROM enrollments WHERE student_id = s.id ORDER BY id DESC LIMIT 1)"}
          LEFT JOIN class_levels cl ON cl.id = e.class_level_id
          JOIN centers ce ON ce.id = s.center_id
+         ${SIBLING_JOIN}
          ${where}
          ORDER BY ce.code, cl.sequence NULLS LAST, student
          LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -261,7 +267,7 @@ export default async function DataExplorerPage({
               <table className="tbl text-[12px]">
                 <thead>
                   <tr>
-                    <th>Enrolment No</th><th>Student</th><th>Class</th><th>Section</th>
+                    <th>Enrolment No</th><th>Student</th><th>Siblings</th><th>Class</th><th>Section</th>
                     <th>Roll</th><th>Centre</th><th>Gender</th><th>DOB</th><th>Age</th>
                     <th>Father</th><th>Mother</th><th>Phone</th><th>Alt Phone</th>
                     <th>WhatsApp</th><th>Address</th><th>City</th><th>State</th>
@@ -273,7 +279,11 @@ export default async function DataExplorerPage({
                   {studentRows.map((r, i) => (
                     <tr key={i}>
                       <td className="whitespace-nowrap font-mono text-[11px]">{r.enrollment_no}</td>
-                      <td className="whitespace-nowrap font-medium">{r.student}</td>
+                      <td className="whitespace-nowrap font-medium">
+                        {r.student}
+                        <SiblingMark count={r.sibling_count ? Number(r.sibling_count) : 0} names={r.sibling_names} />
+                      </td>
+                      <td className="text-[11px] text-[var(--muted)]">{r.sibling_names ?? "—"}</td>
                       <td className="whitespace-nowrap">{r.class_name}</td>
                       <td>{r.section}</td>
                       <td className="text-right tabular-nums">{r.roll_no}</td>
@@ -325,7 +335,7 @@ export default async function DataExplorerPage({
                 <thead>
                   <tr>
                     <th>Period</th><th>Centre</th><th>Enrolment No</th><th>Student</th>
-                    <th>Class</th><th>Session</th><th>Gender</th>
+                    <th>Siblings</th><th>Class</th><th>Session</th><th>Gender</th>
                     <th>Admitted</th><th>Source</th><th>Status</th>
                   </tr>
                 </thead>
@@ -335,7 +345,11 @@ export default async function DataExplorerPage({
                       <td className="whitespace-nowrap tabular-nums text-[var(--muted)]">{r.period_start ?? "—"}</td>
                       <td className="whitespace-nowrap">{r.center_code} · {r.center_name}</td>
                       <td className="whitespace-nowrap font-mono text-[11px]">{r.enrollment_no}</td>
-                      <td className="whitespace-nowrap font-medium">{r.student}</td>
+                      <td className="whitespace-nowrap font-medium">
+                        {r.student}
+                        <SiblingMark count={r.sibling_count ? Number(r.sibling_count) : 0} names={r.sibling_names} />
+                      </td>
+                      <td className="text-[11px] text-[var(--muted)]">{r.sibling_names ?? "—"}</td>
                       <td className="whitespace-nowrap">{r.class_name}</td>
                       <td className="whitespace-nowrap">{r.session_name}</td>
                       <td className="capitalize">{r.gender}</td>
