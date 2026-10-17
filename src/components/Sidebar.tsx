@@ -413,12 +413,16 @@ function Horizontal({ role, active, menu = MENU }: { role: Role; active: string 
 /** Remove nodes whose href (or any descendant href) is in the hidden set. */
 function applyOverrides(nodes: Node[], hidden: Set<string>): Node[] {
   if (hidden.size === 0) return nodes;
-  return nodes.flatMap((n) => {
-    if (!isGroup(n)) return hidden.has(n.href) ? [] : [n];
-    const children = applyOverrides(n.children, hidden);
-    if (children.length === 0) return [];
-    return [{ ...n, children }];
-  });
+  const out: Node[] = [];
+  for (const n of nodes) {
+    if (!isGroup(n)) {
+      if (!hidden.has(n.href)) out.push(n);
+    } else {
+      const children = applyOverrides(n.children, hidden);
+      if (children.length > 0) out.push({ ...n, children });
+    }
+  }
+  return out;
 }
 
 export default function Sidebar({ role, horizontal = false, hiddenHrefs = [] }:
