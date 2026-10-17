@@ -25,11 +25,11 @@ export default async function StaffPage({
   const rows = await query<{
     id: number; name: string; email: string; phone: string | null; role: Role;
     center_id: number | null; center_name: string | null; designation: string | null;
-    is_active: boolean; last_login_at: string | null; is_manager: boolean;
-    is_test: boolean;
+    subject: string | null; is_active: boolean; last_login_at: string | null;
+    is_manager: boolean; is_test: boolean;
   }>(
     `SELECT u.id, u.name, u.email, u.phone, u.role, u.center_id, c.name AS center_name,
-            u.designation, u.is_active, u.last_login_at, u.is_test,
+            u.designation, u.subject, u.is_active, u.last_login_at, u.is_test,
             (c.manager_id = u.id) AS is_manager
        FROM users u LEFT JOIN centers c ON c.id = u.center_id
       WHERE ${showTest ? "u.is_test" : "NOT u.is_test"} ${scope}
@@ -39,7 +39,7 @@ export default async function StaffPage({
 
   const editing = edit
     ? await one<Staff>(
-        `SELECT id, name, email, phone, role, center_id, designation, is_active, is_test
+        `SELECT id, name, email, phone, role, center_id, designation, subject, is_active, is_test
            FROM users WHERE id = $1`,
         [Number(edit)])
     : null;
@@ -97,6 +97,9 @@ export default async function StaffPage({
                               : r.role === "center_manager" ? "ok" : "mute"}>
                               {ROLE_LABEL[r.role]}
                             </Badge>
+                            {r.role === "misc_teacher" && r.subject && (
+                              <Badge tone="mute" dot={false}>{r.subject}</Badge>
+                            )}
                             {r.is_manager && <Badge tone="info" dot={false}>Centre head</Badge>}
                             {!r.is_active && <Badge tone="bad">Disabled</Badge>}
                             {r.is_test && <Badge tone="warn">Test login</Badge>}

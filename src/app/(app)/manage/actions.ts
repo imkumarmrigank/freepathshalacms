@@ -102,6 +102,9 @@ export async function saveStaff(_prev: unknown, form: FormData) {
   const actor = await requireUser();
   if (!canManageStaff(actor.role)) return { error: "You cannot manage staff." };
 
+  // Ensure the subject column exists (added for misc_teacher specialisation).
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS subject TEXT`);
+
   const id = numOrNull(form, "id");
   const name = str(form, "name");
   const email = str(form, "email")?.toLowerCase();
@@ -141,22 +144,22 @@ export async function saveStaff(_prev: unknown, form: FormData) {
 
       await query(
         `UPDATE users SET name=$2, email=$3, phone=$4, role=$5, center_id=$6,
-            designation=$7, is_active=$8
-            ${actor.role === "super_admin" ? ", is_test=$9" : ""}
-            ${password ? `, password_hash=$${actor.role === "super_admin" ? 10 : 9}` : ""}
+            designation=$7, is_active=$8, subject=$9
+            ${actor.role === "super_admin" ? ", is_test=$10" : ""}
+            ${password ? `, password_hash=$${actor.role === "super_admin" ? 11 : 10}` : ""}
           WHERE id=$1`,
         [id, name, email, str(form, "phone"), role, centerId, str(form, "designation"),
-         form.get("is_active") === "on",
+         form.get("is_active") === "on", str(form, "subject"),
          ...(actor.role === "super_admin" ? [isTest] : []),
          ...(password ? [await hashPassword(password)] : [])],
       );
     } else {
       await query(
         `INSERT INTO users (name, email, phone, password_hash, role, center_id,
-                            designation, is_test)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+                            designation, subject, is_test)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
         [name, email, str(form, "phone"), await hashPassword(password!), role, centerId,
-         str(form, "designation"), isTest],
+         str(form, "designation"), str(form, "subject"), isTest],
       );
     }
   } catch (err) {

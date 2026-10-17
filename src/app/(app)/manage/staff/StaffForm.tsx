@@ -7,8 +7,8 @@ import { CREATABLE_ROLES, ROLE_LABEL, needsCentre, type Role } from "@/lib/roles
 
 export type Staff = {
   id: number; name: string; email: string; phone: string | null; role: string;
-  center_id: number | null; designation: string | null; is_active: boolean;
-  is_test?: boolean;
+  center_id: number | null; designation: string | null; subject: string | null;
+  is_active: boolean; is_test?: boolean;
 };
 
 export default function StaffForm({
@@ -54,7 +54,9 @@ export default function StaffForm({
                   ? "A backup teacher is not attached to a centre — they work at whichever centre they are assigned to cover, under Backup Cover."
                   : role === "mentor"
                     ? "A mentor works across every centre, on parent meetings, follow-ups and progress reports."
-                    : "This role works across every centre."}
+                    : role === "misc_teacher"
+                      ? "A misc teacher (computer, music, drawing, etc.) visits any centre — no fixed centre needed."
+                      : "This role works across every centre."}
               </p>
             ) : (
               <Field label="Centre *">
@@ -76,6 +78,14 @@ export default function StaffForm({
           </>
         )}
 
+        {role === "misc_teacher" && (
+          <Field label="Subject / specialisation *"
+            hint="e.g. Computer, Music, Drawing, Dance, Art…">
+            <input className="input" name="subject" required
+              defaultValue={staff?.subject ?? ""}
+              placeholder="Computer" />
+          </Field>
+        )}
         <Field label="Designation"><input className="input" name="designation" defaultValue={staff?.designation ?? ""} /></Field>
         <Field label={staff ? "New password" : "Initial password *"}
           hint={staff ? "Leave blank to keep the current password" : "At least 8 characters"}>
