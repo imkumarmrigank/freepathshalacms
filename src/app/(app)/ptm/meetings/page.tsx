@@ -4,6 +4,7 @@ import { centersForUser, currentSession, listClasses, resolveCenterId } from "@/
 import { Alert, Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { fmtDate, titleCase } from "@/lib/format";
 import ScheduleForm from "./ScheduleForm";
+import RescheduleMeetingForm from "./RescheduleMeetingForm";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
 import { getT } from "@/lib/i18n";
 
@@ -60,6 +61,14 @@ export default async function MeetingsPage() {
                             <div className="text-[12px] font-normal text-[var(--muted)]">
                               {m.start_time.slice(0, 5)}{m.end_time ? `–${m.end_time.slice(0, 5)}` : ""}
                             </div>
+                          )}
+                          {!isTeaching(user.role) && m.status === "scheduled" && (
+                            <RescheduleMeetingForm
+                              meetingId={m.id}
+                              currentDate={m.meeting_date}
+                              currentStart={m.start_time}
+                              currentEnd={m.end_time}
+                            />
                           )}
                         </td>
                         <td>{m.title}</td>

@@ -175,6 +175,36 @@ export async function assignFollowUp(_prev: unknown, form: FormData) {
   return { ok: assignee === null ? "Follow-up left with you." : "Follow-up assigned." };
 }
 
+export async function rescheduleMeeting(_prev: unknown, form: FormData) {
+  const user = await requireUser();
+  if (isTeaching(user.role)) return { error: "Only managers can reschedule PTM days." };
+
+  const id = Number(form.get("meeting_id"));
+  if (!id) return { error: "Which meeting?" };
+
+  const meeting = await one<{ center_id: number; status: string; meeting_date: string }>(
+    "SELECT center_id, status, meeting_date FROM ptm_meetings WHERE id = $1", [id]);
+  if (!meeting) return { error: "Meeting not found." };
+  if (!canTouchCenter(user, meeting.center_id))
+    return { error: "That meeting belongs to another centre." };
+  if (meeting.status === "completed")
+    return { error: "A completed PTM cannot be rescheduled." };
+  if (meeting.status === "cancelled")
+    return { error: "A cancelled PTM cannot be rescheduled." };
+
+  const newDate = str(form, "meeting_date");
+  if (!newDate) return { error: "Pick the new date." };
+
+  await query(
+    `UPDATE ptm_meetings
+        SET meeting_date = $2, start_time = $3, end_time = $4
+      WHERE id = $1`,
+    [id, newDate, str(form, "start_time"), str(form, "end_time")],
+  );
+  revalidatePath("/ptm/meetings");
+  return { ok: "Meeting rescheduled." };
+}
+
 export async function scheduleMeeting(_prev: unknown, form: FormData) {
   const user = await requireUser();
   if (isTeaching(user.role)) return { error: "Only managers can schedule PTM days." };
