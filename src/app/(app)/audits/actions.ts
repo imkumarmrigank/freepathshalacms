@@ -67,8 +67,9 @@ export async function scheduleVisit(_prev: unknown, form: FormData) {
  */
 export async function rescheduleVisit(_prev: unknown, form: FormData) {
   const user = await requireUser();
-  if (!canConductAudit(user.role))
-    return { error: "Only an auditor can reschedule their own visit." };
+  const canReschedule = canConductAudit(user.role) || user.role === "mentor";
+  if (!canReschedule)
+    return { error: "Only an auditor or mentor can reschedule a visit." };
 
   const id = num(form, "visit_id");
   const newDate = str(form, "scheduled_for");
@@ -81,10 +82,15 @@ export async function rescheduleVisit(_prev: unknown, form: FormData) {
   const v = await one<{ auditor_id: number | null; status: string; scheduled_for: string | null }>(
     "SELECT auditor_id, status, scheduled_for FROM audit_visits WHERE id = $1", [id]);
   if (!v) return { error: "That visit is gone." };
-  if (v.auditor_id !== user.uid) return { error: "That visit is assigned to another auditor." };
+  // Auditors may only reschedule their own; mentors may reschedule any visit
+  if (canConductAudit(user.role) && v.auditor_id !== user.uid)
+    return { error: "That visit is assigned to another auditor." };
   if (v.status !== "planned") return { error: "Only a planned (not yet started) visit can be rescheduled." };
 
   const tod = today();
+  // Block rescheduling once the scheduled date has arrived or passed
+  if (v.scheduled_for && v.scheduled_for <= tod)
+    return { error: "The visit date has already passed — it can no longer be rescheduled." };
   if (newDate <= tod) return { error: "The new date must be in the future." };
 
   await query(

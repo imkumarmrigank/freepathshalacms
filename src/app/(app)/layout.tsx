@@ -12,6 +12,7 @@ import { IconLogout } from "@/components/icons";
 import { destroySession, getSession } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { ROLE_LABEL } from "@/lib/roles";
+import { hiddenKeysForUser } from "@/lib/menu-overrides";
 import { fmtDate } from "@/lib/format";
 import { dictFor, getLocale, getT } from "@/lib/i18n";
 import { LocaleProvider } from "@/components/LocaleProvider";
@@ -30,7 +31,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // The bubble must be able to light up wherever the reader is, so the live
   // stream belongs to the shell rather than to the messages page. It resumes
   // from the newest message already written, so nothing is replayed.
-  const [unread, since, birthdayKids] = await Promise.all([
+  const [unread, since, birthdayKids, hiddenSet] = await Promise.all([
     unreadTotal(user.uid),
     latestMessageId(user.uid),
     query<{ name: string; center_name: string; class_name: string | null }>(
@@ -46,7 +47,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           AND to_char(s.dob, 'MM-DD') = to_char(CURRENT_DATE, 'MM-DD')
         ORDER BY ce.name, s.first_name`,
     ),
+    hiddenKeysForUser(user.uid),
   ]);
+  const hiddenHrefs = [...hiddenSet];
 
   // A stand-in has no home centre — say where they are actually covering.
   let scopeLabel = "All centres";
@@ -78,7 +81,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </Link>
 
         <div className="flex-1 overflow-y-auto">
-          <Sidebar role={user.role} />
+          <Sidebar role={user.role} hiddenHrefs={hiddenHrefs} />
         </div>
 
         <div className="border-t border-[var(--border)] p-3">
@@ -108,6 +111,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             centerName={user.centerName ?? null}
             scopeLabel={scopeLabel}
             logout={logout}
+            hiddenHrefs={hiddenHrefs}
           />
           <Link href="/dashboard" className="lg:hidden">
             <Brand size="sm" />

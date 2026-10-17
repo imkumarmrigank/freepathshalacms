@@ -26,7 +26,11 @@ type Leaf = Gate & { href: string; label: string; icon?: Icon };
 type Group = Gate & { label: string; icon: Icon; children: Node[] };
 type Node = Leaf | Group;
 
-const isGroup = (n: Node): n is Group => "children" in n;
+export const isGroup = (n: Node): n is Group => "children" in n;
+
+/** All hrefs in the menu tree, for external use (e.g. menu-access management). */
+export { MENU };
+export type { Node, Leaf, Group };
 
 /**
  * The menu, as a tree. Grouping is by what somebody is trying to do, not by
@@ -159,6 +163,7 @@ const MENU: Node[] = [
             roles: ["super_admin", "admin", "mentor"] },
           { href: "/manage/syllabus", label: "Syllabus", roles: ["super_admin", "admin"] },
           { href: "/manage/manual", label: "Training manuals", roles: ["super_admin", "admin"] },
+          { href: "/manage/menu-access", label: "Menu access", roles: ["super_admin"] },
         ],
       },
     ],
@@ -349,9 +354,9 @@ function Row({ node, role, active, depth }: {
  * On a phone the tree becomes two rows: the sections, then the pages inside
  * whichever section you are in. Tapping a section switches the second row.
  */
-function Horizontal({ role, active }: { role: Role; active: string | null }) {
+function Horizontal({ role, active, menu = MENU }: { role: Role; active: string | null; menu?: Node[] }) {
   const t = useT();
-  const top = MENU.filter((n) => visible(n, role));
+  const top = menu.filter((n) => visible(n, role));
   const current = top.find((n) => active !== null && contains(n, active));
   const [picked, setPicked] = useState<string | null>(null);
   const shownLabel = picked ?? (current && isGroup(current) ? current.label : null);
@@ -405,16 +410,29 @@ function Horizontal({ role, active }: { role: Role; active: string | null }) {
 
 /* ------------------------------------------------------------------- export */
 
-export default function Sidebar({ role, horizontal = false }:
-  { role: Role; horizontal?: boolean }) {
+/** Remove nodes whose href (or any descendant href) is in the hidden set. */
+function applyOverrides(nodes: Node[], hidden: Set<string>): Node[] {
+  if (hidden.size === 0) return nodes;
+  return nodes.flatMap((n) => {
+    if (!isGroup(n)) return hidden.has(n.href) ? [] : [n];
+    const children = applyOverrides(n.children, hidden);
+    if (children.length === 0) return [];
+    return [{ ...n, children }];
+  });
+}
+
+export default function Sidebar({ role, horizontal = false, hiddenHrefs = [] }:
+  { role: Role; horizontal?: boolean; hiddenHrefs?: string[] }) {
   const path = usePathname();
   const active = activeHref(path, role);
+  const hidden = new Set(hiddenHrefs);
+  const menu = applyOverrides(MENU, hidden);
 
-  if (horizontal) return <Horizontal role={role} active={active} />;
+  if (horizontal) return <Horizontal role={role} active={active} menu={menu} />;
 
   return (
     <nav className="flex flex-col gap-0.5 px-3 pb-6">
-      {MENU.filter((n) => visible(n, role)).map((n) => (
+      {menu.filter((n) => visible(n, role)).map((n) => (
         <Row key={isGroup(n) ? n.label : n.href} node={n} role={role}
           active={active} depth={0} />
       ))}

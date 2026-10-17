@@ -25,7 +25,7 @@ import LanguageToggle from "./LanguageToggle";
  * of the screen and the drawer ended up an invisible sliver.
  */
 export default function MobileNav({
-  role, name, centerName, scopeLabel, logout,
+  role, name, centerName, scopeLabel, logout, hiddenHrefs = [],
 }: {
   role: Role;
   name: string;
@@ -33,6 +33,7 @@ export default function MobileNav({
   scopeLabel: string;
   /** The sign-out server action, handed down so the drawer can post it. */
   logout: () => Promise<void>;
+  hiddenHrefs?: string[];
   children?: ReactNode;
 }) {
   const t = useT();
@@ -98,7 +99,7 @@ export default function MobileNav({
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto py-2">
-              <Sidebar role={role} />
+              <Sidebar role={role} hiddenHrefs={hiddenHrefs} />
               <div className="px-3 pt-3"><LanguageToggle /></div>
             </div>
 
