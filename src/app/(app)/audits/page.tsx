@@ -14,6 +14,7 @@ import {
 import ScheduleVisit from "./ScheduleVisit";
 import StartVisit from "./StartVisit";
 import RescheduleVisit from "./RescheduleVisit";
+import CancelVisit from "./CancelVisit";
 import MissedVisit from "./MissedVisit";
 import { listCenters } from "@/lib/queries";
 import Mark from "@/components/Mark";
@@ -273,8 +274,11 @@ export default async function AuditsPage({
                   {(user.role === "mentor" || canScheduleVisits(user.role))
                     && v.status === "planned"
                     && v.scheduled_for && v.scheduled_for > today() && (
-                    <div className="mt-2 border-t border-[#f1f1f6] pt-2">
+                    <div className="mt-2 border-t border-[#f1f1f6] pt-2 flex flex-wrap gap-4">
                       <RescheduleVisit visitId={v.id} currentDate={v.scheduled_for} />
+                      {canScheduleVisits(user.role) && (
+                        <CancelVisit visitId={v.id} />
+                      )}
                     </div>
                   )}
                 </div>

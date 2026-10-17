@@ -23,13 +23,13 @@ export default function RescheduleVisit({ visitId, currentDate }: Props) {
 
   return (
     <form action={action} className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
-      <input type="hidden" name="visitId" value={visitId} />
+      <input type="hidden" name="visit_id" value={visitId} />
       <div className="flex flex-wrap gap-2">
         <div>
           <label className="block text-[11px] text-[var(--muted)] mb-0.5">New date</label>
           <input
             type="date"
-            name="newDate"
+            name="scheduled_for"
             defaultValue={currentDate}
             min={new Date(Date.now() + 86400000).toISOString().slice(0, 10)}
             required
