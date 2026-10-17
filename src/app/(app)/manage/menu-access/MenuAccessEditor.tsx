@@ -4,11 +4,10 @@ import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveMenuAccess } from "./actions";
 import { MENU, isGroup, type Node } from "@/components/Sidebar";
-import { type Role } from "@/lib/roles";
+import { ROLE_LABEL, type Role } from "@/lib/roles";
 
 type FlatItem = { key: string; label: string; group: string };
 
-/** Flatten the menu tree into (key=href, label, group) for a given role. */
 function flatItems(): FlatItem[] {
   const out: FlatItem[] = [];
   function walk(nodes: Node[], groupLabel: string) {
@@ -27,21 +26,21 @@ function flatItems(): FlatItem[] {
 
 const ALL_ITEMS = flatItems();
 
-type User = { id: number; name: string; role: Role; center_name: string | null };
+const MANAGEABLE_ROLES: Role[] = [
+  "admin", "mentor", "center_manager", "teacher", "backup_teacher",
+  "auditor", "sports_teacher", "rider",
+];
 
 const init = { error: null as string | null, ok: false };
 
 export default function MenuAccessEditor({
-  users,
-  initialUserId,
+  selectedRole,
   initialHiddenKeys,
 }: {
-  users: User[];
-  initialUserId: number | null;
+  selectedRole: Role | null;
   initialHiddenKeys: string[];
 }) {
   const router = useRouter();
-  const [selectedId] = useState<number | null>(initialUserId);
   const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set(initialHiddenKeys));
 
   const [state, action, pending] = useActionState(
@@ -53,7 +52,6 @@ export default function MenuAccessEditor({
     init,
   );
 
-  // Group items by their group label
   const groups = ALL_ITEMS.reduce<Record<string, FlatItem[]>>((acc, item) => {
     (acc[item.group] ??= []).push(item);
     return acc;
@@ -71,37 +69,43 @@ export default function MenuAccessEditor({
 
   return (
     <div className="space-y-6">
-      {/* User selector */}
+      {/* Role selector */}
       <div>
-        <label className="label-cap mb-1 block">Select user</label>
-        <select
-          className="rounded-[9px] border border-[var(--border)] px-3 py-2 text-[14px] focus:outline-none focus:ring-2 focus:ring-[var(--brand)] w-full max-w-sm"
-          value={selectedId ?? ""}
-          onChange={(e) => {
-            const uid = Number(e.target.value) || null;
-            router.push(uid ? `/manage/menu-access?user=${uid}` : "/manage/menu-access");
-          }}
-        >
-          <option value="">— choose a user —</option>
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.name} · {u.role.replace(/_/g, " ")}
-              {u.center_name ? ` · ${u.center_name}` : ""}
-            </option>
+        <label className="label-cap mb-1 block">Select role</label>
+        <div className="flex flex-wrap gap-2">
+          {MANAGEABLE_ROLES.map((r) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => {
+                router.push(`/manage/menu-access?role=${r}`);
+              }}
+              className={`rounded-[8px] border px-3 py-1.5 text-[13px] transition-colors ${
+                selectedRole === r
+                  ? "border-[var(--brand)] bg-[var(--brand)] text-white"
+                  : "border-[var(--border)] hover:bg-[#fafafd]"
+              }`}
+            >
+              {ROLE_LABEL[r]}
+            </button>
           ))}
-        </select>
+        </div>
       </div>
 
-      {selectedId && (
+      {selectedRole && (
         <form action={action} className="space-y-4">
-          <input type="hidden" name="user_id" value={selectedId} />
+          <input type="hidden" name="role" value={selectedRole} />
           {allKeys.map((k) => (
             <input key={k} type="hidden" name="all_keys" value={k} />
           ))}
-          {/* Visible keys are sent as checkboxes */}
           {allKeys.filter((k) => !hiddenKeys.has(k)).map((k) => (
             <input key={k} type="hidden" name="visible_key" value={k} />
           ))}
+
+          <p className="text-[13px] text-[var(--muted)]">
+            Checked items are visible to <strong>{ROLE_LABEL[selectedRole]}</strong>.
+            Uncheck to hide from their menu. Role gates still apply — this only hides items the role would otherwise see.
+          </p>
 
           <div className="flex items-center gap-3 text-[13px] text-[var(--muted)]">
             <button type="button" className="underline hover:text-[var(--text)]"
@@ -132,7 +136,7 @@ export default function MenuAccessEditor({
                       <span className={visible ? "" : "text-[var(--faint)] line-through"}>
                         {item.label}
                       </span>
-                      <span className="ml-auto text-[11px] text-[var(--faint)] font-mono">
+                      <span className="ml-auto text-[11px] text-[var(--faint)] font-mono truncate max-w-[140px]">
                         {item.key}
                       </span>
                     </label>
@@ -143,9 +147,8 @@ export default function MenuAccessEditor({
           ))}
 
           <div className="flex items-center gap-3 pt-2">
-            <button type="submit" disabled={pending}
-              className="btn btn-primary">
-              {pending ? "Saving…" : "Save access settings"}
+            <button type="submit" disabled={pending} className="btn btn-primary">
+              {pending ? "Saving…" : `Save for ${ROLE_LABEL[selectedRole]}`}
             </button>
             {state.ok && <span className="text-[13px] text-[var(--ok)]">Saved.</span>}
             {state.error && <span className="text-[13px] text-[var(--bad)]">{state.error}</span>}

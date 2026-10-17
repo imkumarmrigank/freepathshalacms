@@ -12,7 +12,7 @@ import { IconLogout } from "@/components/icons";
 import { destroySession, getSession } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { ROLE_LABEL } from "@/lib/roles";
-import { hiddenKeysForUser } from "@/lib/menu-overrides";
+import { hiddenKeysForRole } from "@/lib/menu-overrides";
 import { fmtDate } from "@/lib/format";
 import { dictFor, getLocale, getT } from "@/lib/i18n";
 import { LocaleProvider } from "@/components/LocaleProvider";
@@ -47,7 +47,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           AND to_char(s.dob, 'MM-DD') = to_char(CURRENT_DATE, 'MM-DD')
         ORDER BY ce.name, s.first_name`,
     ),
-    hiddenKeysForUser(user.uid),
+    hiddenKeysForRole(user.role),
   ]);
   const hiddenHrefs = [...hiddenSet];
 
