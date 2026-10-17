@@ -269,9 +269,14 @@ export default async function AuditsPage({
                       ) : null}
                     </div>
                   )}
-                  {/* Mentor / admin / super_admin can reschedule any planned visit before its date */}
-                  {(user.role === "mentor" || canScheduleVisits(user.role))
-                    && v.status === "planned"
+                  {/* Admin / super_admin can reschedule any planned visit at any time */}
+                  {canScheduleVisits(user.role) && v.status === "planned" && v.scheduled_for && (
+                    <div className="mt-2 border-t border-[#f1f1f6] pt-2">
+                      <RescheduleVisit visitId={v.id} currentDate={v.scheduled_for} />
+                    </div>
+                  )}
+                  {/* Mentor can reschedule planned visits that haven't passed yet */}
+                  {user.role === "mentor" && v.status === "planned"
                     && v.scheduled_for && v.scheduled_for > today() && (
                     <div className="mt-2 border-t border-[#f1f1f6] pt-2">
                       <RescheduleVisit visitId={v.id} currentDate={v.scheduled_for} />
