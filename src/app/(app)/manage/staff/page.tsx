@@ -19,6 +19,9 @@ export default async function StaffPage({
   // asking: the list is the real team unless this is on.
   const showTest = test === "1" && user.role === "super_admin";
   const centers = await centersForUser(user);
+
+  // Add subject column if it doesn't exist yet (one-time migration).
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS subject TEXT`);
   const scope = user.role === "super_admin" ? "" : " AND u.center_id = $1";
   const params = user.role === "super_admin" ? [] : [user.centerId];
 

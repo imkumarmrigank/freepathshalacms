@@ -42,6 +42,12 @@ export default async function SupplyRequestsPage({
         `SELECT id, name, unit, category FROM supply_items WHERE is_active ORDER BY category, name`,
       );
 
+  // Build params sequentially so placeholder numbers are contiguous.
+  const rowParams: unknown[] = [statusFilter];
+  if (user.centerId) rowParams.push(user.centerId);
+  const limitIdx = rowParams.length + 1;
+  rowParams.push(pg.size, pg.offset);
+
   const rows = await query<{
     id: number; item: string; unit: string; quantity: number;
     reason: string | null; requested_on: string; status: string;
@@ -62,12 +68,10 @@ export default async function SupplyRequestsPage({
        JOIN users u ON u.id = sr.requested_by
        LEFT JOIN users h ON h.id = sr.handled_by
       WHERE ($1::text = 'all' OR sr.status = $1)
-        ${user.centerId ? "AND sr.center_id = $3" : ""}
+        ${user.centerId ? "AND sr.center_id = $2" : ""}
       ORDER BY sr.requested_on DESC, sr.id DESC
-      LIMIT ${user.centerId ? "$4" : "$2"} OFFSET ${user.centerId ? "$5" : "$3"}`,
-    user.centerId
-      ? [statusFilter, pg.size, user.centerId, pg.size, pg.offset]
-      : [statusFilter, pg.size, pg.offset],
+      LIMIT $${limitIdx} OFFSET $${limitIdx + 1}`,
+    rowParams,
   );
 
   const total = totalOf(rows);
