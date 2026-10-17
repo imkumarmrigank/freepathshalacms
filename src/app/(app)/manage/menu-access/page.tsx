@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { PageHeader, Card } from "@/components/ui";
 import { type Role } from "@/lib/roles";
 import { ensureMenuOverridesTable, hiddenKeysArrayForRole } from "@/lib/menu-overrides";
-import { accessibleHrefs } from "@/components/Sidebar";
+import { accessibleHrefs } from "@/lib/menu-tree";
 import MenuAccessEditor from "./MenuAccessEditor";
 
 export const metadata = { title: "Menu access · FreePathshala" };

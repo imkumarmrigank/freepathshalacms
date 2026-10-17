@@ -3,28 +3,14 @@
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveMenuAccess } from "./actions";
-import { MENU, isGroup, type Node } from "@/components/Sidebar";
+import { flatMenuItems } from "@/lib/menu-tree";
 import { ROLE_LABEL, type Role } from "@/lib/roles";
 
 type FlatItem = { key: string; label: string; group: string };
 
-function flatItems(): FlatItem[] {
-  const out: FlatItem[] = [];
-  function walk(nodes: Node[], groupLabel: string) {
-    for (const n of nodes) {
-      if (isGroup(n)) {
-        const childGroup = groupLabel ? `${groupLabel} › ${n.label}` : n.label;
-        walk(n.children, childGroup);
-      } else {
-        out.push({ key: n.href, label: n.label, group: groupLabel || "Top level" });
-      }
-    }
-  }
-  walk(MENU, "");
-  return out;
-}
-
-const ALL_ITEMS_MAP = Object.fromEntries(flatItems().map((i) => [i.key, i]));
+const ALL_ITEMS_MAP = Object.fromEntries(
+  flatMenuItems().map((i) => [i.href, { key: i.href, label: i.label, group: i.group } as FlatItem])
+);
 
 const MANAGEABLE_ROLES: Role[] = [
   "admin", "mentor", "center_manager", "teacher", "backup_teacher",
