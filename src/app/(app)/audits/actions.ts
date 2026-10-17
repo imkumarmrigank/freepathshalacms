@@ -88,12 +88,10 @@ export async function rescheduleVisit(_prev: unknown, form: FormData) {
   if (v.status !== "planned") return { error: "Only a planned (not yet started) visit can be rescheduled." };
 
   const tod = today();
-  // Auditors and mentors cannot reschedule once the date has passed; admin/super_admin can.
-  if (!canScheduleVisits(user.role)) {
-    if (v.scheduled_for && v.scheduled_for <= tod)
-      return { error: "The visit date has already passed — it can no longer be rescheduled." };
-    if (newDate <= tod) return { error: "The new date must be in the future." };
-  }
+  // Nobody can reschedule once the scheduled date has arrived or passed.
+  if (v.scheduled_for && v.scheduled_for <= tod)
+    return { error: "The visit date has already passed — it can no longer be rescheduled." };
+  if (newDate <= tod) return { error: "The new date must be in the future." };
 
   await query(
     `UPDATE audit_visits
