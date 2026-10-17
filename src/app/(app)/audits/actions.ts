@@ -67,9 +67,9 @@ export async function scheduleVisit(_prev: unknown, form: FormData) {
  */
 export async function rescheduleVisit(_prev: unknown, form: FormData) {
   const user = await requireUser();
-  const canReschedule = canConductAudit(user.role) || user.role === "mentor";
+  const canReschedule = canConductAudit(user.role) || canScheduleVisits(user.role) || user.role === "mentor";
   if (!canReschedule)
-    return { error: "Only an auditor or mentor can reschedule a visit." };
+    return { error: "Only an auditor, mentor, admin or super admin can reschedule a visit." };
 
   const id = num(form, "visit_id");
   const newDate = str(form, "scheduled_for");
@@ -82,7 +82,7 @@ export async function rescheduleVisit(_prev: unknown, form: FormData) {
   const v = await one<{ auditor_id: number | null; status: string; scheduled_for: string | null }>(
     "SELECT auditor_id, status, scheduled_for FROM audit_visits WHERE id = $1", [id]);
   if (!v) return { error: "That visit is gone." };
-  // Auditors may only reschedule their own; mentors may reschedule any visit
+  // Auditors may only reschedule their own visits; admin/super_admin/mentor can reschedule any
   if (canConductAudit(user.role) && v.auditor_id !== user.uid)
     return { error: "That visit is assigned to another auditor." };
   if (v.status !== "planned") return { error: "Only a planned (not yet started) visit can be rescheduled." };
