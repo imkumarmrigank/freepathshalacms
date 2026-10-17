@@ -24,7 +24,7 @@ function flatItems(): FlatItem[] {
   return out;
 }
 
-const ALL_ITEMS = flatItems();
+const ALL_ITEMS_MAP = Object.fromEntries(flatItems().map((i) => [i.key, i]));
 
 const MANAGEABLE_ROLES: Role[] = [
   "admin", "mentor", "center_manager", "teacher", "backup_teacher",
@@ -35,12 +35,15 @@ const init = { error: null as string | null, ok: false };
 
 export default function MenuAccessEditor({
   selectedRole,
+  roleHrefs,
   initialHiddenKeys,
 }: {
   selectedRole: Role | null;
+  roleHrefs: string[];
   initialHiddenKeys: string[];
 }) {
   const router = useRouter();
+  // hiddenKeys = items the role can access but are turned off
   const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set(initialHiddenKeys));
 
   const [state, action, pending] = useActionState(
@@ -52,11 +55,6 @@ export default function MenuAccessEditor({
     init,
   );
 
-  const groups = ALL_ITEMS.reduce<Record<string, FlatItem[]>>((acc, item) => {
-    (acc[item.group] ??= []).push(item);
-    return acc;
-  }, {});
-
   const toggle = (key: string) => {
     setHiddenKeys((prev) => {
       const next = new Set(prev);
@@ -65,21 +63,24 @@ export default function MenuAccessEditor({
     });
   };
 
-  const allKeys = ALL_ITEMS.map((i) => i.key);
+  // Build groups from only the hrefs this role can actually reach
+  const items = roleHrefs.map((href) => ALL_ITEMS_MAP[href]).filter(Boolean);
+  const groups = items.reduce<Record<string, FlatItem[]>>((acc, item) => {
+    (acc[item.group] ??= []).push(item);
+    return acc;
+  }, {});
 
   return (
     <div className="space-y-6">
       {/* Role selector */}
       <div>
-        <label className="label-cap mb-1 block">Select role</label>
+        <label className="label-cap mb-2 block">Select role</label>
         <div className="flex flex-wrap gap-2">
           {MANAGEABLE_ROLES.map((r) => (
             <button
               key={r}
               type="button"
-              onClick={() => {
-                router.push(`/manage/menu-access?role=${r}`);
-              }}
+              onClick={() => router.push(`/manage/menu-access?role=${r}`)}
               className={`rounded-[8px] border px-3 py-1.5 text-[13px] transition-colors ${
                 selectedRole === r
                   ? "border-[var(--brand)] bg-[var(--brand)] text-white"
@@ -92,51 +93,53 @@ export default function MenuAccessEditor({
         </div>
       </div>
 
-      {selectedRole && (
+      {selectedRole && items.length > 0 && (
         <form action={action} className="space-y-4">
           <input type="hidden" name="role" value={selectedRole} />
-          {allKeys.map((k) => (
+          {/* Send every accessible key so the action knows the full set */}
+          {roleHrefs.map((k) => (
             <input key={k} type="hidden" name="all_keys" value={k} />
           ))}
-          {allKeys.filter((k) => !hiddenKeys.has(k)).map((k) => (
+          {/* Visible (checked) keys */}
+          {roleHrefs.filter((k) => !hiddenKeys.has(k)).map((k) => (
             <input key={k} type="hidden" name="visible_key" value={k} />
           ))}
 
-          <p className="text-[13px] text-[var(--muted)]">
-            Checked items are visible to <strong>{ROLE_LABEL[selectedRole]}</strong>.
-            Uncheck to hide from their menu. Role gates still apply — this only hides items the role would otherwise see.
-          </p>
-
-          <div className="flex items-center gap-3 text-[13px] text-[var(--muted)]">
-            <button type="button" className="underline hover:text-[var(--text)]"
+          <div className="flex items-center gap-4 text-[13px]">
+            <span className="text-[var(--muted)]">
+              {roleHrefs.length - hiddenKeys.size} of {roleHrefs.length} items visible
+            </span>
+            <button type="button" className="underline text-[var(--muted)] hover:text-[var(--text)]"
               onClick={() => setHiddenKeys(new Set())}>
               Show all
             </button>
-            <button type="button" className="underline hover:text-[var(--text)]"
-              onClick={() => setHiddenKeys(new Set(allKeys))}>
+            <button type="button" className="underline text-[var(--muted)] hover:text-[var(--text)]"
+              onClick={() => setHiddenKeys(new Set(roleHrefs))}>
               Hide all
             </button>
           </div>
 
-          {Object.entries(groups).map(([group, items]) => (
+          {Object.entries(groups).map(([group, grpItems]) => (
             <div key={group}>
               <div className="label-cap mb-2 text-[var(--muted)]">{group}</div>
               <div className="grid gap-1.5 sm:grid-cols-2">
-                {items.map((item) => {
+                {grpItems.map((item) => {
                   const visible = !hiddenKeys.has(item.key);
                   return (
                     <label key={item.key}
-                      className="flex cursor-pointer items-center gap-2 rounded-[8px] border border-[var(--border)] px-3 py-2 text-[13px] hover:bg-[#fafafd]">
+                      className={`flex cursor-pointer items-center gap-2 rounded-[8px] border px-3 py-2 text-[13px] transition-colors hover:bg-[#fafafd] ${
+                        visible ? "border-[var(--border)]" : "border-[#ebebf5] bg-[#f8f8fc]"
+                      }`}>
                       <input
                         type="checkbox"
                         checked={visible}
                         onChange={() => toggle(item.key)}
-                        className="h-4 w-4 accent-[var(--brand)]"
+                        className="h-4 w-4 accent-[var(--brand)] flex-none"
                       />
-                      <span className={visible ? "" : "text-[var(--faint)] line-through"}>
+                      <span className={visible ? "font-medium" : "text-[var(--faint)] line-through"}>
                         {item.label}
                       </span>
-                      <span className="ml-auto text-[11px] text-[var(--faint)] font-mono truncate max-w-[140px]">
+                      <span className="ml-auto text-[11px] text-[var(--faint)] font-mono truncate max-w-[120px]">
                         {item.key}
                       </span>
                     </label>
@@ -146,7 +149,7 @@ export default function MenuAccessEditor({
             </div>
           ))}
 
-          <div className="flex items-center gap-3 pt-2">
+          <div className="flex items-center gap-3 pt-2 border-t border-[var(--border)]">
             <button type="submit" disabled={pending} className="btn btn-primary">
               {pending ? "Saving…" : `Save for ${ROLE_LABEL[selectedRole]}`}
             </button>

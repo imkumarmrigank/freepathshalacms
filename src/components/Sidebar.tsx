@@ -270,6 +270,20 @@ function visible(n: Node, role: Role): boolean {
   return isGroup(n) ? n.children.some((c) => visible(c, role)) : true;
 }
 
+/** All leaf hrefs the given role can reach (ignoring overrides). */
+export function accessibleHrefs(role: Role): string[] {
+  const out: string[] = [];
+  function walk(nodes: Node[]) {
+    for (const n of nodes) {
+      if (!allowed(n, role)) continue;
+      if (isGroup(n)) walk(n.children);
+      else out.push(n.href);
+    }
+  }
+  walk(MENU);
+  return out;
+}
+
 function leaves(n: Node): Leaf[] {
   return isGroup(n) ? n.children.flatMap(leaves) : [n];
 }

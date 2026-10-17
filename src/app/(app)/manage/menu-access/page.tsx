@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { PageHeader, Card } from "@/components/ui";
 import { type Role } from "@/lib/roles";
 import { ensureMenuOverridesTable, hiddenKeysArrayForRole } from "@/lib/menu-overrides";
+import { accessibleHrefs } from "@/components/Sidebar";
 import MenuAccessEditor from "./MenuAccessEditor";
 
 export const metadata = { title: "Menu access · FreePathshala" };
@@ -23,9 +24,12 @@ export default async function MenuAccessPage({
 
   await ensureMenuOverridesTable();
 
-  const initialHiddenKeys = selectedRole
-    ? await hiddenKeysArrayForRole(selectedRole)
-    : [];
+  const [initialHiddenKeys, roleHrefs] = selectedRole
+    ? await Promise.all([
+        hiddenKeysArrayForRole(selectedRole),
+        Promise.resolve(accessibleHrefs(selectedRole)),
+      ])
+    : [[], [] as string[]];
 
   return (
     <>
@@ -36,6 +40,7 @@ export default async function MenuAccessPage({
       <Card className="mt-6">
         <MenuAccessEditor
           selectedRole={selectedRole}
+          roleHrefs={roleHrefs}
           initialHiddenKeys={initialHiddenKeys}
         />
       </Card>
