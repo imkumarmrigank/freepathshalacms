@@ -39,6 +39,7 @@ export default async function MenuAccessPage({
       />
       <Card className="mt-6">
         <MenuAccessEditor
+          key={selectedRole ?? "none"}
           selectedRole={selectedRole}
           defaultHrefs={defaultHrefs}
           hiddenKeys={overrides.hiddenKeys}
