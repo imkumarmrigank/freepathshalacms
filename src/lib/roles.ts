@@ -42,7 +42,7 @@ export const ROLE_BLURB: Record<Role, string> = {
 /** Roles that work across every centre rather than being pinned to one. */
 export function isGlobalRole(role: Role) {
   return role === "super_admin" || role === "admin" || role === "mentor"
-    || role === "auditor" || role === "sports_teacher";
+    || role === "auditor" || role === "sports_teacher" || role === "misc_teacher";
 }
 
 /** Structural settings — sessions, classes, promotion, centres, admins. */
@@ -89,8 +89,7 @@ export function canManageStaff(role: Role) {
  * a backup teacher goes wherever they are assigned — none of them has a home centre.
  */
 export function needsCentre(role: Role) {
-  return role === "center_manager" || role === "teacher" || role === "rider"
-    || role === "store_manager";
+  return role === "center_manager" || role === "teacher" || role === "rider";
 }
 
 /** Only the super admin opens a new centre; an admin maintains existing ones. */
@@ -210,7 +209,9 @@ const FEATURES: Record<Role, Feature[]> = {
   sports_teacher: ["sports", "calendar", "messages"],
   // Misc teachers (computer, drawing, music, etc.) have the same base access
   // as sports teachers; super_admin can grant extra pages via menu access.
-  misc_teacher: ["calendar", "messages"],
+  // Misc teachers (computer, drawing, music, etc.) visit any centre like a
+  // sports teacher — they mark the subject register and see students there.
+  misc_teacher: ["students", "attendance", "calendar", "messages"],
   // A store manager's remit is the supply chain only.
   store_manager: ["supplies"],
   // The shortest list there is: a rider proves they were at the centre.

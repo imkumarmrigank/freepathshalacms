@@ -176,7 +176,8 @@ const MENU: Node[] = [
       { href: "/manage/tests/dashboard", label: "Training dashboard",
         roles: ["super_admin", "admin"] },
       { href: "/my-test", label: "My test",
-        roles: ["teacher", "backup_teacher", "mentor", "sports_teacher", "center_manager"] },
+        roles: ["teacher", "backup_teacher", "mentor", "sports_teacher",
+                "misc_teacher", "center_manager"] },
       { href: "/manage/tests", label: "Question bank", roles: ["super_admin", "admin"] },
       { href: "/manage/tests/results", label: "Test results", roles: ["super_admin", "admin"] },
     ],
@@ -245,8 +246,9 @@ const DOCK: Record<Role, { href: string; label: string; icon: Icon }[]> = {
   ],
   misc_teacher: [
     { href: "/dashboard", label: "Home", icon: IconGrid },
+    { href: "/attendance", label: "Register", icon: IconCheck },
+    { href: "/students", label: "Students", icon: IconUsers },
     { href: "/calendar", label: "Calendar", icon: IconCal },
-    { href: "/messages", label: "Messages", icon: IconChat },
   ],
   store_manager: [
     { href: "/dashboard", label: "Home", icon: IconGrid },
