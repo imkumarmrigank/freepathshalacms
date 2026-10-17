@@ -267,6 +267,15 @@ export const REPORTS: ReportMeta[] = [
     roles: ["super_admin", "admin", "center_manager"],
   },
   {
+    key: "supply-requests",
+    label: "Supply requests",
+    group: "Supplies",
+    description:
+      "All requests from centres — item, quantity, centre, status (pending / dispatched / rejected), and who handled them.",
+    filters: ["dates", "center"],
+    roles: ["super_admin", "admin"],
+  },
+  {
     key: "exam-marks",
     label: "Marks sheet",
     group: "Tests",

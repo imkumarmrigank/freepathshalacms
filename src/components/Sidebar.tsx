@@ -126,8 +126,11 @@ const MENU: Node[] = [
 
   { href: "/calendar", label: "Calendar", icon: IconCal, feature: "calendar" },
   {
-    label: "Supplies", icon: IconBox, feature: "supplies", children: [
+    label: "Supplies", icon: IconBox, children: [
       { href: "/supplies", label: "Stock overview", feature: "supplies" },
+      { href: "/supplies/requests", label: "Supply requests",
+        roles: ["super_admin", "admin", "center_manager", "teacher", "backup_teacher",
+                "sports_teacher", "misc_teacher", "store_manager"] },
       { href: "/supplies/distribute", label: "Distribute to students",
         roles: ["super_admin", "admin"] },
     ],
@@ -193,7 +196,7 @@ const DOCK: Record<Role, { href: string; label: string; icon: Icon }[]> = {
   teacher: [
     { href: "/dashboard", label: "Home", icon: IconGrid },
     { href: "/attendance", label: "Register", icon: IconCheck },
-    { href: "/my-attendance", label: "Check in", icon: IconClock },
+    { href: "/supplies/requests", label: "Supply req.", icon: IconBox },
     { href: "/calendar", label: "Calendar", icon: IconCal },
   ],
   backup_teacher: [
@@ -247,6 +250,7 @@ const DOCK: Record<Role, { href: string; label: string; icon: Icon }[]> = {
   ],
   store_manager: [
     { href: "/dashboard", label: "Home", icon: IconGrid },
+    { href: "/supplies/requests", label: "Supply req.", icon: IconBox },
     { href: "/supplies", label: "Supplies", icon: IconBox },
   ],
   rider: [

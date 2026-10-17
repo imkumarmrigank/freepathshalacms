@@ -122,6 +122,7 @@ export async function runReport(
     case "sports-marks":                 return sportsMarks(scoped, period);
     case "sports-talent":                return sportsTalent(scoped);
     case "syllabus-progress":            return syllabusProgress(scoped);
+    case "supply-requests":              return supplyRequestsReport(scoped, period);
     default: throw new Error("Unknown report.");
   }
 }
@@ -2880,5 +2881,52 @@ async function syllabusProgress(p: ReportParams): Promise<ReportResult> {
         completed_on: r.completed_on ?? "",
       };
     }),
+  };
+}
+
+/* -------------------------------------------------- supply requests */
+
+async function supplyRequestsReport(p: ReportParams, period: string): Promise<ReportResult> {
+  const params: unknown[] = [p.from, p.to];
+  let where = "";
+  if (p.centerId) { params.push(p.centerId); where = ` AND sr.center_id = $${params.length}`; }
+
+  const rows = await query<ReportRow>(
+    `SELECT sr.requested_on::text AS requested_on,
+            c.name AS center_name,
+            i.name AS item, i.unit, sr.quantity,
+            sr.reason,
+            sr.status,
+            u.name AS requested_by,
+            sr.handled_on::text AS handled_on,
+            h.name AS handled_by,
+            sr.notes
+       FROM supply_requests sr
+       JOIN supply_items i ON i.id = sr.item_id
+       JOIN centers c ON c.id = sr.center_id
+       JOIN users u ON u.id = sr.requested_by
+       LEFT JOIN users h ON h.id = sr.handled_by
+      WHERE sr.requested_on BETWEEN $1 AND $2 ${where}
+      ORDER BY sr.requested_on DESC, c.name, i.name`,
+    params,
+  );
+
+  return {
+    title: "Supply requests",
+    subtitle: period,
+    columns: [
+      { key: "requested_on", label: "Requested on", width: 14 },
+      { key: "center_name", label: "Centre", width: 20 },
+      { key: "item", label: "Item", width: 22 },
+      { key: "quantity", label: "Qty", numeric: true },
+      { key: "unit", label: "Unit", width: 10 },
+      { key: "reason", label: "Reason", width: 28 },
+      { key: "status", label: "Status", width: 12 },
+      { key: "requested_by", label: "Requested by", width: 20 },
+      { key: "handled_on", label: "Handled on", width: 14 },
+      { key: "handled_by", label: "Handled by", width: 20 },
+      { key: "notes", label: "Notes", width: 28 },
+    ],
+    rows,
   };
 }

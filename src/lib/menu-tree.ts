@@ -106,8 +106,11 @@ const TREE: TreeNode[] = [
 
   { href: "/calendar", label: "Calendar", feature: "calendar" },
   {
-    label: "Supplies", feature: "supplies", children: [
+    label: "Supplies", children: [
       { href: "/supplies", label: "Stock overview", feature: "supplies" },
+      { href: "/supplies/requests", label: "Supply requests",
+        roles: ["super_admin", "admin", "center_manager", "teacher", "backup_teacher",
+                "sports_teacher", "misc_teacher", "store_manager"] },
       { href: "/supplies/distribute", label: "Distribute to students",
         roles: ["super_admin", "admin"] },
     ],
