@@ -12,7 +12,7 @@ import { IconLogout } from "@/components/icons";
 import { destroySession, getSession } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { ROLE_LABEL } from "@/lib/roles";
-import { hiddenKeysForRole } from "@/lib/menu-overrides";
+import { overridesForRole } from "@/lib/menu-overrides";
 import { fmtDate } from "@/lib/format";
 import { dictFor, getLocale, getT } from "@/lib/i18n";
 import { LocaleProvider } from "@/components/LocaleProvider";
@@ -47,9 +47,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           AND to_char(s.dob, 'MM-DD') = to_char(CURRENT_DATE, 'MM-DD')
         ORDER BY ce.name, s.first_name`,
     ),
-    hiddenKeysForRole(user.role),
+    overridesForRole(user.role),
   ]);
-  const hiddenHrefs = [...hiddenSet];
+  const hiddenHrefs = [...hiddenSet.hidden];
+  const grantedHrefs = [...hiddenSet.granted];
 
   // A stand-in has no home centre — say where they are actually covering.
   let scopeLabel = "All centres";
@@ -81,7 +82,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </Link>
 
         <div className="flex-1 overflow-y-auto">
-          <Sidebar role={user.role} hiddenHrefs={hiddenHrefs} />
+          <Sidebar role={user.role} hiddenHrefs={hiddenHrefs} grantedHrefs={grantedHrefs} />
         </div>
 
         <div className="border-t border-[var(--border)] p-3">
@@ -112,6 +113,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             scopeLabel={scopeLabel}
             logout={logout}
             hiddenHrefs={hiddenHrefs}
+            grantedHrefs={grantedHrefs}
           />
           <Link href="/dashboard" className="lg:hidden">
             <Brand size="sm" />

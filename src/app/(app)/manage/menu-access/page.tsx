@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { PageHeader, Card } from "@/components/ui";
 import { type Role } from "@/lib/roles";
-import { ensureMenuOverridesTable, hiddenKeysArrayForRole } from "@/lib/menu-overrides";
+import { ensureMenuOverridesTable, overrideArraysForRole } from "@/lib/menu-overrides";
 import { accessibleHrefs } from "@/lib/menu-tree";
 import MenuAccessEditor from "./MenuAccessEditor";
 
@@ -24,12 +24,12 @@ export default async function MenuAccessPage({
 
   await ensureMenuOverridesTable();
 
-  const [initialHiddenKeys, roleHrefs] = selectedRole
+  const [overrides, defaultHrefs] = selectedRole
     ? await Promise.all([
-        hiddenKeysArrayForRole(selectedRole),
+        overrideArraysForRole(selectedRole),
         Promise.resolve(accessibleHrefs(selectedRole)),
       ])
-    : [[], [] as string[]];
+    : [{ hiddenKeys: [], grantedKeys: [] }, [] as string[]];
 
   return (
     <>
@@ -40,8 +40,9 @@ export default async function MenuAccessPage({
       <Card className="mt-6">
         <MenuAccessEditor
           selectedRole={selectedRole}
-          roleHrefs={roleHrefs}
-          initialHiddenKeys={initialHiddenKeys}
+          defaultHrefs={defaultHrefs}
+          hiddenKeys={overrides.hiddenKeys}
+          grantedKeys={overrides.grantedKeys}
         />
       </Card>
     </>

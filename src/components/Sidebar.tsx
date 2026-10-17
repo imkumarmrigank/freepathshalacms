@@ -247,16 +247,19 @@ const DOCK: Record<Role, { href: string; label: string; icon: Icon }[]> = {
 
 /** Only the entries this role can actually reach. */
 export function dockFor(role: Role) {
+  const none = new Set<string>();
   const reachable = new Set(
-    MENU.filter((n) => visible(n, role)).flatMap(leaves)
-      .filter((l) => visible(l, role)).map((l) => l.href),
+    MENU.filter((n) => visible(n, role, none)).flatMap(leaves)
+      .filter((l) => visible(l, role, none)).map((l) => l.href),
   );
   return DOCK[role].filter((d) => reachable.has(d.href));
 }
 
 /* ------------------------------------------------------------------ helpers */
 
-function allowed(n: Node, role: Role): boolean {
+function allowed(n: Node, role: Role, granted: Set<string>): boolean {
+  // Explicitly granted items bypass all role gates
+  if (!isGroup(n) && granted.has(n.href)) return true;
   if (n.roles && !n.roles.includes(role)) return false;
   if (n.feature && !can(role, n.feature)) return false;
   if (n.when && !n.when(role)) return false;
@@ -264,9 +267,9 @@ function allowed(n: Node, role: Role): boolean {
 }
 
 /** A group is only worth showing if something inside it is. */
-function visible(n: Node, role: Role): boolean {
-  if (!allowed(n, role)) return false;
-  return isGroup(n) ? n.children.some((c) => visible(c, role)) : true;
+function visible(n: Node, role: Role, granted: Set<string>): boolean {
+  if (!allowed(n, role, granted)) return false;
+  return isGroup(n) ? n.children.some((c) => visible(c, role, granted)) : true;
 }
 
 
@@ -278,9 +281,9 @@ function leaves(n: Node): Leaf[] {
  * Which link the current path belongs to. The longest matching href wins, so
  * /students/new lights up "New admission" rather than "All students".
  */
-function activeHref(path: string, role: Role): string | null {
-  const all = MENU.filter((n) => visible(n, role)).flatMap(leaves)
-    .filter((l) => visible(l, role));
+function activeHref(path: string, role: Role, granted: Set<string>): string | null {
+  const all = MENU.filter((n) => visible(n, role, granted)).flatMap(leaves)
+    .filter((l) => visible(l, role, granted));
   let best: string | null = null;
   for (const l of all) {
     if (path === l.href || path.startsWith(l.href + "/")) {
@@ -296,8 +299,8 @@ function contains(n: Node, href: string): boolean {
 
 /* -------------------------------------------------------------- the vertical */
 
-function Row({ node, role, active, depth }: {
-  node: Node; role: Role; active: string | null; depth: number;
+function Row({ node, role, active, depth, granted }: {
+  node: Node; role: Role; active: string | null; depth: number; granted: Set<string>;
 }) {
   const t = useT();
   const holdsActive = active !== null && contains(node, active);
@@ -338,9 +341,9 @@ function Row({ node, role, active, depth }: {
       {expanded && (
         <div className="mt-0.5 space-y-0.5 border-l border-[var(--border)] pl-1"
           style={{ marginLeft: "0.9rem" }}>
-          {node.children.filter((c) => visible(c, role)).map((c) => (
+          {node.children.filter((c) => visible(c, role, granted)).map((c) => (
             <Row key={isGroup(c) ? c.label : c.href} node={c} role={role}
-              active={active} depth={0} />
+              active={active} depth={0} granted={granted} />
           ))}
         </div>
       )}
@@ -354,9 +357,9 @@ function Row({ node, role, active, depth }: {
  * On a phone the tree becomes two rows: the sections, then the pages inside
  * whichever section you are in. Tapping a section switches the second row.
  */
-function Horizontal({ role, active, menu = MENU }: { role: Role; active: string | null; menu?: Node[] }) {
+function Horizontal({ role, active, menu = MENU, granted }: { role: Role; active: string | null; menu?: Node[]; granted: Set<string> }) {
   const t = useT();
-  const top = menu.filter((n) => visible(n, role));
+  const top = menu.filter((n) => visible(n, role, granted));
   const current = top.find((n) => active !== null && contains(n, active));
   const [picked, setPicked] = useState<string | null>(null);
   const shownLabel = picked ?? (current && isGroup(current) ? current.label : null);
@@ -394,8 +397,8 @@ function Horizontal({ role, active, menu = MENU }: { role: Role; active: string 
 
       {shown && (
         <nav className="mt-1 flex gap-1 border-t border-[var(--border)] pt-1.5">
-          {shown.children.filter((c) => visible(c, role)).flatMap(leaves)
-            .filter((l) => visible(l, role))
+          {shown.children.filter((c) => visible(c, role, granted)).flatMap(leaves)
+            .filter((l) => visible(l, role, granted))
             .map((l) => (
               <Link key={l.href} href={l.href} className="nav-item nav-item-sm whitespace-nowrap"
                 data-active={active === l.href}>
@@ -425,20 +428,21 @@ function applyOverrides(nodes: Node[], hidden: Set<string>): Node[] {
   return out;
 }
 
-export default function Sidebar({ role, horizontal = false, hiddenHrefs = [] }:
-  { role: Role; horizontal?: boolean; hiddenHrefs?: string[] }) {
+export default function Sidebar({ role, horizontal = false, hiddenHrefs = [], grantedHrefs = [] }:
+  { role: Role; horizontal?: boolean; hiddenHrefs?: string[]; grantedHrefs?: string[] }) {
   const path = usePathname();
-  const active = activeHref(path, role);
+  const granted = new Set(grantedHrefs);
+  const active = activeHref(path, role, granted);
   const hidden = new Set(hiddenHrefs);
   const menu = applyOverrides(MENU, hidden);
 
-  if (horizontal) return <Horizontal role={role} active={active} menu={menu} />;
+  if (horizontal) return <Horizontal role={role} active={active} menu={menu} granted={granted} />;
 
   return (
     <nav className="flex flex-col gap-0.5 px-3 pb-6">
-      {menu.filter((n) => visible(n, role)).map((n) => (
+      {menu.filter((n) => visible(n, role, granted)).map((n) => (
         <Row key={isGroup(n) ? n.label : n.href} node={n} role={role}
-          active={active} depth={0} />
+          active={active} depth={0} granted={granted} />
       ))}
     </nav>
   );

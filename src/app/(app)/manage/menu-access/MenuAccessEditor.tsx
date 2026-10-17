@@ -6,11 +6,9 @@ import { saveMenuAccess } from "./actions";
 import { flatMenuItems } from "@/lib/menu-tree";
 import { ROLE_LABEL, type Role } from "@/lib/roles";
 
-type FlatItem = { key: string; label: string; group: string };
+type FlatItem = { href: string; label: string; group: string };
 
-const ALL_ITEMS_MAP = Object.fromEntries(
-  flatMenuItems().map((i) => [i.href, { key: i.href, label: i.label, group: i.group } as FlatItem])
-);
+const ALL_ITEMS: FlatItem[] = flatMenuItems();
 
 const MANAGEABLE_ROLES: Role[] = [
   "admin", "mentor", "center_manager", "teacher", "backup_teacher",
@@ -21,16 +19,24 @@ const init = { error: null as string | null, ok: false };
 
 export default function MenuAccessEditor({
   selectedRole,
-  roleHrefs,
-  initialHiddenKeys,
+  defaultHrefs,   // hrefs the role can reach via its normal gates
+  hiddenKeys,     // overrides: hide items the role normally has
+  grantedKeys,    // overrides: grant items the role normally lacks
 }: {
   selectedRole: Role | null;
-  roleHrefs: string[];
-  initialHiddenKeys: string[];
+  defaultHrefs: string[];
+  hiddenKeys: string[];
+  grantedKeys: string[];
 }) {
   const router = useRouter();
-  // hiddenKeys = items the role can access but are turned off
-  const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set(initialHiddenKeys));
+
+  const defaultSet = new Set(defaultHrefs);
+  const initialChecked = new Set([
+    ...defaultHrefs.filter((k) => !hiddenKeys.includes(k)),
+    ...grantedKeys,
+  ]);
+
+  const [checkedKeys, setCheckedKeys] = useState<Set<string>>(initialChecked);
 
   const [state, action, pending] = useActionState(
     async (_prev: typeof init, fd: FormData) => {
@@ -42,19 +48,20 @@ export default function MenuAccessEditor({
   );
 
   const toggle = (key: string) => {
-    setHiddenKeys((prev) => {
+    setCheckedKeys((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
   };
 
-  // Build groups from only the hrefs this role can actually reach
-  const items = roleHrefs.map((href) => ALL_ITEMS_MAP[href]).filter(Boolean);
-  const groups = items.reduce<Record<string, FlatItem[]>>((acc, item) => {
+  const groups = ALL_ITEMS.reduce<Record<string, FlatItem[]>>((acc, item) => {
     (acc[item.group] ??= []).push(item);
     return acc;
   }, {});
+
+  const allHrefs = ALL_ITEMS.map((i) => i.href);
+  const checkedCount = checkedKeys.size;
 
   return (
     <div className="space-y-6">
@@ -79,55 +86,88 @@ export default function MenuAccessEditor({
         </div>
       </div>
 
-      {selectedRole && items.length > 0 && (
+      {selectedRole && (
         <form action={action} className="space-y-4">
           <input type="hidden" name="role" value={selectedRole} />
-          {/* Send every accessible key so the action knows the full set */}
-          {roleHrefs.map((k) => (
-            <input key={k} type="hidden" name="all_keys" value={k} />
+          {/* Send every key so action knows the full set */}
+          {allHrefs.map((k) => (
+            <input key={`all-${k}`} type="hidden" name="all_keys" value={k} />
           ))}
-          {/* Visible (checked) keys */}
-          {roleHrefs.filter((k) => !hiddenKeys.has(k)).map((k) => (
-            <input key={k} type="hidden" name="visible_key" value={k} />
+          {/* Send which keys the role has by default (so action can diff) */}
+          {defaultHrefs.map((k) => (
+            <input key={`def-${k}`} type="hidden" name="default_key" value={k} />
+          ))}
+          {/* Send which keys are currently checked */}
+          {[...checkedKeys].map((k) => (
+            <input key={`chk-${k}`} type="hidden" name="checked_key" value={k} />
           ))}
 
-          <div className="flex items-center gap-4 text-[13px]">
+          <div className="flex flex-wrap items-center gap-4 text-[13px]">
             <span className="text-[var(--muted)]">
-              {roleHrefs.length - hiddenKeys.size} of {roleHrefs.length} items visible
+              <strong>{checkedCount}</strong> of {allHrefs.length} items visible for {ROLE_LABEL[selectedRole]}
             </span>
             <button type="button" className="underline text-[var(--muted)] hover:text-[var(--text)]"
-              onClick={() => setHiddenKeys(new Set())}>
-              Show all
+              onClick={() => setCheckedKeys(new Set(allHrefs))}>
+              Check all
             </button>
             <button type="button" className="underline text-[var(--muted)] hover:text-[var(--text)]"
-              onClick={() => setHiddenKeys(new Set(roleHrefs))}>
-              Hide all
+              onClick={() => setCheckedKeys(new Set())}>
+              Uncheck all
+            </button>
+            <button type="button" className="underline text-[var(--muted)] hover:text-[var(--text)]"
+              onClick={() => setCheckedKeys(new Set(defaultHrefs))}>
+              Reset to defaults
             </button>
           </div>
 
-          {Object.entries(groups).map(([group, grpItems]) => (
+          <div className="flex gap-4 text-[12px]">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-[var(--ok)]" />
+              Default access
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-[var(--brand)]" />
+              Extra access granted
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#e5e5f0]" />
+              Not in role (uncheck = hidden, check = granted)
+            </span>
+          </div>
+
+          {Object.entries(groups).map(([group, items]) => (
             <div key={group}>
               <div className="label-cap mb-2 text-[var(--muted)]">{group}</div>
               <div className="grid gap-1.5 sm:grid-cols-2">
-                {grpItems.map((item) => {
-                  const visible = !hiddenKeys.has(item.key);
+                {items.map((item) => {
+                  const isDefault = defaultSet.has(item.href);
+                  const isChecked = checkedKeys.has(item.href);
+                  const isGranted = !isDefault && isChecked;
+                  const isHidden = isDefault && !isChecked;
+
+                  let borderColor = "border-[var(--border)]";
+                  let bg = "";
+                  if (isGranted) { borderColor = "border-[var(--brand)]"; bg = "bg-[#f0f4ff]"; }
+                  else if (isHidden) { borderColor = "border-[#ebebf5]"; bg = "bg-[#f8f8fc]"; }
+                  else if (!isDefault) { borderColor = "border-[#ebebf5]"; bg = "bg-[#fafafa]"; }
+
                   return (
-                    <label key={item.key}
-                      className={`flex cursor-pointer items-center gap-2 rounded-[8px] border px-3 py-2 text-[13px] transition-colors hover:bg-[#fafafd] ${
-                        visible ? "border-[var(--border)]" : "border-[#ebebf5] bg-[#f8f8fc]"
-                      }`}>
+                    <label key={item.href}
+                      className={`flex cursor-pointer items-center gap-2 rounded-[8px] border px-3 py-2 text-[13px] transition-colors hover:bg-[#f5f5fb] ${borderColor} ${bg}`}>
                       <input
                         type="checkbox"
-                        checked={visible}
-                        onChange={() => toggle(item.key)}
-                        className="h-4 w-4 accent-[var(--brand)] flex-none"
+                        checked={isChecked}
+                        onChange={() => toggle(item.href)}
+                        className="h-4 w-4 flex-none accent-[var(--brand)]"
                       />
-                      <span className={visible ? "font-medium" : "text-[var(--faint)] line-through"}>
+                      <span className={isHidden ? "text-[var(--faint)] line-through" : isGranted ? "font-medium text-[var(--brand)]" : ""}>
                         {item.label}
                       </span>
-                      <span className="ml-auto text-[11px] text-[var(--faint)] font-mono truncate max-w-[120px]">
-                        {item.key}
-                      </span>
+                      {!isDefault && (
+                        <span className="ml-auto text-[10px] text-[var(--faint)] font-medium">
+                          {isGranted ? "GRANTED" : "NOT IN ROLE"}
+                        </span>
+                      )}
                     </label>
                   );
                 })}
