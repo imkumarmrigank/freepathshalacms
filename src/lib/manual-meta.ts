@@ -94,6 +94,8 @@ const OF_ROLE: Record<Role, ManualKey> = {
   super_admin: "admin",
   auditor: "auditor",
   sports_teacher: "teacher",
+  misc_teacher: "teacher",
+  store_manager: "admin",
   rider: "teacher",
 };
 
