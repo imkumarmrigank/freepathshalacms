@@ -240,6 +240,15 @@ const DOCK: Record<Role, { href: string; label: string; icon: Icon }[]> = {
     { href: "/calendar", label: "Calendar", icon: IconCal },
     { href: "/messages", label: "Messages", icon: IconChat },
   ],
+  misc_teacher: [
+    { href: "/dashboard", label: "Home", icon: IconGrid },
+    { href: "/calendar", label: "Calendar", icon: IconCal },
+    { href: "/messages", label: "Messages", icon: IconChat },
+  ],
+  store_manager: [
+    { href: "/dashboard", label: "Home", icon: IconGrid },
+    { href: "/supplies", label: "Supplies", icon: IconBox },
+  ],
   rider: [
     { href: "/my-attendance", label: "Check in", icon: IconClock },
   ],

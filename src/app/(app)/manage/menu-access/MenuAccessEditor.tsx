@@ -12,7 +12,7 @@ const ALL_ITEMS: FlatItem[] = flatMenuItems();
 
 const MANAGEABLE_ROLES: Role[] = [
   "admin", "mentor", "center_manager", "teacher", "backup_teacher",
-  "auditor", "sports_teacher", "rider",
+  "auditor", "sports_teacher", "misc_teacher", "store_manager", "rider",
 ];
 
 const init = { error: null as string | null, ok: false };

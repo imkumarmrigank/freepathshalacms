@@ -10,7 +10,7 @@ export const metadata = { title: "Menu access · FreePathshala" };
 
 const VALID_ROLES: Role[] = [
   "admin", "mentor", "center_manager", "teacher", "backup_teacher",
-  "auditor", "sports_teacher", "rider",
+  "auditor", "sports_teacher", "misc_teacher", "store_manager", "rider",
 ];
 
 export default async function MenuAccessPage({

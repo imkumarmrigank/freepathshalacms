@@ -7,6 +7,8 @@ export type Role =
   | "backup_teacher"
   | "auditor"
   | "sports_teacher"
+  | "misc_teacher"
+  | "store_manager"
   | "rider";
 
 export const ROLE_LABEL: Record<Role, string> = {
@@ -18,6 +20,8 @@ export const ROLE_LABEL: Record<Role, string> = {
   backup_teacher: "Backup Teacher",
   auditor: "Auditor",
   sports_teacher: "Sports Teacher",
+  misc_teacher: "Misc Teacher",
+  store_manager: "Store Manager",
   rider: "Rider",
 };
 
@@ -30,6 +34,8 @@ export const ROLE_BLURB: Record<Role, string> = {
   backup_teacher: "Stands in for an absent teacher at whichever centre is assigned.",
   auditor: "Visits centres, rates them, and leaves suggestions to act on.",
   sports_teacher: "Goes to any centre: runs its games, the sports register, tests and talent.",
+  misc_teacher: "Visits any centre: computer, drawing, music or other specialist subjects.",
+  store_manager: "Manages supplies — stock overview and distribution to students.",
   rider: "One centre: checks in and out there, and nothing else.",
 };
 
@@ -57,15 +63,17 @@ export function isTeaching(role: Role) {
  */
 export const CREATABLE_ROLES: Record<Role, Role[]> = {
   super_admin: ["super_admin", "admin", "mentor", "center_manager", "teacher",
-    "backup_teacher", "auditor", "sports_teacher", "rider"],
+    "backup_teacher", "auditor", "sports_teacher", "misc_teacher", "store_manager", "rider"],
   admin: ["mentor", "center_manager", "teacher", "backup_teacher", "auditor",
-    "sports_teacher", "rider"],
+    "sports_teacher", "misc_teacher", "store_manager", "rider"],
   mentor: [],
   center_manager: ["teacher"],
   teacher: [],
   backup_teacher: [],
   auditor: [],
   sports_teacher: [],
+  misc_teacher: [],
+  store_manager: [],
   rider: [],
 };
 
@@ -81,7 +89,8 @@ export function canManageStaff(role: Role) {
  * a backup teacher goes wherever they are assigned — none of them has a home centre.
  */
 export function needsCentre(role: Role) {
-  return role === "center_manager" || role === "teacher" || role === "rider";
+  return role === "center_manager" || role === "teacher" || role === "rider"
+    || role === "store_manager";
 }
 
 /** Only the super admin opens a new centre; an admin maintains existing ones. */
@@ -199,6 +208,11 @@ const FEATURES: Record<Role, Feature[]> = {
   // A sports teacher sees a child only as a player: the sports pages carry the
   // names they need, and nothing of the classroom record comes with them.
   sports_teacher: ["sports", "calendar", "messages"],
+  // Misc teachers (computer, drawing, music, etc.) have the same base access
+  // as sports teachers; super_admin can grant extra pages via menu access.
+  misc_teacher: ["calendar", "messages"],
+  // A store manager's remit is the supply chain only.
+  store_manager: ["supplies"],
   // The shortest list there is: a rider proves they were at the centre.
   rider: ["ownCheckIn"],
 };
