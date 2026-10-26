@@ -168,7 +168,7 @@ export function mentorDays(
      feedback AS (
        SELECT (fb.created_at ${IST})::date AS day, fb.mentor_id AS person, count(*)::int AS n
          FROM centre_feedback fb
-        WHERE (fb.created_at ${IST})::date BETWEEN $1 AND $2
+        WHERE fb.status = 'submitted' AND (fb.created_at ${IST})::date BETWEEN $1 AND $2
           ${centreNo ? `AND fb.center_id = $${centreNo}` : ""}
         GROUP BY 1, 2
      ),
@@ -324,12 +324,13 @@ export function mentorDayDetail(day: string, personId: number, centerId: number 
      SELECT 'Centre feedback',
             to_char(fb.created_at ${IST}, 'HH24:MI'),
             c.name, c.name, fb.working_well,
-            'Rated ' || fb.rating || ' of 5'
+            'Rated ' || CASE WHEN fb.rating IS NOT NULL THEN fb.rating || ' of 5'
+                             ELSE to_char(fb.overall_score, 'FM0.00') || ' of 3' END
               || CASE WHEN fb.urgent THEN ' · urgent' ELSE '' END,
             '/centre-feedback'
        FROM centre_feedback fb
        JOIN centers c ON c.id = fb.center_id
-      WHERE fb.mentor_id = $2 AND (fb.created_at ${IST})::date = $1
+      WHERE fb.status = 'submitted' AND fb.mentor_id = $2 AND (fb.created_at ${IST})::date = $1
         ${centre ? `AND fb.center_id = $${centre}` : ""}
      ORDER BY 2 NULLS LAST, 1`,
     args);

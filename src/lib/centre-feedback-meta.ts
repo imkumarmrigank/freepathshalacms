@@ -71,7 +71,55 @@ export function isTopic(v: string) {
 /** One label, both languages — "Centre / केंद्र". */
 export const both = (t: Bi) => `${t.en} / ${t.hi}`;
 
+/** The six parameters a mentor scores on a visit. 0 stored = "not observed". */
+export const ASSESSMENT_PARAMS: { key: string; en: string; hi: string }[] = [
+  { key: "teaching",    en: "Teaching Quality",              hi: "पढ़ाई की गुणवत्ता" },
+  { key: "attendance",  en: "Children's Attendance",         hi: "बच्चों की उपस्थिति" },
+  { key: "punctuality", en: "Teacher Punctuality",           hi: "शिक्षक की समयबद्धता" },
+  { key: "engagement",  en: "Student Engagement",            hi: "बच्चों की सहभागिता" },
+  { key: "safety",      en: "Cleanliness & Safety",          hi: "साफ़-सफ़ाई एवं सुरक्षा" },
+  { key: "environment", en: "Learning Environment & Materials", hi: "सीखने का माहौल एवं सामग्री" },
+];
+
+export const SCORE_OPTIONS: { value: number; en: string; hi: string }[] = [
+  { value: 3, en: "Good",       hi: "अच्छा" },
+  { value: 2, en: "Average",    hi: "औसत" },
+  { value: 1, en: "Below Avg",  hi: "औसत से कम" },
+];
+
+export type Ratings = Record<string, number>;
+
+/** How many parameters must be rated before a consolidated rating means anything. */
+export const MIN_RATED = 3;
+
+/** Consolidated rating out of 3, from whichever parameters were observed. */
+export function consolidate(ratings: Ratings) {
+  const scores = ASSESSMENT_PARAMS.map((p) => ratings[p.key]).filter((v) => v >= 1 && v <= 3);
+  const good = scores.filter((v) => v === 3).length;
+  const average = scores.filter((v) => v === 2).length;
+  const below = scores.filter((v) => v === 1).length;
+  const score = scores.length ? scores.reduce((n, v) => n + v, 0) / scores.length : null;
+  const band: "insufficient" | "good" | "average" | "below" =
+    scores.length < MIN_RATED || score === null ? "insufficient"
+    : score >= 2.5 ? "good" : score >= 1.75 ? "average" : "below";
+  return { score, rated: scores.length, good, average, below, band };
+}
+
+export const BAND_LABEL: Record<string, Bi> = {
+  insufficient: { en: "Insufficient Data", hi: "पर्याप्त डेटा नहीं" },
+  good:         { en: "Good",              hi: "अच्छा" },
+  average:      { en: "Average",           hi: "औसत" },
+  below:        { en: "Below Average",     hi: "औसत से कम" },
+};
+
+export const BAND_TONE: Record<string, string> = {
+  insufficient: "mute", good: "ok", average: "warn", below: "bad",
+};
+
 export type FeedbackRow = {
+  status: string;
+  ratings: Ratings;
+  overall_score: string | null;
   id: number;
   center_id: number;
   center_name: string;

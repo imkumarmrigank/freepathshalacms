@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { query } from "@/lib/db";
@@ -6,13 +7,17 @@ import { Badge, Card, Empty, PageHeader, StatCard } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { can } from "@/lib/roles";
 import {
-  FEEDBACK_RATINGS, FEEDBACK_TEXT as T, RATING_TONE, TOPIC_LABEL, type FeedbackRow,
+  ASSESSMENT_PARAMS, BAND_LABEL, BAND_TONE, FEEDBACK_RATINGS, FEEDBACK_TEXT as T,
+  RATING_TONE, SCORE_OPTIONS, TOPIC_LABEL, consolidate, type FeedbackRow,
 } from "@/lib/centre-feedback-meta";
 import FeedbackForm from "./FeedbackForm";
 
 export const metadata = { title: "Centre feedback · Pehchaan" };
 
-export default async function CentreFeedbackPage() {
+export default async function CentreFeedbackPage({
+  searchParams,
+}: { searchParams: Promise<{ done?: string; draft?: string }> }) {
+  const sp = await searchParams;
   const user = await requireUser();
   const mayWrite = can(user.role, "centreFeedback");
   const readsAll = can(user.role, "centreFeedbackReports");
@@ -24,11 +29,12 @@ export default async function CentreFeedbackPage() {
   // Who sees what: the office sees everything, a mentor sees what they wrote,
   // and a centre sees only the feedback the mentor chose to share with it.
   const params: unknown[] = [];
-  let where = "";
+  // drafts belong to the mentor who started them and nobody else
+  let where = "WHERE f.status = 'submitted'";
   if (!readsAll) {
     if (isCentre) {
       params.push(user.centerId ?? -1);
-      where = `WHERE f.share_with_centre AND f.center_id = $${params.length}`;
+      where = `WHERE f.status = 'submitted' AND f.share_with_centre AND f.center_id = $${params.length}`;
     } else {
       params.push(user.uid);
       where = `WHERE f.mentor_id = $${params.length}`;
@@ -38,7 +44,8 @@ export default async function CentreFeedbackPage() {
   const rows = await query<FeedbackRow>(
     `SELECT f.id, f.center_id, c.name AS center_name, u.name AS mentor_name,
             f.visited_on, f.rating, f.topics, f.working_well, f.needs_attention,
-            f.parent_voice, f.urgent, f.share_with_centre, f.language, f.created_at
+            f.parent_voice, f.urgent, f.share_with_centre, f.language, f.created_at,
+            f.status, f.ratings, f.overall_score
        FROM centre_feedback f
        JOIN centers c ON c.id = f.center_id
        JOIN users u ON u.id = f.mentor_id
@@ -48,10 +55,73 @@ export default async function CentreFeedbackPage() {
     params,
   );
 
+  if (mayWrite && !readsAll) {
+    const draftRow = sp.draft ? rows.find((r) => r.id === Number(sp.draft) && r.status === "draft") : undefined;
+    const previous = (
+      <details className="rounded-2xl border border-[var(--border)] bg-white px-4 py-3 shadow-sm">
+        <summary className="cursor-pointer text-[13px]">
+          <span className="font-semibold">Previous Feedback</span>{" "}
+          <span className="text-[var(--muted)]">| पिछला फ़ीडबैक ({rows.length})</span>
+        </summary>
+        {rows.length === 0 ? (
+          <p className="mt-3 text-[13px] text-[var(--muted)]">{T.none.en} / {T.none.hi}</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-[var(--border)]">
+            {rows.map((r) => {
+              const c = consolidate(r.ratings ?? {});
+              return (
+                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-[13px]">
+                  <div>
+                    <div className="font-medium">{r.center_name}</div>
+                    <div className="text-[12px] text-[var(--muted)]">{fmtDate(r.visited_on)}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {r.status === "draft" ? (
+                      <>
+                        <Badge tone="warn">Draft</Badge>
+                        <Link href={`/centre-feedback?draft=${r.id}`}
+                          className="text-[12px] text-[var(--brand)] hover:underline">Continue</Link>
+                      </>
+                    ) : r.overall_score !== null ? (
+                      <Badge tone={BAND_TONE[c.band]}>
+                        {Number(r.overall_score).toFixed(2)}/3 · {BAND_LABEL[c.band].en}
+                      </Badge>
+                    ) : r.rating != null ? (
+                      <Badge tone={RATING_TONE[r.rating]}>{r.rating}/5</Badge>
+                    ) : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </details>
+    );
+    return (
+      <>
+        {sp.done && (
+          <div className="mx-auto mb-4 max-w-[640px] rounded-[9px] bg-[var(--ok-soft)] px-3.5 py-2.5 text-[13px] text-[#15803d]">
+            {sp.done === "draft"
+              ? "Draft saved. / ड्राफ़्ट सहेज लिया गया।"
+              : "Feedback submitted. / फ़ीडबैक जमा हो गया।"}
+          </div>
+        )}
+        <FeedbackForm key={draftRow?.id ?? "new"} centers={centers} mentorName={user.name}
+          previous={previous}
+          draft={draftRow ? {
+            id: draftRow.id, centerId: draftRow.center_id,
+            visitedOn: String(draftRow.visited_on).slice(0, 10), ratings: draftRow.ratings ?? {},
+            workingWell: draftRow.working_well ?? "", needsAttention: draftRow.needs_attention ?? "",
+            parentVoice: draftRow.parent_voice ?? "",
+          } : null} />
+      </>
+    );
+  }
+
   const urgent = rows.filter((r) => r.urgent).length;
-  const rated = rows.filter((r) => r.rating != null);
-  const average = rated.length
-    ? Math.round((rated.reduce((n, r) => n + (r.rating ?? 0), 0) / rated.length) * 10) / 10
+  const scored = rows.filter((r) => r.overall_score !== null);
+  const average = scored.length
+    ? Math.round((scored.reduce((n, r) => n + Number(r.overall_score), 0) / scored.length) * 100) / 100
     : null;
 
   return (
@@ -69,11 +139,11 @@ export default async function CentreFeedbackPage() {
         <StatCard label="Needs the office" value={urgent}
           hint={urgent ? "marked urgent" : "nothing urgent"}
           tone={urgent ? "bad" : "default"} />
-        <StatCard label="Average rating" value={average ?? "—"} hint="out of 5" />
+        <StatCard label="Average rating" value={average ?? "—"} hint="out of 3" />
       </div>
 
-      <div className={mayWrite ? "grid gap-5 lg:grid-cols-5" : ""}>
-        <div className={mayWrite ? "lg:col-span-3" : ""}>
+      <div>
+        <div>
           <div className="label-cap mb-2.5">{T.history.en} / {T.history.hi}</div>
           {rows.length === 0 ? (
             <Card pad={false}>
@@ -98,6 +168,11 @@ export default async function CentreFeedbackPage() {
                     <div className="flex flex-wrap gap-2">
                       {r.urgent && <Badge tone="bad">Urgent / ज़रूरी</Badge>}
                       {!r.share_with_centre && <Badge tone="mute">Office only</Badge>}
+                      {r.overall_score !== null && (
+                        <Badge tone={BAND_TONE[consolidate(r.ratings ?? {}).band]}>
+                          {Number(r.overall_score).toFixed(2)}/3 · {BAND_LABEL[consolidate(r.ratings ?? {}).band].en}
+                        </Badge>
+                      )}
                       {r.rating != null && (
                         <Badge tone={RATING_TONE[r.rating]}>
                           {r.rating}/5 · {FEEDBACK_RATINGS.find((x) => x.value === r.rating)?.en}
@@ -105,6 +180,20 @@ export default async function CentreFeedbackPage() {
                       )}
                     </div>
                   </div>
+
+                  {r.overall_score !== null && (
+                    <div className="mt-2.5 grid gap-x-4 gap-y-1 text-[12px] sm:grid-cols-2">
+                      {ASSESSMENT_PARAMS.map((p) => {
+                        const v = r.ratings?.[p.key];
+                        return (
+                          <div key={p.key} className="flex justify-between gap-2">
+                            <span className="text-[var(--muted)]">{p.en}</span>
+                            <span>{v ? SCORE_OPTIONS.find((o) => o.value === v)?.en : "Not observed"}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   {r.topics.length > 0 && (
                     <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -137,11 +226,6 @@ export default async function CentreFeedbackPage() {
           )}
         </div>
 
-        {mayWrite && (
-          <div className="lg:col-span-2">
-            <FeedbackForm centers={centers} />
-          </div>
-        )}
       </div>
     </>
   );
