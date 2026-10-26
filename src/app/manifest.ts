@@ -23,7 +23,7 @@ export default function manifest(): MetadataRoute.Manifest {
     shortcuts: [
       { name: "Mark attendance", url: "/attendance" },
       { name: "My check-in", url: "/my-attendance" },
-      { name: "Record PTM", url: "/ptm/new" },
+      { name: "Scheduled PTMs", url: "/ptm/meetings" },
     ],
   };
 }

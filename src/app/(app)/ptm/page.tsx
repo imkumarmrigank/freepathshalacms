@@ -8,7 +8,6 @@ import FlagMark from "@/components/FlagMark";
 import SiblingMark from "@/components/SiblingMark";
 import TransportMark from "@/components/TransportMark";
 import { SIBLING_COLS, SIBLING_JOIN } from "@/lib/siblings";
-import { IconPlus } from "@/components/icons";
 import { fmtDate, fullName, titleCase } from "@/lib/format";
 import { isGlobalRole } from "@/lib/roles";
 import Pager from "@/components/Pager";
@@ -81,9 +80,6 @@ export default async function PtmPage({
         right={
           <>
             <Link href="/ptm/meetings" className="btn btn-ghost">Scheduled PTMs</Link>
-            <Link href="/ptm/new" className="btn btn-primary">
-              <IconPlus className="h-4 w-4" /> Record Parent Interaction
-            </Link>
           </>
         } />
 
@@ -100,12 +96,8 @@ export default async function PtmPage({
       <Card className="mt-4 overflow-hidden" pad={false}>
         {rows.length === 0 ? (
           <Empty title={t("No interactions recorded")}
-            hint={t("Record what was discussed with a parent, and the follow-up it needs.")}
-            action={
-              <Link href="/ptm/new" className="btn btn-primary btn-sm">
-                <IconPlus className="h-3.5 w-3.5" /> {t("Record Parent Interaction")}
-              </Link>
-            } />
+            hint={t("Open a scheduled PTM and use Record PTM interaction to log a parent conversation.")}
+            action={<Link href="/ptm/meetings" className="btn btn-primary btn-sm">{t("Scheduled PTMs")}</Link>} />
         ) : (
           <div className="overflow-x-auto">
             <table className="tbl">

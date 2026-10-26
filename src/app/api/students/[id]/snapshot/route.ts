@@ -30,10 +30,13 @@ export async function GET(
     center_id: number; center_name: string; father_name: string | null;
     mother_name: string | null; primary_phone: string | null;
     class_name: string | null; class_level_id: number | null; section: string | null;
+    photo_media_id: number | null; father_photo_media_id: number | null;
+    mother_photo_media_id: number | null;
   }>(
     `SELECT s.id, s.enrollment_no, s.first_name, s.last_name, s.center_id,
             c.name AS center_name, s.father_name, s.mother_name, s.primary_phone,
-            cl.name AS class_name, e.class_level_id, e.section
+            cl.name AS class_name, e.class_level_id, e.section,
+            s.photo_media_id, s.father_photo_media_id, s.mother_photo_media_id
        FROM students s
        JOIN centers c ON c.id = s.center_id
        LEFT JOIN enrollments e ON e.student_id = s.id AND e.session_id = $2
@@ -103,6 +106,9 @@ export async function GET(
       father: student.father_name,
       mother: student.mother_name,
       phone: student.primary_phone,
+      photo: student.photo_media_id ? `/api/media/${student.photo_media_id}` : null,
+      fatherPhoto: student.father_photo_media_id ? `/api/media/${student.father_photo_media_id}` : null,
+      motherPhoto: student.mother_photo_media_id ? `/api/media/${student.mother_photo_media_id}` : null,
     },
     attendance: {
       present, marked,

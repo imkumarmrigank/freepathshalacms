@@ -6,6 +6,7 @@ import { requireUser, canTouchCenter } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
 import { isGlobalRole, isTeaching } from "@/lib/roles";
+import { FOLLOW_UP_OWNER_OPTIONS, NO_COMMITMENT, followUpDateFor } from "@/lib/ptm-meta";
 
 const str = (f: FormData, k: string) => {
   const v = String(f.get(k) ?? "").trim();
@@ -39,32 +40,34 @@ export async function recordInteraction(_prev: unknown, form: FormData) {
   const parentPresent = String(form.get("parent_present") ?? "");
   const engagement = String(form.get("engagement") ?? "");
   // Not every conversation leaves something owing. When the mentor says no
-  // follow-up is needed, the priority and the date go with it rather than
-  // being filled in with something meaningless.
+  // follow-up is needed, the owner and the date go with it. Otherwise the date
+  // is not typed: it follows from who owns the follow-up.
   const followUpRequired = String(form.get("follow_up_required") ?? "yes") !== "no";
-  const priority = followUpRequired ? String(form.get("follow_up_priority") ?? "") : "";
-  const followUpDate = followUpRequired ? str(form, "follow_up_date") : null;
+  const ownerRaw = String(form.get("follow_up_owner") ?? "");
+  const owner = FOLLOW_UP_OWNER_OPTIONS.find((o) => o.value === ownerRaw);
+  const priority = followUpRequired ? owner?.priority ?? "" : "";
+  const followUpDate = followUpRequired && owner
+    ? followUpDateFor(owner.value, new Date(`${today()}T00:00:00`)) : null;
   const confidence = form.get("confidence") ? Number(form.get("confidence")) : null;
 
   if (!parentPresent) return { error: "Say who attended." };
   if (!engagement) return { error: "Record the parent's engagement level." };
-  if (followUpRequired && !priority) return { error: "Set the follow-up priority." };
-  if (followUpRequired && !followUpDate) return { error: "Set the next follow-up date." };
+  if (followUpRequired && !owner) return { error: "Choose who the follow-up is with." };
   if (confidence === null || confidence < 1 || confidence > 5)
     return { error: "Rate your confidence in this family's progress from 1 to 5." };
 
   const concernTags = form.getAll("concern_tags").map(String).filter(Boolean);
   const commitmentTags = form.getAll("commitment_tags").map(String).filter(Boolean);
-  if (concernTags.length === 0) return { error: "Choose at least one concern discussed." };
+  if (concernTags.length === 0) return { error: "Choose at least one problem expressed by the parent." };
   if (commitmentTags.length === 0)
-    return { error: "Record at least one commitment the parent made." };
+    return { error: "Record a commitment, or tick “No commitment taken”." };
+  // "No commitment taken" stands alone
+  if (commitmentTags.includes(NO_COMMITMENT) && commitmentTags.length > 1)
+    return { error: "“No commitment taken” cannot be combined with other commitments." };
 
-  const interactionDate = str(form, "interaction_date") ?? today();
-  if (interactionDate > today())
-    return { error: "The interaction cannot be dated in the future." };
-
-  // whoever is named as the mentor, defaulting to the person filling this in
-  const mentorId = form.get("mentor_id") ? Number(form.get("mentor_id")) : user.uid;
+  // the date and the mentor are captured, not asked for
+  const interactionDate = today();
+  const mentorId = user.uid;
   const assigneeRaw = form.get("follow_up_assignee_id");
   const assigneeId = !followUpRequired
     ? null
@@ -87,9 +90,10 @@ export async function recordInteraction(_prev: unknown, form: FormData) {
         interaction_date, mode, parent_present, engagement, attendance_pct,
         discussion, concerns, action_items, concern_tags, commitment_tags,
         follow_up_required, follow_up_date, follow_up_priority, follow_up_owner,
-        follow_up_assignee_id, follow_up_status, confidence, support_needed)
+        follow_up_assignee_id, follow_up_status, confidence, support_needed,
+        centre_feedback, follow_up_description)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
-             $17,$18,$19,$20,$21,$22,$23,$24)
+             $17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
      RETURNING id`,
     [num(form, "meeting_id"), studentId, session.id, student.class_level_id,
      student.center_id, mentorId,
@@ -100,7 +104,8 @@ export async function recordInteraction(_prev: unknown, form: FormData) {
      followUpRequired, followUpDate, priority || null,
      followUpRequired ? str(form, "follow_up_owner") : null,
      assigneeId, followUpRequired ? "pending" : "done",
-     confidence, str(form, "support_needed")],
+     confidence, str(form, "support_needed"), str(form, "centre_feedback"),
+     followUpRequired ? str(form, "follow_up_description") : null],
   );
 
   revalidatePath("/ptm");

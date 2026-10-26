@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireFeature } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { centersForUser, currentSession, listClasses, resolveCenterId } from "@/lib/queries";
@@ -71,7 +72,16 @@ export default async function MeetingsPage() {
                             />
                           )}
                         </td>
-                        <td>{m.title}</td>
+                        <td>
+                          {m.title}
+                          {(m.status === "scheduled" || m.status === "ongoing") && (
+                            <div className="mt-1.5">
+                              <Link href={`/ptm/new?meeting=${m.id}`} className="btn btn-primary btn-sm">
+                                {t("Record PTM interaction")}
+                              </Link>
+                            </div>
+                          )}
+                        </td>
                         <td className="text-[var(--muted)]">{m.class_name ?? "All classes"}</td>
                         {!centerId && <td className="text-[var(--muted)]">{m.center_name}</td>}
                         <td className="tabular-nums">{m.recorded}</td>

@@ -29,6 +29,7 @@ export default async function InteractionPage({
     follow_up_mode: string | null; follow_up_status: string; follow_up_notes: string | null;
     concern_tags: string[]; commitment_tags: string[]; follow_up_priority: string | null;
     follow_up_owner: string | null; confidence: number | null; support_needed: string | null;
+    centre_feedback: string | null; follow_up_description: string | null;
     assignee: string | null;
     created_at: string; student_id: number; student_first: string; student_last: string | null;
     enrollment_no: string; class_name: string | null; center_name: string; mentor: string | null;
@@ -68,7 +69,7 @@ export default async function InteractionPage({
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="space-y-5 lg:col-span-2">
           <Card>
-            <h2 className="mb-3 text-[15px] font-semibold">{t("Concerns discussed")}</h2>
+            <h2 className="mb-3 text-[15px] font-semibold">{t("Problems expressed by Parent")}</h2>
             {row.concern_tags?.length ? (
               <div className="mb-4 flex flex-wrap gap-1.5">
                 {row.concern_tags.map((c) => <Badge key={c} tone="warn" dot={false}>{t(c)}</Badge>)}
@@ -99,6 +100,22 @@ export default async function InteractionPage({
               <p className="mt-2 whitespace-pre-wrap text-[14px] leading-relaxed text-[var(--muted)]">
                 {row.action_items}
               </p>
+            )}
+            {row.follow_up_description && (
+              <>
+                <h3 className="mb-2 mt-5 text-[14px] font-semibold">{t("Follow-up description")}</h3>
+                <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-[var(--muted)]">
+                  {row.follow_up_description}
+                </p>
+              </>
+            )}
+            {row.centre_feedback && (
+              <>
+                <h3 className="mb-2 mt-5 text-[14px] font-semibold">{t("Centre feedback")}</h3>
+                <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-[var(--muted)]">
+                  {row.centre_feedback}
+                </p>
+              </>
             )}
             {row.support_needed && (
               <>

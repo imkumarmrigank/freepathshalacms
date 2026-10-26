@@ -254,7 +254,7 @@ export default async function PtmDashboardPage({
                       </Badge>
                     </td>
                     <td className="whitespace-nowrap">
-                      <Link href="/ptm/new" className="btn btn-ghost btn-sm">Record a meeting</Link>
+                      <Link href={`/ptm/new?meeting=${m.id}`} className="btn btn-ghost btn-sm">Record PTM interaction</Link>
                     </td>
                   </tr>
                 ))}

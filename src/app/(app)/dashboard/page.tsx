@@ -4,7 +4,6 @@ import { requireUser } from "@/lib/auth";
 import { query, one } from "@/lib/db";
 import { currentSession, resolveCenterId } from "@/lib/queries";
 import { Alert, Avatar, Badge, Card, Empty, StatCard } from "@/components/ui";
-import { IconPlus } from "@/components/icons";
 import { fmtDate, fullName, today } from "@/lib/format";
 import { eventsBetween } from "@/lib/calendar";
 import { EVENT_LABEL, EVENT_TONE } from "@/lib/calendar-meta";
@@ -334,9 +333,7 @@ export default async function Dashboard({
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2.5">
-        <Link href="/ptm/new" className="btn btn-primary">
-          <IconPlus className="h-4 w-4" /> {t("Record Parent Interaction")}
-        </Link>
+        <Link href="/ptm/meetings" className="btn btn-primary">{t("Scheduled PTMs")}</Link>
         <Link href="/ptm" className="btn btn-ghost">{t("View Interaction History")}</Link>
         {can(user.role, "attendance") && (
           <Link href="/attendance" className="btn btn-ghost">{t("Mark student attendance")}</Link>
@@ -509,11 +506,7 @@ export default async function Dashboard({
             {recent.length === 0
               ? <Empty title={t("No interactions yet")}
                   hint={t("Parent-teacher conversations you record will show up here.")}
-                  action={
-                    <Link href="/ptm/new" className="btn btn-primary btn-sm">
-                      <IconPlus className="h-3.5 w-3.5" /> {t("Record Parent Interaction")}
-                    </Link>
-                  } />
+                  action={<Link href="/ptm/meetings" className="btn btn-primary btn-sm">{t("Scheduled PTMs")}</Link>} />
               : <ul>
                   {recent.map((r) => (
                     <li key={r.id} className="flex items-center gap-3 border-b border-[#f1f1f6] px-4 py-3 last:border-0">
