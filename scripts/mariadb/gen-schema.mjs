@@ -196,7 +196,7 @@ for (const name of names) {
   }
 
   tableSql.push(
-    `CREATE TABLE ${q(name)} (\n${lines.join(",\n")}\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+    `CREATE TABLE ${q(name)} (\n${lines.join(",\n")}\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;`,
   );
 
   for (const k of t.constraints.filter((k) => k.type === "f")) {

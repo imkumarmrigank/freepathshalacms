@@ -134,7 +134,7 @@ const trimToks = (toks: Tok[]) => {
 /* ----------------------------------------------------- pass 1: simple renames */
 
 const RENAME: Record<string, string> = {
-  ILIKE: "LIKE", BTRIM: "TRIM", JSON_AGG: "JSON_ARRAYAGG", JSONB_AGG: "JSON_ARRAYAGG",
+  BTRIM: "TRIM", JSON_AGG: "JSON_ARRAYAGG", JSONB_AGG: "JSON_ARRAYAGG",
   JSON_BUILD_OBJECT: "JSON_OBJECT", JSONB_BUILD_OBJECT: "JSON_OBJECT", ARRAY_AGG: "JSON_ARRAYAGG",
   BOOL_OR: "MAX", BOOL_AND: "MIN", RANDOM: "RAND",
 };
@@ -158,7 +158,19 @@ function passWords(toks: Tok[]): Tok[] {
     if (t.t !== "word") { out.push(t); continue; }
     const u = t.s.toUpperCase();
     const nx = toks[nextSig(toks, i)];
-    if (RENAME[u] && (u === "ILIKE" || nx?.s === "(")) { out.push(W(RENAME[u])); continue; }
+    if (u === "ILIKE") {
+      // columns compare exactly (like PostgreSQL), so ILIKE asks for a case-insensitive collation
+      let e = out.length - 1;
+      while (e >= 0 && (out[e].t === "ws" || out[e].t === "cmt")) e--;
+      let notTok: Tok | null = null;
+      if (isWord(out[e], "NOT")) { notTok = out[e]; e--; while (e >= 0 && (out[e].t === "ws" || out[e].t === "cmt")) e--; }
+      const s0 = operandBefore(out, e);
+      const operand = out.slice(s0, e + 1);
+      out.length = s0;
+      out.push(...operand, SP, W("COLLATE"), SP, W("utf8mb4_unicode_ci"), SP, ...(notTok ? [notTok, SP] : []), W("LIKE"));
+      continue;
+    }
+    if (RENAME[u] && nx?.s === "(") { out.push(W(RENAME[u])); continue; }
     // PostgreSQL length() counts characters; MariaDB length() counts bytes (Hindi text!)
     if (u === "LENGTH" && nx?.s === "(") { out.push(W("CHAR_LENGTH")); continue; }
     if (RESERVED_ALIASES.has(u) && isWord(toks[prevSig(toks, i)], "AS")) { out.push({ t: "qid", s: "`" + t.s + "`" }); continue; }
@@ -922,15 +934,70 @@ function passDates(toksIn: Tok[]): Tok[] {
 /* -------------------------------------------------------------------- public API */
 
 type Seg = { k: "text"; s: string } | { k: "scalar"; n: number } | { k: "list"; n: number };
-export type Template = Seg[];
+export type Template = { segs: Seg[]; booleans: string[] };
 
 const cache = new Map<string, Template>();
+
+/**
+ * PostgreSQL gives real booleans for comparisons and EXISTS(); MariaDB gives 0 or 1. Looking at the
+ * statement's own select list, return the output names that are boolean expressions, so only
+ * those results are turned back into true/false (a count named "present" must stay a number).
+ */
+function booleanAliases(toks: Tok[]): string[] {
+  let depth = 0, sel = -1;
+  for (let i = 0; i < toks.length; i++) {
+    const t = toks[i];
+    if (t.t === "p" && t.s === "(") depth++;
+    else if (t.t === "p" && t.s === ")") depth--;
+    else if (depth === 0 && isWord(t, "SELECT")) { sel = i; break; }
+  }
+  if (sel < 0) return [];
+  depth = 0;
+  let end = toks.length;
+  for (let i = sel + 1; i < toks.length; i++) {
+    const t = toks[i];
+    if (t.t === "p" && t.s === "(") depth++;
+    else if (t.t === "p" && t.s === ")") depth--;
+    else if (depth === 0 && isWord(t, "FROM")) { end = i; break; }
+  }
+  const out: string[] = [];
+  for (const raw of splitTop(toks, sel + 1, end)) {
+    let item = trimToks(raw);
+    if (isWord(item[0], "DISTINCT")) item = trimToks(item.slice(1));
+    // alias = the word after the last depth-0 AS
+    let d = 0, asAt = -1;
+    item.forEach((t, k) => { if (t.s === "(") d++; else if (t.s === ")") d--; else if (d === 0 && isWord(t, "AS")) asAt = k; });
+    if (asAt < 0) continue;
+    const aliasTok = item[nextSig(item, asAt)];
+    if (!aliasTok) continue;
+    let expr = trimToks(item.slice(0, asAt));
+    // unwrap one level of redundant parentheses: (a = b)
+    while (expr[0]?.s === "(" && matchParen(expr, 0) === expr.length - 1) expr = trimToks(expr.slice(1, -1));
+    if (isWord(expr[0], "EXISTS") || isWord(expr[0], "NOT")) { out.push(aliasTok.s.replace(/["`]/g, "")); continue; }
+    // a comparison / IS / BETWEEN / IN / LIKE / AND / OR at the top level, and no CASE or arithmetic wrapper
+    d = 0;
+    let boolish = false, hasCase = false;
+    for (let k = 0; k < expr.length; k++) {
+      const t = expr[k];
+      if (t.s === "(") d++; else if (t.s === ")") d--;
+      else if (d === 0) {
+        if (t.t === "word" && /^CASE$/i.test(t.s)) hasCase = true;
+        if ((t.t === "op" && /^(<>|<=|>=|!=)$/.test(t.s)) || (t.t === "p" && /^[=<>]$/.test(t.s))) boolish = true;
+        if (t.t === "word" && /^(IS|BETWEEN|LIKE|ILIKE|AND|OR)$/i.test(t.s)) boolish = true;
+        if (t.t === "word" && /^IN$/i.test(t.s) && k > 0) boolish = true;
+      }
+    }
+    if (boolish && !hasCase) out.push(aliasTok.s.replace(/["`]/g, ""));
+  }
+  return out;
+}
 
 export function compile(sql: string): Template {
   const hit = cache.get(sql);
   if (hit) return hit;
 
   let toks = tokenize(sql);
+  const booleans = booleanAliases(toks);
   toks = passWords(toks);
   toks = passParams(toks);
   toks = passSets(toks);
@@ -943,7 +1010,7 @@ export function compile(sql: string): Template {
   toks = passDates(toks);
   toks = passUpsert(toks);
 
-  const tpl: Template = [];
+  const tpl: Seg[] = [];
   let text = "";
   for (const t of toks) {
     if (t.t === "param" && t.n !== undefined) {
@@ -952,9 +1019,10 @@ export function compile(sql: string): Template {
     } else text += t.s;
   }
   if (text) tpl.push({ k: "text", s: text });
+  const compiled: Template = { segs: tpl, booleans };
   if (cache.size > 2000) cache.clear();
-  cache.set(sql, tpl);
-  return tpl;
+  cache.set(sql, compiled);
+  return compiled;
 }
 
 const plain = (v: unknown) =>
@@ -967,10 +1035,10 @@ const plain = (v: unknown) =>
  * Fill a compiled template. Scalars become "?"; lists (from = ANY($n)) become "?,?,?", or
  * NULL when empty, which is what `= ANY('{}')` evaluates to (never true).
  */
-export function bind(tpl: Template, params: unknown[]): { sql: string; values: unknown[] } {
+export function bind(tpl: Template, params: unknown[]): { sql: string; values: unknown[]; booleans: string[] } {
   let sql = "";
   const values: unknown[] = [];
-  for (const seg of tpl) {
+  for (const seg of tpl.segs) {
     if (seg.k === "text") sql += seg.s;
     else if (seg.k === "scalar") { sql += "?"; values.push(plain(params[seg.n - 1])); }
     else {
@@ -980,7 +1048,7 @@ export function bind(tpl: Template, params: unknown[]): { sql: string; values: u
       else { sql += arr.map(() => "?").join(","); values.push(...arr); }
     }
   }
-  return { sql, values };
+  return { sql, values, booleans: tpl.booleans };
 }
 
 export function translate(sql: string, params: unknown[] = []) {

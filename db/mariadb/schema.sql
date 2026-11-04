@@ -12,7 +12,7 @@ CREATE TABLE `academic_sessions` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `academic_sessions_name_key` (`name`),
   UNIQUE KEY `uniq_one_current_session` (`is_current`, `_u_uniq_one_current_session`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `admission_drafts` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -24,14 +24,14 @@ CREATE TABLE `admission_drafts` (
   `updated_at` TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   KEY `idx_drafts_owner` (`created_by`, `updated_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `app_settings` (
   `key` VARCHAR(255) NOT NULL,
   `value` TEXT NOT NULL,
   `updated_at` TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`key`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `audit_criteria` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -53,7 +53,7 @@ CREATE TABLE `audit_criteria` (
   PRIMARY KEY (`id`),
   KEY `idx_criteria_order` (`is_active`, `position`, `id`),
   CONSTRAINT `audit_criteria_weight_check` CHECK (((weight >= 1) AND (weight <= 5)))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `audit_ratings` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -69,7 +69,7 @@ CREATE TABLE `audit_ratings` (
   UNIQUE KEY `audit_ratings_visit_id_criterion_id_key` (`visit_id`, `criterion_id`),
   KEY `idx_ratings_visit` (`visit_id`),
   CONSTRAINT `audit_ratings_band_check` CHECK (((band >= 0) AND (band <= 4)))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `audit_replies` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -80,7 +80,7 @@ CREATE TABLE `audit_replies` (
   `created_at` TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   KEY `idx_replies_sugg` (`suggestion_id`, `id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `audit_settings` (
   `id` TINYINT(1) NOT NULL DEFAULT 1,
@@ -93,7 +93,7 @@ CREATE TABLE `audit_settings` (
   PRIMARY KEY (`id`),
   CONSTRAINT `audit_settings_id_check` CHECK (id),
   CONSTRAINT `audit_settings_rating_weight_pct_check` CHECK (((rating_weight_pct >= 0) AND (rating_weight_pct <= 100)))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `audit_suggestions` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -121,7 +121,7 @@ CREATE TABLE `audit_suggestions` (
   CONSTRAINT `audit_suggestions_priority_check` CHECK ((priority IN ('low', 'medium', 'high', 'critical'))),
   CONSTRAINT `audit_suggestions_status_check` CHECK ((status IN ('open', 'in_progress', 'done', 'verified', 'not_done', 'dropped'))),
   CONSTRAINT `audit_suggestions_verdict_check` CHECK ((verdict IN ('done_well', 'partly', 'not_done')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `audit_visits` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -153,7 +153,7 @@ CREATE TABLE `audit_visits` (
   CONSTRAINT `audit_visits_kind_check` CHECK ((kind IN ('scheduled', 'follow_up', 'special'))),
   CONSTRAINT `audit_visits_overall_check` CHECK ((overall IN ('healthy', 'attention', 'support', 'urgent'))),
   CONSTRAINT `audit_visits_status_check` CHECK ((status IN ('planned', 'in_progress', 'submitted', 'cancelled', 'missed')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `calendar_event_exceptions` (
   `event_id` BIGINT NOT NULL,
@@ -163,7 +163,7 @@ CREATE TABLE `calendar_event_exceptions` (
   `created_by` BIGINT,
   PRIMARY KEY (`event_id`, `center_id`),
   KEY `idx_event_exceptions_center` (`center_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `calendar_events` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -186,7 +186,7 @@ CREATE TABLE `calendar_events` (
   KEY `idx_cal_range` (`start_date`, `end_date`),
   CONSTRAINT `calendar_events_dates` CHECK ((end_date >= start_date)),
   CONSTRAINT `calendar_events_event_type_check` CHECK ((event_type IN ('holiday', 'ptm', 'exam', 'event', 'feast', 'activity', 'closure', 'other')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `center_supply_receipts` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -203,7 +203,7 @@ CREATE TABLE `center_supply_receipts` (
   PRIMARY KEY (`id`),
   KEY `idx_receipts_center` (`center_id`, `received_on`),
   CONSTRAINT `center_supply_receipts_quantity_check` CHECK ((quantity > 0))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `centers` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -228,7 +228,7 @@ CREATE TABLE `centers` (
   CONSTRAINT `centers_center_type_check` CHECK (((center_type IS NULL) OR (center_type IN ('park', 'school')))),
   CONSTRAINT `centers_default_section_m_e` CHECK ((default_section IN ('M', 'E'))),
   CONSTRAINT `centers_geofence_radius_range` CHECK (((geofence_radius_m >= 20) AND (geofence_radius_m <= 70)))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `centre_feedback` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -255,7 +255,7 @@ CREATE TABLE `centre_feedback` (
   CONSTRAINT `centre_feedback_language_check` CHECK ((language IN ('en', 'hi'))),
   CONSTRAINT `centre_feedback_rating_check` CHECK (((rating IS NULL) OR ((rating >= 1) AND (rating <= 5)))),
   CONSTRAINT `centre_feedback_status_check` CHECK ((status IN ('draft', 'submitted')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `class_levels` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -266,7 +266,7 @@ CREATE TABLE `class_levels` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `class_levels_name_key` (`name`),
   UNIQUE KEY `class_levels_sequence_key` (`sequence`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `conversation_members` (
   `conversation_id` BIGINT NOT NULL,
@@ -275,7 +275,7 @@ CREATE TABLE `conversation_members` (
   `last_read_id` BIGINT NOT NULL DEFAULT 0,
   PRIMARY KEY (`conversation_id`, `user_id`),
   KEY `idx_members_user` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `conversations` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -293,7 +293,7 @@ CREATE TABLE `conversations` (
   UNIQUE KEY `uniq_centre_room` (`center_id`, `_u_uniq_centre_room`),
   UNIQUE KEY `uniq_direct_pair` (`direct_key`, `_u_uniq_direct_pair`),
   CONSTRAINT `conversations_kind_check` CHECK ((kind IN ('direct', 'centre', 'group')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `counselling_actions` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -306,7 +306,7 @@ CREATE TABLE `counselling_actions` (
   PRIMARY KEY (`id`),
   KEY `idx_flag_actions` (`flag_id`, `acted_on`, `id`),
   CONSTRAINT `counselling_actions_kind_check` CHECK ((kind IN ('picked_up', 'note', 'closed', 'reopened')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `counselling_flags` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -334,13 +334,13 @@ CREATE TABLE `counselling_flags` (
   UNIQUE KEY `uniq_flag_open_per_student` (`student_id`, `_u_uniq_flag_open_per_student`),
   CONSTRAINT `counselling_flags_status_check` CHECK ((status IN ('open', 'in_progress', 'closed'))),
   CONSTRAINT `counselling_flags_urgency_check` CHECK ((urgency IN ('normal', 'high')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `enrollment_counters` (
   `center_id` BIGINT NOT NULL,
   `next_seq` INT NOT NULL DEFAULT 1,
   PRIMARY KEY (`center_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `enrollments` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -364,7 +364,7 @@ CREATE TABLE `enrollments` (
   CONSTRAINT `enrollments_section_m_e` CHECK ((section IN ('M', 'E'))),
   CONSTRAINT `enrollments_source_check` CHECK ((source IN ('new', 'promoted', 'retained', 'mid_session', 'transfer'))),
   CONSTRAINT `enrollments_status_check` CHECK ((status IN ('active', 'completed', 'left', 'graduated')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `exam_marks` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -380,7 +380,7 @@ CREATE TABLE `exam_marks` (
   UNIQUE KEY `exam_marks_exam_id_student_id_key` (`exam_id`, `student_id`),
   KEY `idx_marks_student` (`student_id`),
   CONSTRAINT `exam_marks_marks_obtained_check` CHECK (((marks_obtained IS NULL) OR (marks_obtained >= (0))))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `exams` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -404,7 +404,7 @@ CREATE TABLE `exams` (
   CONSTRAINT `exams_pass_marks_check` CHECK (((pass_marks IS NULL) OR (pass_marks >= (0)))),
   CONSTRAINT `exams_pass_within_max` CHECK (((pass_marks IS NULL) OR (pass_marks <= max_marks))),
   CONSTRAINT `exams_status_check` CHECK ((status IN ('open', 'published')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `hq_supply_receipts` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -420,7 +420,7 @@ CREATE TABLE `hq_supply_receipts` (
   PRIMARY KEY (`id`),
   KEY `idx_hq_receipts_item` (`item_id`, `received_on`),
   CONSTRAINT `hq_supply_receipts_quantity_check` CHECK ((quantity > 0))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `manual_intro` (
   `role` VARCHAR(255) NOT NULL,
@@ -432,7 +432,7 @@ CREATE TABLE `manual_intro` (
   `updated_by` BIGINT,
   `lang` VARCHAR(255) NOT NULL DEFAULT 'en',
   PRIMARY KEY (`role`, `lang`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `manual_pitfalls` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -445,7 +445,7 @@ CREATE TABLE `manual_pitfalls` (
   `lang` VARCHAR(255) NOT NULL DEFAULT 'en',
   PRIMARY KEY (`id`),
   KEY `idx_manual_pitfalls_book` (`role`, `lang`, `position`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `manual_tasks` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -463,7 +463,7 @@ CREATE TABLE `manual_tasks` (
   `lang` VARCHAR(255) NOT NULL DEFAULT 'en',
   PRIMARY KEY (`id`),
   KEY `idx_manual_tasks_book` (`role`, `lang`, `position`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `media` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -474,7 +474,7 @@ CREATE TABLE `media` (
   `created_at` TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   CONSTRAINT `media_size` CHECK (((byte_size > 0) AND (byte_size <= 3145728)))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `messages` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -485,13 +485,13 @@ CREATE TABLE `messages` (
   PRIMARY KEY (`id`),
   KEY `idx_messages_convo` (`conversation_id`, `id`),
   CONSTRAINT `messages_body_check` CHECK (((length(TRIM(body)) > 0) AND (length(body) <= 4000)))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `number_counters` (
   `scope` VARCHAR(255) NOT NULL,
   `next_seq` INT NOT NULL DEFAULT 1,
   PRIMARY KEY (`scope`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `promotion_moves` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -514,7 +514,7 @@ CREATE TABLE `promotion_moves` (
   KEY `idx_moves_student` (`student_id`, `moved_on`),
   CONSTRAINT `promotion_moves_basis_check` CHECK ((basis IN ('result', 'manual', 'no_result'))),
   CONSTRAINT `promotion_moves_decision_check` CHECK ((decision IN ('promoted', 'retained', 'graduated')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `promotion_runs` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -532,7 +532,7 @@ CREATE TABLE `promotion_runs` (
   `kind` TEXT NOT NULL DEFAULT 'session',
   PRIMARY KEY (`id`),
   CONSTRAINT `promotion_runs_kind_check` CHECK ((kind IN ('session', 'manual')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `ptm_interactions` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -578,7 +578,7 @@ CREATE TABLE `ptm_interactions` (
   CONSTRAINT `ptm_interactions_follow_up_status_check` CHECK ((follow_up_status IN ('pending', 'done', 'cancelled'))),
   CONSTRAINT `ptm_interactions_mode_check` CHECK ((mode IN ('in_person', 'phone', 'video', 'home_visit'))),
   CONSTRAINT `ptm_interactions_parent_present_check` CHECK ((parent_present IN ('mother', 'father', 'both', 'guardian', 'none')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `ptm_meetings` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -598,7 +598,7 @@ CREATE TABLE `ptm_meetings` (
   KEY `idx_ptm_meet` (`center_id`, `meeting_date`),
   CONSTRAINT `ptm_meetings_mode_check` CHECK ((mode IN ('in_person', 'phone', 'video', 'home_visit'))),
   CONSTRAINT `ptm_meetings_status_check` CHECK ((status IN ('scheduled', 'ongoing', 'completed', 'cancelled')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `role_menu_overrides` (
   `id` INT NOT NULL AUTO_INCREMENT,
@@ -608,13 +608,13 @@ CREATE TABLE `role_menu_overrides` (
   `updated_at` TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   UNIQUE KEY `role_menu_overrides_role_menu_key_key` (`role`, `menu_key`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `schema_migrations` (
   `filename` VARCHAR(255) NOT NULL,
   `applied_at` TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`filename`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `sport_attendance` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -628,7 +628,7 @@ CREATE TABLE `sport_attendance` (
   UNIQUE KEY `sport_attendance_sport_id_student_id_att_date_key` (`sport_id`, `student_id`, `att_date`),
   KEY `idx_sport_att_day` (`sport_id`, `att_date`),
   CONSTRAINT `sport_attendance_status_check` CHECK ((status IN ('present', 'absent')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `sport_marks` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -643,7 +643,7 @@ CREATE TABLE `sport_marks` (
   UNIQUE KEY `sport_marks_test_id_student_id_key` (`test_id`, `student_id`),
   CONSTRAINT `sport_marks_absent` CHECK ((NOT (is_absent AND (marks IS NOT NULL)))),
   CONSTRAINT `sport_marks_marks_check` CHECK (((marks IS NULL) OR (marks >= (0))))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `sport_students` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -665,7 +665,7 @@ CREATE TABLE `sport_students` (
   KEY `idx_sport_students_special` (`sport_id`),
   KEY `idx_sport_students_student` (`student_id`),
   CONSTRAINT `sport_students_special_level_check` CHECK (((special_level IS NULL) OR (special_level IN ('centre', 'district', 'state', 'national'))))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `sport_tests` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -678,7 +678,7 @@ CREATE TABLE `sport_tests` (
   PRIMARY KEY (`id`),
   KEY `idx_sport_tests_sport` (`sport_id`, `test_date`),
   CONSTRAINT `sport_tests_max_marks_check` CHECK ((max_marks > (0)))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `sports` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -690,7 +690,7 @@ CREATE TABLE `sports` (
   `created_at` TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_sports_centre_name` (`center_id`, `name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `sports_visits` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -722,7 +722,7 @@ CREATE TABLE `sports_visits` (
   UNIQUE KEY `uq_sports_visit_open` (`user_id`, `_u_uq_sports_visit_open`),
   CONSTRAINT `sports_visit_report` CHECK (((report_submitted_at IS NULL) OR (activities IS NOT NULL))),
   CONSTRAINT `sports_visits_children_count_check` CHECK (((children_count IS NULL) OR (children_count >= 0)))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `staff_attendance` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -750,7 +750,7 @@ CREATE TABLE `staff_attendance` (
   UNIQUE KEY `staff_attendance_user_id_att_date_key` (`user_id`, `att_date`),
   KEY `idx_staff_att_date` (`center_id`, `att_date`),
   CONSTRAINT `staff_attendance_status_check` CHECK ((status IN ('present', 'late', 'absent', 'leave', 'holiday')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `staff_checkin_refusals` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -768,7 +768,7 @@ CREATE TABLE `staff_checkin_refusals` (
   PRIMARY KEY (`id`),
   KEY `idx_refusals_recent` (`att_date`, `center_id`),
   CONSTRAINT `staff_checkin_refusals_kind_check` CHECK ((kind IN ('in', 'out')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `staff_day_notes` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -801,7 +801,7 @@ CREATE TABLE `staff_day_notes` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `staff_day_notes_user_id_on_date_key` (`user_id`, `on_date`),
   KEY `idx_staff_day_notes` (`on_date`, `role`, `center_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `staff_leave_requests` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -825,7 +825,7 @@ CREATE TABLE `staff_leave_requests` (
   CONSTRAINT `leave_decided` CHECK (((status IN ('pending', 'cancelled')) = (decided_by IS NULL))),
   CONSTRAINT `staff_leave_requests_leave_type_check` CHECK ((leave_type IN ('casual', 'sick', 'emergency', 'planned', 'unpaid'))),
   CONSTRAINT `staff_leave_requests_status_check` CHECK ((status IN ('pending', 'approved', 'rejected', 'cancelled')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `staff_punches` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -851,7 +851,7 @@ CREATE TABLE `staff_punches` (
   KEY `idx_staff_punch_att` (`attendance_id`),
   KEY `idx_staff_punch_day` (`user_id`, `att_date`),
   UNIQUE KEY `idx_staff_punch_open` (`user_id`, `att_date`, `_u_idx_staff_punch_open`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `staff_test_answers` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -864,7 +864,7 @@ CREATE TABLE `staff_test_answers` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `staff_test_answers_test_id_position_key` (`test_id`, `position`),
   UNIQUE KEY `staff_test_answers_test_id_question_id_key` (`test_id`, `question_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `staff_test_config` (
   `for_role` VARCHAR(255) NOT NULL,
@@ -880,7 +880,7 @@ CREATE TABLE `staff_test_config` (
   CONSTRAINT `staff_test_config_duration_minutes_check` CHECK (((duration_minutes >= 1) AND (duration_minutes <= 180))),
   CONSTRAINT `staff_test_config_question_count_check` CHECK (((question_count >= 1) AND (question_count <= 50))),
   CONSTRAINT `staff_test_config_tests_per_month_check` CHECK (((tests_per_month >= 1) AND (tests_per_month <= 12)))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `staff_test_questions` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -901,7 +901,7 @@ CREATE TABLE `staff_test_questions` (
   KEY `idx_staff_q_role` (`for_role`, `is_active`),
   UNIQUE KEY `uq_staff_q_text` (`for_role`, `question_hi`),
   CONSTRAINT `staff_q_options` CHECK ((((JSON_LENGTH(options_en) >= 2) AND (JSON_LENGTH(options_en) <= 6)) AND (JSON_LENGTH(options_hi) = JSON_LENGTH(options_en)) AND (correct_index >= 0) AND (correct_index < JSON_LENGTH(options_en))))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `staff_tests` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -923,7 +923,7 @@ CREATE TABLE `staff_tests` (
   KEY `idx_staff_tests_user` (`user_id`, `cycle_month`, `slot`),
   CONSTRAINT `staff_tests_slot_check` CHECK (((slot >= 1) AND (slot <= 12))),
   CONSTRAINT `staff_tests_status_check` CHECK ((status IN ('in_progress', 'submitted', 'expired')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `student_attendance` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -945,7 +945,7 @@ CREATE TABLE `student_attendance` (
   KEY `idx_satt_reason` (`center_id`, `reason`),
   CONSTRAINT `student_attendance_reason_check` CHECK (((reason IS NULL) OR ((status = 'absent') AND (reason IN ('Sick', 'Didn''t wake up', 'Distance issue', 'Parents allowed it', 'Siblings responsibility', 'Visiting Hometown', 'Need Followup', 'Parents not aware', 'Drop'))) OR ((status = 'leave') AND (reason IN ('Approved leave', 'Festival', 'Marriage'))))),
   CONSTRAINT `student_attendance_status_check` CHECK ((status IN ('present', 'absent', 'late', 'half_day', 'leave', 'holiday')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `student_reactivations` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -963,7 +963,7 @@ CREATE TABLE `student_reactivations` (
   `created_at` TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   KEY `idx_reactivations_day` (`reactivated_on`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `student_siblings` (
   `student_a` BIGINT NOT NULL,
@@ -973,7 +973,7 @@ CREATE TABLE `student_siblings` (
   PRIMARY KEY (`student_a`, `student_b`),
   KEY `idx_siblings_b` (`student_b`),
   CONSTRAINT `siblings_ordered` CHECK ((student_a < student_b))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `student_supply_issues` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -990,7 +990,7 @@ CREATE TABLE `student_supply_issues` (
   KEY `idx_issues_center` (`center_id`, `issued_on`),
   KEY `idx_issues_student` (`student_id`),
   CONSTRAINT `student_supply_issues_quantity_check` CHECK ((quantity > 0))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `student_transfers` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -1013,7 +1013,7 @@ CREATE TABLE `student_transfers` (
   KEY `idx_transfers_day` (`transferred_on`),
   KEY `idx_transfers_student` (`student_id`, `transferred_on`),
   CONSTRAINT `transfer_somewhere` CHECK ((from_center_id <> to_center_id))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `students` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -1122,7 +1122,7 @@ CREATE TABLE `students` (
   CONSTRAINT `students_gender_check` CHECK ((gender IN ('male', 'female', 'other'))),
   CONSTRAINT `students_status_check` CHECK ((status IN ('active', 'inactive', 'graduated', 'transferred', 'dropped', 'suspended'))),
   CONSTRAINT `students_transport_mode_check` CHECK ((transport_mode IN ('rickshaw', 'cycle', 'walk')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `supply_items` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -1134,7 +1134,7 @@ CREATE TABLE `supply_items` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `supply_items_name_key` (`name`),
   CONSTRAINT `supply_items_category_check` CHECK ((category IN ('stationery', 'books', 'uniform', 'hygiene', 'equipment', 'other')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `supply_requests` (
   `id` INT NOT NULL AUTO_INCREMENT,
@@ -1150,7 +1150,7 @@ CREATE TABLE `supply_requests` (
   `handled_on` DATE,
   `receipt_id` BIGINT,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `syllabus_completions` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -1163,7 +1163,7 @@ CREATE TABLE `syllabus_completions` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `syllabus_completions_topic_id_center_id_session_id_key` (`topic_id`, `center_id`, `session_id`),
   KEY `idx_syllabus_completions_center` (`center_id`, `session_id`, `topic_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `syllabus_item_ticks` (
   `item_id` BIGINT NOT NULL,
@@ -1171,7 +1171,7 @@ CREATE TABLE `syllabus_item_ticks` (
   `done_on` DATE NOT NULL DEFAULT (CURDATE()),
   `marked_by` BIGINT,
   PRIMARY KEY (`item_id`, `center_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `syllabus_items` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -1181,7 +1181,7 @@ CREATE TABLE `syllabus_items` (
   `week_no` INT NOT NULL DEFAULT 1,
   PRIMARY KEY (`id`),
   KEY `idx_syllabus_items` (`unit_id`, `position`, `id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `syllabus_progress` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -1196,7 +1196,7 @@ CREATE TABLE `syllabus_progress` (
   UNIQUE KEY `syllabus_progress_unit_id_center_id_key` (`unit_id`, `center_id`),
   KEY `idx_syllabus_progress` (`center_id`, `status`),
   CONSTRAINT `syllabus_progress_status_check` CHECK ((status IN ('not_started', 'in_progress', 'completed')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `syllabus_topics` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -1211,7 +1211,7 @@ CREATE TABLE `syllabus_topics` (
   `created_at` TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   KEY `idx_syllabus_topics_class` (`class_level`, `subject`, `month_no`, `week_no`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `syllabus_units` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -1230,7 +1230,7 @@ CREATE TABLE `syllabus_units` (
   KEY `idx_syllabus_scope` (`session_id`, `class_level_id`, `subject`, `term_no`, `month_no`),
   CONSTRAINT `syllabus_units_month_no_check` CHECK (((month_no >= 1) AND (month_no <= 3))),
   CONSTRAINT `syllabus_units_term_no_check` CHECK (((term_no >= 1) AND (term_no <= 3)))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `syllabus_week_progress` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -1244,7 +1244,7 @@ CREATE TABLE `syllabus_week_progress` (
   UNIQUE KEY `syllabus_week_progress_unit_id_center_id_week_no_key` (`unit_id`, `center_id`, `week_no`),
   KEY `idx_swp_unit` (`unit_id`, `center_id`),
   CONSTRAINT `syllabus_week_progress_week_no_check` CHECK (((week_no >= 1) AND (week_no <= 4)))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `teacher_classes` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -1255,7 +1255,7 @@ CREATE TABLE `teacher_classes` (
   `is_class_teacher` TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `teacher_classes_user_id_session_id_class_level_id_key` (`user_id`, `session_id`, `class_level_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `teacher_coverage` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -1273,7 +1273,7 @@ CREATE TABLE `teacher_coverage` (
   KEY `idx_coverage_covering` (`covering_id`),
   CONSTRAINT `coverage_dates` CHECK (((ends_on IS NULL) OR (ends_on >= starts_on))),
   CONSTRAINT `coverage_not_self` CHECK ((backup_id <> covering_id))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `teacher_day_notes` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -1299,7 +1299,7 @@ CREATE TABLE `teacher_day_notes` (
   PRIMARY KEY (`id`),
   KEY `idx_teacher_day_notes` (`on_date`, `center_id`),
   UNIQUE KEY `uq_teacher_day_note` (`user_id`, `on_date`, `_cl0`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `teaching_plan_topics` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -1320,7 +1320,7 @@ CREATE TABLE `teaching_plan_topics` (
   KEY `idx_topics_plan` (`plan_id`, `sequence`),
   KEY `idx_topics_status` (`status`),
   CONSTRAINT `teaching_plan_topics_status_check` CHECK ((status IN ('planned', 'in_progress', 'completed', 'skipped')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `teaching_plans` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -1342,7 +1342,7 @@ CREATE TABLE `teaching_plans` (
   KEY `idx_plans_status` (`status`, `starts_on`),
   KEY `idx_plans_teacher` (`teacher_id`, `session_id`),
   CONSTRAINT `teaching_plans_status_check` CHECK ((status IN ('draft', 'submitted', 'active', 'completed', 'archived')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `timetable_slots` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -1367,7 +1367,7 @@ CREATE TABLE `timetable_slots` (
   CONSTRAINT `timetable_slots_day_of_week_check` CHECK (((day_of_week >= 1) AND (day_of_week <= 7))),
   CONSTRAINT `timetable_slots_period_no_check` CHECK (((period_no >= 1) AND (period_no <= 12))),
   CONSTRAINT `timetable_times` CHECK ((end_time > start_time))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `user_menu_overrides` (
   `id` INT NOT NULL AUTO_INCREMENT,
@@ -1377,7 +1377,7 @@ CREATE TABLE `user_menu_overrides` (
   `updated_at` TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   UNIQUE KEY `user_menu_overrides_user_id_menu_key_key` (`user_id`, `menu_key`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE `users` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -1398,4 +1398,4 @@ CREATE TABLE `users` (
   KEY `idx_users_center` (`center_id`),
   KEY `idx_users_real` (`role`),
   CONSTRAINT `users_role_check` CHECK ((role IN ('super_admin', 'admin', 'mentor', 'center_manager', 'teacher', 'backup_teacher', 'auditor', 'sports_teacher', 'rider')))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

@@ -44,6 +44,7 @@ function makePool(): Pool {
   const pool = mysql.createPool({
     host: u.hostname,
     port: Number(u.port || 3306),
+    socketPath: u.searchParams.get("socket") ?? undefined, // local testing over a unix socket
     user: decodeURIComponent(u.username),
     password: decodeURIComponent(u.password),
     database: u.pathname.slice(1),
@@ -51,7 +52,7 @@ function makePool(): Pool {
     waitForConnections: true,
     connectionLimit: Number(process.env.DB_POOL_MAX ?? 5),
     queueLimit: 0,
-    charset: "utf8mb4",
+    charset: "UTF8MB4_BIN", // exact comparison and code-point ordering, like PostgreSQL C.UTF-8
     timezone: TZ,
     // DATE columns are calendar days, not instants: keep "YYYY-MM-DD" so they never shift
     // across timezones. (TIMESTAMPs still arrive as Date objects.)
@@ -126,9 +127,21 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
 }
 
 async function run<T>(conn: Pool | PoolConnection, text: string, params: unknown[]): Promise<DbResult<T>> {
-  const { sql, values } = bind(compile(text), params);
+  const { sql, values, booleans } = bind(compile(text), params);
   const [res] = await conn.query(sql, values);
-  if (Array.isArray(res)) return { rows: res as T[], rowCount: res.length };
+  if (Array.isArray(res)) {
+    const rows = res as T[];
+    // comparison / EXISTS() results arrive as 0 or 1: hand them on as true / false, as PostgreSQL did
+    if (booleans.length) {
+      for (const r of rows as Record<string, unknown>[]) {
+        for (const name of booleans) {
+          const v = r[name];
+          if (v === 0 || v === 1 || v === "0" || v === "1") r[name] = v === 1 || v === "1";
+        }
+      }
+    }
+    return { rows, rowCount: rows.length };
+  }
   const h = res as ResultSetHeader;
   return { rows: [], rowCount: h.affectedRows, insertId: h.insertId };
 }

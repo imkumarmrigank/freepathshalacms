@@ -4,7 +4,7 @@
  * non-null values and a checksum (sums, lengths, min/max). A mismatch is reported by name
  * and the script exits non-zero, so a bad copy cannot be mistaken for a good one.
  *
- *   SOURCE_URL=postgres://...  TARGET_URL=mysql://user:pw@host:3306/db  \
+ *   SOURCE_URL=postgres://...  TARGET_URL=mysql://user@host:3306/db  TARGET_PASSWORD=...  \
  *     node scripts/mariadb/copy-data.mjs --replace [--with-media] [--verify-only]
  *
  *   --replace      empty the MariaDB tables first (needed to re-run; this is the "final sync")
@@ -37,7 +37,7 @@ src.on("connect", (c) => c.query("SET TIME ZONE 'UTC'"));
 const u = new URL(TARGET);
 const dst = await mysql.createConnection({
   host: u.hostname, port: Number(u.port || 3306),
-  user: decodeURIComponent(u.username), password: decodeURIComponent(u.password),
+  user: decodeURIComponent(u.username), password: process.env.TARGET_PASSWORD ?? decodeURIComponent(u.password),
   database: u.pathname.slice(1), socketPath: u.searchParams.get("socket") ?? undefined,
   ssl: u.searchParams.get("ssl") === "true" ? { rejectUnauthorized: false } : undefined,
   charset: "utf8mb4", supportBigNumbers: true, bigNumberStrings: false,

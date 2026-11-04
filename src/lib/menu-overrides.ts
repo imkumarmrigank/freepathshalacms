@@ -3,16 +3,7 @@ import { type Role } from "@/lib/roles";
 
 /** Create the table if it doesn't exist yet (idempotent). */
 export async function ensureMenuOverridesTable() {
-  await query(`
-    CREATE TABLE IF NOT EXISTS role_menu_overrides (
-      id         SERIAL PRIMARY KEY,
-      role       TEXT NOT NULL,
-      menu_key   TEXT NOT NULL,
-      hidden     BOOLEAN NOT NULL,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-      UNIQUE (role, menu_key)
-    )
-  `);
+  // role_menu_overrides is part of the baseline schema (db/mariadb/schema.sql); nothing to do.
 }
 
 type RoleOverrides = { hidden: Set<string>; granted: Set<string> };

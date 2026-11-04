@@ -11,22 +11,7 @@ const str = (f: FormData, k: string) => {
 };
 
 export async function ensureSupplyRequestsTable() {
-  await query(`
-    CREATE TABLE IF NOT EXISTS supply_requests (
-      id            SERIAL PRIMARY KEY,
-      center_id     INTEGER NOT NULL REFERENCES centers(id),
-      item_id       INTEGER NOT NULL REFERENCES supply_items(id),
-      quantity      INTEGER NOT NULL,
-      reason        TEXT,
-      requested_by  INTEGER NOT NULL REFERENCES users(id),
-      requested_on  DATE NOT NULL DEFAULT CURRENT_DATE,
-      status        TEXT NOT NULL DEFAULT 'pending',
-      notes         TEXT,
-      handled_by    INTEGER REFERENCES users(id),
-      handled_on    DATE,
-      receipt_id    INTEGER REFERENCES center_supply_receipts(id)
-    )
-  `);
+  // supply_requests is part of the baseline schema (db/mariadb/schema.sql); nothing to do.
 }
 
 /** Any centre-based user can submit a supply request. */

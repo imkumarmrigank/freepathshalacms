@@ -102,9 +102,6 @@ export async function saveStaff(_prev: unknown, form: FormData) {
   const actor = await requireUser();
   if (!canManageStaff(actor.role)) return { error: "You cannot manage staff." };
 
-  // Ensure the subject column exists (added for misc_teacher specialisation).
-  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS subject TEXT`);
-
   const id = numOrNull(form, "id");
   const name = str(form, "name");
   const email = str(form, "email")?.toLowerCase();
