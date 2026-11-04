@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { closeRegisterUpToYesterday } from "@/lib/attendance";
 
 /**
- * Nightly close-out. Point a Render cron job at this URL with the CRON_SECRET
+ * Nightly close-out. Point a scheduled job (any cron service) at this URL with the CRON_SECRET
  * header so unmarked days are auto-marked absent even if nobody opens the app.
  */
 export async function GET(req: Request) {

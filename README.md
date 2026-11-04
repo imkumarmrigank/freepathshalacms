@@ -2,7 +2,7 @@
 
 Student, attendance and parent–teacher management for FreePathshala centres.
 
-Built with Next.js 16 (App Router) + TypeScript + Tailwind, on Neon Postgres, deployed to Render.
+Built with Next.js 16 (App Router) + TypeScript + Tailwind, on Neon Postgres, deployed to Hostinger (Node.js hosting, from GitHub).
 
 ---
 
@@ -133,16 +133,17 @@ Seeded as `admin@freepathshala.org` with password `ChangeMe@123` unless you set
 
 ---
 
-## Deploying to Render
+## Deploying to Hostinger
 
-The repo carries a `render.yaml` blueprint: a web service plus a nightly cron job.
+The site runs on Hostinger Node.js hosting and redeploys from the `main` branch on GitHub
+(Git auto-deployment). Every push to `main` builds with `npm run build` and restarts the app.
 
-1. Render → **New → Blueprint**, point it at this repo.
-2. Set `DATABASE_URL` to the Neon **pooled** connection string.
-3. Set `APP_URL` on the cron service to the web service's URL.
-4. `JWT_SECRET` and `CRON_SECRET` are generated automatically and persist across deploys.
+1. Set the environment variables below in hPanel (Node.js → Environment variables).
+2. Push to `main`; Hostinger builds and restarts the app.
 
-Migrations run from the start command, so a deploy applies any new SQL before the app boots.
+**Migrations are not run on deploy.** Apply new SQL files from `db/migrations` to the
+Neon database yourself (`npm run migrate` with `DATABASE_URL` set, or paste the SQL into
+the Neon SQL editor and record it in `schema_migrations`) *before* pushing code that needs them.
 
 ### Environment variables
 
@@ -152,7 +153,7 @@ Migrations run from the start command, so a deploy applies any new SQL before th
 | `JWT_SECRET` | yes | Signs the session cookie. 32+ random characters |
 | `ENROLLMENT_PREFIX` | no | Defaults to `FP` |
 | `CRON_SECRET` | no | If set, the close-register endpoint requires it |
-| `APP_URL` | cron only | Base URL the cron job calls |
+| `APP_URL` | cron only | Base URL an external scheduler calls, if you run the nightly close-out |
 
 > Geolocation only works over HTTPS (or `localhost`), so staff check-in needs the deployed URL.
 

@@ -9,7 +9,7 @@ const MAX_BYTES = 3 * 1024 * 1024;
 // as often as they scan it, so both have to be accepted.
 const ALLOWED = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 
-/** Photographs are stored in Postgres — Render's filesystem does not survive a deploy. */
+/** Photographs are stored in Postgres — the host's filesystem does not survive a deploy. */
 export async function POST(req: Request) {
   const user = await getSession();
   if (!user) return new NextResponse("Unauthorized", { status: 401 });
