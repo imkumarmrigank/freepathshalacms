@@ -133,19 +133,48 @@ const trimToks = (toks: Tok[]) => {
 
 /* ----------------------------------------------------- pass 1: simple renames */
 
+const RENAME: Record<string, string> = {
+  ILIKE: "LIKE", BTRIM: "TRIM", JSON_AGG: "JSON_ARRAYAGG", JSONB_AGG: "JSON_ARRAYAGG",
+  JSON_BUILD_OBJECT: "JSON_OBJECT", JSONB_BUILD_OBJECT: "JSON_OBJECT", ARRAY_AGG: "JSON_ARRAYAGG",
+  BOOL_OR: "MAX", BOOL_AND: "MIN", RANDOM: "RAND",
+};
+/** words that are reserved in MariaDB but are plain column names here */
+const RESERVED_COLUMNS = new Set(["KEY"]);
+
 function passWords(toks: Tok[]): Tok[] {
-  return toks.map((t, i) => {
-    if (t.t !== "word") return t;
+  const out: Tok[] = [];
+  for (let i = 0; i < toks.length; i++) {
+    const t = toks[i];
+    if (t.t === "str" && t.s === "'{}'") { out.push({ t: "str", s: "'[]'" }); continue; } // empty array literal
+    if (t.t !== "word") { out.push(t); continue; }
     const u = t.s.toUpperCase();
-    if (u === "ILIKE") return W("LIKE");
-    if (u === "BTRIM") return W("TRIM");
+    const nx = toks[nextSig(toks, i)];
+    if (RENAME[u] && (u === "ILIKE" || nx?.s === "(")) { out.push(W(RENAME[u])); continue; }
     // PostgreSQL length() counts characters; MariaDB length() counts bytes (Hindi text!)
-    if (u === "LENGTH" && toks[nextSig(toks, i)]?.s === "(") return W("CHAR_LENGTH");
-    if (u === "ARRAY_AGG" || u === "UNNEST" || u === "GENERATE_SERIES" || u === "LATERAL") {
-      throw new Error(`sql-compat: ${t.s} has no portable translation; write this query without it`);
+    if (u === "LENGTH" && nx?.s === "(") { out.push(W("CHAR_LENGTH")); continue; }
+    if (RESERVED_COLUMNS.has(u)) {
+      const pv = toks[prevSig(toks, i)];
+      // "ON DUPLICATE KEY", "PRIMARY KEY" etc. are keywords; a bare column named key is not
+      if (!(pv && pv.t === "word" && /^(DUPLICATE|PRIMARY|FOREIGN|UNIQUE)$/i.test(pv.s))) {
+        out.push({ t: "qid", s: "`" + t.s + "`" });
+        continue;
+      }
     }
-    return t;
-  });
+    // INITCAP(x): first letter up, rest down (the app only ever applies it to single words)
+    if (u === "INITCAP" && nx?.s === "(") {
+      const o = nextSig(toks, i), c = matchParen(toks, o);
+      const x = trimToks(toks.slice(o + 1, c));
+      out.push(W("CONCAT"), P("("), W("UPPER"), P("("), W("LEFT"), P("("), ...x, P(","), SP, { t: "num", s: "1" }, P(")"), P(")"), P(","), SP,
+        W("LOWER"), P("("), W("SUBSTRING"), P("("), ...x, P(","), SP, { t: "num", s: "2" }, P(")"), P(")"), P(")"));
+      i = c;
+      continue;
+    }
+    if (u === "LATERAL" && !isWord(nx, "UNNEST")) {
+      throw new Error("sql-compat: LATERAL subqueries have no portable translation; use a window-function join or a correlated subquery");
+    }
+    out.push(t);
+  }
+  return out;
 }
 
 /* --------------------------------- pass 2: $n placeholders and = ANY(array) */
@@ -187,6 +216,97 @@ function passParams(toks: Tok[]): Tok[] {
     out.push(t);
   }
   return out;
+}
+
+/* ------------------------------ pass 2b: unnest(...) and generate_series(...) */
+
+function arrayArg(argToks: Tok[]): { expr: Tok[]; type: string } {
+  const a = trimToks(argToks);
+  // $n::bigint[]  ->  expr, BIGINT
+  const ci = a.findIndex((t, i) => t.t === "op" && t.s === "::" && a.slice(i).some((x) => x.s === "["));
+  if (ci < 0) return { expr: a, type: "TEXT" };
+  const typeWord = a[nextSig(a, ci)].s.toLowerCase();
+  const type = /^(bigint|int8|int|int4|integer|smallint)$/.test(typeWord) ? "BIGINT"
+    : typeWord === "date" ? "DATE" : /^(numeric|decimal)$/.test(typeWord) ? "DECIMAL(30,10)" : "TEXT";
+  return { expr: trimToks(a.slice(0, ci)), type };
+}
+
+function passSets(toksIn: Tok[]): Tok[] {
+  let toks = toksIn;
+  for (let guard = 0; guard < 500; guard++) {
+    const ui = toks.findIndex((t, i) => (isWord(t, "UNNEST") || isWord(t, "GENERATE_SERIES")) && toks[nextSig(toks, i)]?.s === "(");
+    if (ui < 0) return toks;
+    const isUnnest = isWord(toks[ui], "UNNEST");
+    const o = nextSig(toks, ui);
+    const c = matchParen(toks, o);
+    const args = splitTop(toks, o + 1, c).map(trimToks);
+
+    // what follows: [WITH ORDINALITY] [AS] alias [(col, col)]
+    let k = nextSig(toks, c);
+    let ordinality = false;
+    if (isWord(toks[k], "WITH") && isWord(toks[nextSig(toks, k)], "ORDINALITY")) { ordinality = true; k = nextSig(toks, nextSig(toks, k)); }
+    if (isWord(toks[k], "AS")) k = nextSig(toks, k);
+    let alias = "";
+    let cols: string[] = [];
+    let end = c;
+    if (toks[k]?.t === "word" && !/^(ON|JOIN|WHERE|GROUP|ORDER|LEFT|RIGHT|INNER|CROSS|LIMIT|UNION|SET|FROM|AND|OR)$/i.test(toks[k].s)) {
+      alias = toks[k].s; end = k;
+      const k2 = nextSig(toks, k);
+      if (toks[k2]?.s === "(") {
+        const c2 = matchParen(toks, k2);
+        cols = splitTop(toks, k2 + 1, c2).map((x) => join(trimToks(x)));
+        end = c2;
+      }
+    }
+
+    let rep: Tok[];
+    if (isUnnest) {
+      const arrays = args.map(arrayArg);
+      const colName = (i: number) => cols[i] ?? (arrays.length === 1 ? (alias || "unnest") : `c${i}`);
+      const mk = (a: { expr: Tok[]; type: string }, name: string, ord: string | null) =>
+        tokenize(`JSON_TABLE(`).slice(0, 2).concat(a.expr, tokenize(`, '$[*]' COLUMNS (${ord ? `${ord} FOR ORDINALITY, ` : ""}${name} ${a.type} PATH '$'))`));
+      if (arrays.length === 1) {
+        // with ORDINALITY the last listed column is the position
+        const ordName = ordinality ? (cols[1] ?? "ordinality") : null;
+        rep = [...mk(arrays[0], colName(0), ordName), SP, W("AS"), SP, W(`${alias || "unnest"}_t`)];
+        // the column name equals the alias in PostgreSQL's `unnest(x) AS name`; keep the table alias distinct
+      } else {
+        const sel = arrays.map((_, i) => `a${i}.${colName(i)} AS ${colName(i)}`).join(", ");
+        const parts = arrays.map((a, i) => join(mk(a, colName(i), "n")) + ` AS a${i}`);
+        const joins = parts.map((p, i) => (i === 0 ? p : `JOIN ${p} ON a${i}.n = a0.n`)).join(" ");
+        rep = tokenize(`(SELECT ${sel} FROM `).concat(
+          // keep the original expression tokens (they may hold ? markers) by rebuilding with tokens
+          arrays.flatMap((a, i) => [
+            ...(i === 0 ? [] : [SP, W("JOIN"), SP]),
+            ...mk(a, colName(i), "n"), SP, W("AS"), SP, W(`a${i}`),
+            ...(i === 0 ? [] : [SP, W("ON"), SP, W(`a${i}`), P("."), W("n"), SP, P("="), SP, W("a0"), P("."), W("n")]),
+          ]),
+          [P(")"), SP, W("AS"), SP, W(alias || "__u")],
+        );
+        void joins;
+      }
+    } else {
+      // generate_series(A, B, interval 'N unit') alias
+      const step = args[2] ?? [];
+      const sm = join(step).match(/interval\s+'(-?\d+)\s+([a-z]+)'/i);
+      if (!sm) throw new Error("sql-compat: generate_series needs a literal interval step");
+      const n = sm[1], unit = UNIT(sm[2]);
+      const name = alias || "g";
+      rep = [
+        P("("), W("WITH"), SP, W("RECURSIVE"), SP, W("__g"), P("("), W(name), P(")"), SP, W("AS"), SP, P("("),
+        W("SELECT"), SP, ...args[0], SP, W("UNION"), SP, W("ALL"), SP,
+        W("SELECT"), SP, W(name), SP, P("+"), SP, W("INTERVAL"), SP, { t: "num", s: n }, SP, W(unit), SP,
+        W("FROM"), SP, W("__g"), SP, W("WHERE"), SP, W(name), SP, P("+"), SP, W("INTERVAL"), SP, { t: "num", s: n }, SP, W(unit), SP, P("<="), SP, ...args[1],
+        P(")"), SP, W("SELECT"), SP, W(name), SP, W("FROM"), SP, W("__g"), P(")"), SP, W("AS"), SP, W(name),
+      ];
+    }
+    // drop a LATERAL keyword that came right before
+    let start = ui;
+    const pv = prevSig(toks, ui);
+    if (isWord(toks[pv], "LATERAL")) start = pv;
+    toks = [...toks.slice(0, start), ...rep, ...toks.slice(end + 1)];
+  }
+  throw new Error("sql-compat: too many set-returning functions");
 }
 
 /* -------------------------------------------------------- pass 3: x::type casts */
@@ -274,7 +394,7 @@ function passFilter(toksIn: Tok[]): Tok[] {
     let args = trimToks(toks.slice(co + 1, ce));
     let distinct = false;
     if (isWord(args[0], "DISTINCT")) { distinct = true; args = trimToks(args.slice(1)); }
-    const arg = args.length === 1 && args[0].s === "*" ? [{ t: "num", s: "1" } as Tok] : args;
+    const arg = args.length >= 1 && args[args.length - 1].s === "*" ? [{ t: "num", s: "1" } as Tok] : args; // count(*) and count(a.*)
     const wrapped: Tok[] = [
       ...(distinct ? [W("DISTINCT"), SP] : []),
       W("CASE"), SP, W("WHEN"), SP, ...cond, SP, W("THEN"), SP, ...arg, SP, W("END"),
@@ -382,6 +502,75 @@ function passFunctions(toksIn: Tok[]): Tok[] {
         changed = true; break;
       }
 
+      if (u === "EXTRACT") {
+        const inner = trimToks(toks.slice(o + 1, c));
+        const fromAt = inner.findIndex((x) => isWord(x, "FROM"));
+        if (fromAt > 0 && isWord(inner[0], "EPOCH")) {
+          toks = [...toks.slice(0, i), W("UNIX_TIMESTAMP"), P("("), ...trimToks(inner.slice(fromAt + 1)), P(")"), ...toks.slice(c + 1)];
+          changed = true; break;
+        }
+      }
+
+      // make_interval(months => n)  ->  INTERVAL (n) MONTH
+      if (u === "MAKE_INTERVAL") {
+        const inner = trimToks(toks.slice(o + 1, c));
+        const arrow = inner.findIndex((x, k) => x.s === "=" && inner[k + 1]?.s === ">");
+        if (arrow > 0) {
+          const unit = inner[0].s.toLowerCase();
+          const MAP: Record<string, string> = { years: "YEAR", months: "MONTH", weeks: "WEEK", days: "DAY", hours: "HOUR", mins: "MINUTE", secs: "SECOND" };
+          if (!MAP[unit]) throw new Error(`sql-compat: make_interval(${unit} => ...) unsupported`);
+          toks = [...toks.slice(0, i), W("INTERVAL"), SP, P("("), ...trimToks(inner.slice(arrow + 2)), P(")"), SP, W(MAP[unit]), ...toks.slice(c + 1)];
+          changed = true; break;
+        }
+      }
+
+      // array_position(ARRAY['a','b'], x)  ->  COALESCE(NULLIF(FIELD(x, 'a', 'b'), 0), 999)
+      if (u === "ARRAY_POSITION") {
+        const args = splitTop(toks, o + 1, c).map(trimToks);
+        if (isWord(args[0][0], "ARRAY") && args[0][1]?.s === "[") {
+          const items = args[0].slice(2, args[0].length - 1);
+          toks = [...toks.slice(0, i), W("COALESCE"), P("("), W("NULLIF"), P("("), W("FIELD"), P("("), ...args[1], P(","), SP, ...items, P(")"), P(","), SP, { t: "num", s: "0" }, P(")"), P(","), SP, { t: "num", s: "999" }, P(")"), ...toks.slice(c + 1)];
+          changed = true; break;
+        }
+      }
+
+      // array_to_string(json_array_column, sep)  ->  scalar subquery over JSON_TABLE
+      if (u === "ARRAY_TO_STRING") {
+        const args = splitTop(toks, o + 1, c).map(trimToks);
+        toks = [...toks.slice(0, i),
+          P("("), W("SELECT"), SP, W("GROUP_CONCAT"), P("("), W("jt"), P("."), W("v"), SP, W("ORDER"), SP, W("BY"), SP, W("jt"), P("."), W("n"), SP, W("SEPARATOR"), SP, ...args[1], P(")"), SP,
+          W("FROM"), SP, W("JSON_TABLE"), P("("), ...args[0], P(","), SP, { t: "str", s: "'$[*]'" }, SP, W("COLUMNS"), SP, P("("), W("n"), SP, W("FOR"), SP, W("ORDINALITY"), P(","), SP, W("v"), SP, W("TEXT"), SP, W("PATH"), SP, { t: "str", s: "'$'" }, P(")"), P(")"), SP, W("AS"), SP, W("jt"), P(")"),
+          ...toks.slice(c + 1)];
+        changed = true; break;
+      }
+
+      // date_part('year', age(a[, b]))  ->  TIMESTAMPDIFF(YEAR, b, a)
+      if (u === "DATE_PART") {
+        const args = splitTop(toks, o + 1, c).map(trimToks);
+        const unit = args[0]?.[0]?.s?.slice(1, -1).toLowerCase();
+        const ag = args[1] ?? [];
+        if (unit === "year" && isWord(ag[0], "AGE") && ag[1]?.s === "(") {
+          const ac = matchParen(ag, 1);
+          const aargs = splitTop(ag, 2, ac).map(trimToks);
+          const [later, earlier] = aargs.length === 2 ? [aargs[0], aargs[1]] : [[W("CURRENT_DATE")], aargs[0]];
+          toks = [...toks.slice(0, i), W("TIMESTAMPDIFF"), P("("), W("YEAR"), P(","), SP, ...earlier, P(","), SP, ...later, P(")"), ...toks.slice(c + 1)];
+          changed = true; break;
+        }
+        throw new Error("sql-compat: only date_part('year', age(...)) is supported");
+      }
+
+      // count(DISTINCT (a, b))  ->  COUNT(DISTINCT a, b)
+      if (u === "COUNT") {
+        const inner = trimToks(toks.slice(o + 1, c));
+        if (isWord(inner[0], "DISTINCT") && trimToks(inner.slice(1))[0]?.s === "(") {
+          const rest = trimToks(inner.slice(1));
+          if (matchParen(rest, 0) === rest.length - 1 && splitTop(rest, 1, rest.length - 1).length > 1) {
+            toks = [...toks.slice(0, o + 1), W("DISTINCT"), SP, ...rest.slice(1, rest.length - 1), ...toks.slice(c)];
+            changed = true; break;
+          }
+        }
+      }
+
       if (u === "STRING_AGG") {
         let inner = trimToks(toks.slice(o + 1, c));
         let distinct = false;
@@ -419,38 +608,56 @@ function passUpsert(toksIn: Tok[]): Tok[] {
   const oi = toks.findIndex((t, i) => isWord(t, "ON") && isWord(toks[nextSig(toks, i)], "CONFLICT"));
   if (oi < 0) return toks;
   const ci = nextSig(toks, oi);
-  const po = nextSig(toks, ci);
-  if (toks[po]?.s !== "(") throw new Error("sql-compat: ON CONFLICT needs a column list");
-  const pc = matchParen(toks, po);
-  const cols = splitTop(toks, po + 1, pc).map(trimToks);
-  const doI = nextSig(toks, pc);
-  if (!isWord(toks[doI], "DO")) throw new Error("sql-compat: malformed ON CONFLICT");
-  const act = nextSig(toks, doI);
-  let tail = toks.slice(act + 1);
+  let nx = nextSig(toks, ci);
+
+  // the conflict target is only ever the table's unique key, which MariaDB checks anyway
+  let firstCol: Tok[] = [];
+  if (toks[nx]?.s === "(") {
+    const pc = matchParen(toks, nx);
+    firstCol = splitTop(toks, nx + 1, pc).map(trimToks)[0];
+    nx = nextSig(toks, pc);
+    if (isWord(toks[nx], "WHERE")) throw new Error("sql-compat: ON CONFLICT ... WHERE is not supported");
+  }
+  if (!isWord(toks[nx], "DO")) throw new Error("sql-compat: malformed ON CONFLICT");
+  const act = nextSig(toks, nx);
 
   let repl: Tok[];
+  let tail = toks.slice(act + 1);
   if (isWord(toks[act], "NOTHING")) {
     // no-op update: affects 0 rows when the row already exists, like DO NOTHING
-    repl = [W("ON"), SP, W("DUPLICATE"), SP, W("KEY"), SP, W("UPDATE"), SP, ...cols[0], SP, P("="), SP, ...cols[0]];
+    if (!firstCol.length || firstCol.some((t) => t.s === "(")) {
+      // no usable target: take the first column of the INSERT's own column list
+      const ins = toks.findIndex((t, i) => isWord(t, "INSERT") && isWord(toks[nextSig(toks, i)], "INTO"));
+      const colsOpen = toks.findIndex((t, i) => i > ins && t.s === "(");
+      const colsClose = matchParen(toks, colsOpen);
+      firstCol = splitTop(toks, colsOpen + 1, colsClose).map(trimToks)[0];
+    }
+    repl = [W("ON"), SP, W("DUPLICATE"), SP, W("KEY"), SP, W("UPDATE"), SP, ...firstCol, SP, P("="), SP, ...firstCol];
   } else if (isWord(toks[act], "UPDATE")) {
     const setI = nextSig(toks, act);
     if (!isWord(toks[setI], "SET")) throw new Error("sql-compat: expected DO UPDATE SET");
-    // EXCLUDED.col -> VALUES(col)
     const body: Tok[] = [];
     const rest = toks.slice(setI + 1);
     for (let i = 0; i < rest.length; i++) {
+      // EXCLUDED.col -> VALUES(col)
       if (isWord(rest[i], "EXCLUDED") && rest[i + 1]?.s === "." && rest[i + 2]?.t === "word") {
         body.push(W("VALUES"), P("("), rest[i + 2], P(")"));
         i += 2;
       } else body.push(rest[i]);
     }
+    if (body.some((t) => isWord(t, "WHERE") )) {
+      // a top-level WHERE would be the conditional-update form; sub-selects keep theirs inside parens
+      let depth = 0;
+      for (const t of body) {
+        if (t.s === "(") depth++; else if (t.s === ")") depth--;
+        else if (depth === 0 && isWord(t, "WHERE")) throw new Error("sql-compat: DO UPDATE ... WHERE is not supported");
+      }
+    }
     repl = [W("ON"), SP, W("DUPLICATE"), SP, W("KEY"), SP, W("UPDATE"), ...body];
     tail = [];
   } else throw new Error("sql-compat: unsupported ON CONFLICT action");
 
-  // RETURNING after DO NOTHING stays after the no-op update
-  toks = [...toks.slice(0, oi), ...repl, ...tail];
-  return toks;
+  return [...toks.slice(0, oi), ...repl, ...tail];
 }
 
 /* -------------------------------------------------------------------- public API */
@@ -467,6 +674,7 @@ export function compile(sql: string): Template {
   let toks = tokenize(sql);
   toks = passWords(toks);
   toks = passParams(toks);
+  toks = passSets(toks);
   toks = passFilter(toks); // before casts: `count(*) FILTER (...)::int` must not treat FILTER as a function
   toks = passCasts(toks);
   toks = passNulls(toks);
