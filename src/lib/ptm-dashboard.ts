@@ -246,13 +246,13 @@ export async function ptmDayCoverage(day: string, centerId: number | null) {
   const rows = await query<{ expected: number; met: number; missed: number }>(
     `${EXPECTED_ON_DAY(centerId)}
      SELECT count(*)::int AS expected,
-            count(*) FILTER (WHERE met.ok)::int AS met,
-            count(*) FILTER (WHERE NOT met.ok)::int AS missed
-       FROM expected x
-       CROSS JOIN LATERAL (
-         SELECT EXISTS (SELECT 1 FROM ptm_interactions i
-                         WHERE i.student_id = x.student_id
-                           AND i.interaction_date = $1) AS ok) met`,
+            count(*) FILTER (WHERE EXISTS (SELECT 1 FROM ptm_interactions i
+                                            WHERE i.student_id = x.student_id
+                                              AND i.interaction_date = $1))::int AS met,
+            count(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM ptm_interactions i
+                                                WHERE i.student_id = x.student_id
+                                                  AND i.interaction_date = $1))::int AS missed
+       FROM expected x`,
     args);
   return rows[0] ?? { expected: 0, met: 0, missed: 0 };
 }
@@ -283,7 +283,7 @@ export function ptmAbsentees(day: string, centerId: number | null, limit = 200) 
             NULLIF(s.guardian_name, '') AS guardian_name,
             ${FAMILY_PHONE},
             to_char(seen.last_met, 'YYYY-MM-DD') AS last_met,
-            seen.n_session AS met_this_session,
+            COALESCE(seen.n_session, 0) AS met_this_session,
             cf.status AS flag_status, cf.urgency AS flag_urgency,
             cf.raised_on AS flag_on, ${SIBLING_COLS}
        FROM expected x
@@ -292,11 +292,11 @@ export function ptmAbsentees(day: string, centerId: number | null, limit = 200) 
        LEFT JOIN class_levels cl ON cl.id = x.class_level_id
        LEFT JOIN counselling_flags cf ON cf.student_id = s.id AND cf.status <> 'closed'
        ${SIBLING_JOIN}
-       CROSS JOIN LATERAL (
-         SELECT max(i.interaction_date) AS last_met,
+       LEFT JOIN (
+         SELECT i.student_id, max(i.interaction_date) AS last_met,
                 count(*) FILTER (WHERE i.session_id = (SELECT id FROM academic_sessions
                                                         WHERE is_current LIMIT 1))::int AS n_session
-           FROM ptm_interactions i WHERE i.student_id = x.student_id) seen
+           FROM ptm_interactions i GROUP BY i.student_id) seen ON seen.student_id = x.student_id
       WHERE NOT EXISTS (SELECT 1 FROM ptm_interactions i
                          WHERE i.student_id = x.student_id AND i.interaction_date = $1)
       ORDER BY seen.last_met NULLS FIRST, ce.code, cl.sequence NULLS LAST, s.first_name

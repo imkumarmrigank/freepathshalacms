@@ -95,15 +95,15 @@ export default async function FlaggedStudentsPage({
 
   // The trail is fetched with the row rather than in a second pass: a mentor's
   // steps are the point of this page, and a lateral join keeps it to one query.
-  const trail = `LEFT JOIN LATERAL (
-        SELECT count(*)::int AS steps, max(x.acted_on) AS last_on,
+  const trail = `LEFT JOIN (
+        SELECT x.flag_id, count(*)::int AS steps, max(x.acted_on) AS last_on,
                json_agg(json_build_object(
                  'kind', x.kind, 'note', x.note,
                  'on', to_char(x.acted_on, 'YYYY-MM-DD'), 'by', u.name)
                  ORDER BY x.acted_on DESC, x.id DESC) AS trail
           FROM counselling_actions x
           LEFT JOIN users u ON u.id = x.acted_by
-         WHERE x.flag_id = f.id) a ON TRUE`;
+         GROUP BY x.flag_id) a ON a.flag_id = f.id`;
 
   const [rows, tallyRows] = await Promise.all([
     query<Row>(

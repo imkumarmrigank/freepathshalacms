@@ -138,7 +138,7 @@ export function centresBySilence(centerId: number | null) {
   }>(
     `SELECT c.id AS center_id, c.name AS center_name, c.code AS center_code,
             to_char(last.visited_on, 'YYYY-MM-DD') AS last_visited_on,
-            (CURRENT_DATE - last.visited_on)::int  AS days_since,
+            DATEDIFF(CURRENT_DATE, last.visited_on)  AS days_since,
             to_char(next.scheduled_for, 'YYYY-MM-DD') AS next_visit_on,
             (SELECT count(*) FROM audit_suggestions s
               WHERE s.center_id = c.id AND s.status IN ('open','in_progress','done'))::int AS open_suggestions,
@@ -146,15 +146,19 @@ export function centresBySilence(centerId: number | null) {
               WHERE s.center_id = c.id AND s.status IN ('open','in_progress','done')
                 AND s.due_on IS NOT NULL AND s.due_on < CURRENT_DATE)::int AS overdue
        FROM centers c
-       LEFT JOIN LATERAL (
-         SELECT v.visited_on FROM audit_visits v
-          WHERE v.center_id = c.id AND v.status = 'submitted'
-          ORDER BY v.visited_on DESC LIMIT 1) last ON TRUE
-       LEFT JOIN LATERAL (
-         SELECT v.scheduled_for FROM audit_visits v
-          WHERE v.center_id = c.id AND v.status IN ('planned','in_progress')
-            AND v.scheduled_for >= CURRENT_DATE
-          ORDER BY v.scheduled_for LIMIT 1) next ON TRUE
+       LEFT JOIN (
+         SELECT x.center_id, x.visited_on FROM (
+           SELECT v.center_id, v.visited_on,
+                  ROW_NUMBER() OVER (PARTITION BY v.center_id ORDER BY v.visited_on DESC) AS rn
+             FROM audit_visits v WHERE v.status = 'submitted') x
+          WHERE x.rn = 1) last ON last.center_id = c.id
+       LEFT JOIN (
+         SELECT x.center_id, x.scheduled_for FROM (
+           SELECT v.center_id, v.scheduled_for,
+                  ROW_NUMBER() OVER (PARTITION BY v.center_id ORDER BY v.scheduled_for) AS rn
+             FROM audit_visits v
+            WHERE v.status IN ('planned','in_progress') AND v.scheduled_for >= CURRENT_DATE) x
+          WHERE x.rn = 1) next ON next.center_id = c.id
       WHERE c.is_active ${centerId ? "AND c.id = $1" : ""}
       ORDER BY last.visited_on NULLS FIRST, c.code`,
     centerId ? [centerId] : []);

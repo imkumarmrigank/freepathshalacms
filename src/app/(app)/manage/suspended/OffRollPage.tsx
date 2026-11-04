@@ -67,10 +67,11 @@ export default async function OffRollPage({
               s.left_on, s.left_reason
          FROM students s
          JOIN centers c ON c.id = s.center_id
-         LEFT JOIN LATERAL (
-           SELECT e.class_level_id FROM enrollments e
-            WHERE e.student_id = s.id ORDER BY e.session_id DESC LIMIT 1
-         ) last ON TRUE
+         LEFT JOIN (
+         SELECT e.student_id, e.class_level_id FROM enrollments e
+          WHERE e.session_id = (SELECT max(e2.session_id) FROM enrollments e2
+                                 WHERE e2.student_id = e.student_id)
+       ) last ON last.student_id = s.id
          LEFT JOIN class_levels cl ON cl.id = last.class_level_id
         WHERE s.status = $1 ${where}
         ORDER BY c.code, name

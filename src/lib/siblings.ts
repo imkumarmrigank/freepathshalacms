@@ -97,18 +97,7 @@ export async function siblingsOf(studentId: number) {
  * on the roll are counted: the point of the mark is that the teacher in front
  * of this child has the other one too.
  */
-export const SIBLING_JOIN = `LEFT JOIN LATERAL (
-         SELECT count(*)::int AS n,
-                string_agg(o.label, ', ' ORDER BY o.label) AS names
-           FROM (
-             SELECT trim(x.first_name || ' ' || COALESCE(x.last_name, ''))
-                    || COALESCE(' · ' || cl2.name, '') AS label
-               FROM students x
-               LEFT JOIN enrollments e2 ON e2.student_id = x.id AND e2.status = 'active'
-                    AND e2.session_id = (SELECT id FROM academic_sessions
-                                          WHERE is_current LIMIT 1)
-               LEFT JOIN class_levels cl2 ON cl2.id = e2.class_level_id
-              WHERE x.id <> s.id AND x.status = 'active'
+const SIBLING_MATCH = `x.id <> s.id AND x.status = 'active'
                 AND (
                   EXISTS (SELECT 1 FROM student_siblings sb
                            WHERE (sb.student_a = s.id AND sb.student_b = x.id)
@@ -126,16 +115,36 @@ export const SIBLING_JOIN = `LEFT JOIN LATERAL (
                          AND lower(btrim(x.father_name)) = lower(btrim(s.father_name)))
                         OR (NULLIF(btrim(s.mother_name), '') IS NOT NULL
                             AND lower(btrim(x.mother_name)) = lower(btrim(s.mother_name)))))
-                )) o) sib ON TRUE`;
+                )`;
 
-/** The two columns that go with {@link SIBLING_JOIN}. */
-export const SIBLING_COLS = `COALESCE(sib.n, 0) AS sibling_count, sib.names AS sibling_names`;
+const SIBLING_LABEL = `trim(x.first_name || ' ' || COALESCE(x.last_name, '')) || COALESCE(' · ' || cl2.name, '')`;
+
+/** How many brothers and sisters. A correlated subquery, so no join is needed. */
+export const SIBLING_COUNT = `(SELECT count(*) FROM students x WHERE ${SIBLING_MATCH})`;
+
+/** Their names with class, "Asha · Class 2, Ravi · KG". */
+export const SIBLING_NAMES = `(SELECT string_agg(${SIBLING_LABEL}, ', ' ORDER BY ${SIBLING_LABEL})
+           FROM students x
+           LEFT JOIN enrollments e2 ON e2.student_id = x.id AND e2.status = 'active'
+                AND e2.session_id = (SELECT id FROM academic_sessions WHERE is_current LIMIT 1)
+           LEFT JOIN class_levels cl2 ON cl2.id = e2.class_level_id
+          WHERE ${SIBLING_MATCH})`;
+
+/**
+ * Kept so every list can still write ${SIBLING_JOIN} in its FROM clause: the two
+ * columns below are now correlated subqueries on `s`, so there is nothing to join.
+ * MariaDB has no LATERAL join.
+ */
+export const SIBLING_JOIN = ``;
+
+/** The two columns for a list that already joins `students s`. */
+export const SIBLING_COLS = `${SIBLING_COUNT} AS sibling_count, ${SIBLING_NAMES} AS sibling_names`;
 
 /** The same reckoning for one child, for their own page. */
 export async function siblingMark(studentId: number) {
   const rows = await query<{ n: number; names: string | null }>(
-    `SELECT COALESCE(sib.n, 0) AS n, sib.names
-       FROM students s ${SIBLING_JOIN}
+    `SELECT ${SIBLING_COUNT} AS n, ${SIBLING_NAMES} AS names
+       FROM students s
       WHERE s.id = $1`,
     [studentId]);
   return rows[0] ?? { n: 0, names: null };

@@ -116,8 +116,8 @@ function splitTop(toks: Tok[], from: number, to: number): Tok[][] {
   let depth = 0;
   for (let j = from; j < to; j++) {
     const t = toks[j];
-    if (t.t === "p" && t.s === "(") depth++;
-    if (t.t === "p" && t.s === ")") depth--;
+    if (t.t === "p" && (t.s === "(" || t.s === "[")) depth++;
+    if (t.t === "p" && (t.s === ")" || t.s === "]")) depth--;
     if (depth === 0 && t.t === "p" && t.s === ",") { parts.push(cur); cur = []; }
     else cur.push(t);
   }
@@ -138,6 +138,15 @@ const RENAME: Record<string, string> = {
   JSON_BUILD_OBJECT: "JSON_OBJECT", JSONB_BUILD_OBJECT: "JSON_OBJECT", ARRAY_AGG: "JSON_ARRAYAGG",
   BOOL_OR: "MAX", BOOL_AND: "MIN", RANDOM: "RAND",
 };
+/** reserved in MariaDB but fine as an output alias in PostgreSQL: `count(*) AS both` */
+const RESERVED_ALIASES = new Set([
+  "BOTH", "RIGHT", "LEFT", "LEAVE", "RANGE", "ROW", "ROWS", "READ", "WRITE", "REPEAT", "RELEASE", "OPTION",
+  "MATCH", "CONDITION", "USAGE", "LOOP", "ITERATE", "EXIT", "KEYS", "INDEX", "GENERAL", "LOAD", "LOCK",
+  "PURGE", "KILL", "SHOW", "USE", "OUT", "INOUT", "OVER", "WINDOW", "RETURN", "CALL", "FETCH", "FORCE",
+  "IGNORE", "ANALYZE", "CHANGE", "COLUMN", "MOD", "DIV", "XOR", "SQL", "TRAILING", "LEADING", "RANK",
+  "SCHEMA", "DATABASE", "TABLE", "GROUP", "ORDER", "CHECK", "DESC", "ASC", "LIMIT", "INTERVAL", "REGEXP",
+]);
+
 /** words that are reserved in MariaDB but are plain column names here */
 const RESERVED_COLUMNS = new Set(["KEY"]);
 
@@ -152,6 +161,8 @@ function passWords(toks: Tok[]): Tok[] {
     if (RENAME[u] && (u === "ILIKE" || nx?.s === "(")) { out.push(W(RENAME[u])); continue; }
     // PostgreSQL length() counts characters; MariaDB length() counts bytes (Hindi text!)
     if (u === "LENGTH" && nx?.s === "(") { out.push(W("CHAR_LENGTH")); continue; }
+    if (RESERVED_ALIASES.has(u) && isWord(toks[prevSig(toks, i)], "AS")) { out.push({ t: "qid", s: "`" + t.s + "`" }); continue; }
+    if (u === "POSITION" && nx?.s !== "(") { out.push({ t: "qid", s: "`" + t.s + "`" }); continue; }
     if (RESERVED_COLUMNS.has(u)) {
       const pv = toks[prevSig(toks, i)];
       // "ON DUPLICATE KEY", "PRIMARY KEY" etc. are keywords; a bare column named key is not
@@ -359,7 +370,14 @@ function passCasts(toksIn: Tok[]): Tok[] {
     // --- the operand before "::"
     let e = prevSig(toks, ci);
     let s = e;
-    if (toks[e]?.s === ")") {
+    if (isWord(toks[e], "END")) {
+      // (CASE ... END)::type without the parentheses: walk back to the matching CASE
+      let depth = 0;
+      for (let j = e; j >= 0; j--) {
+        if (isWord(toks[j], "END")) depth++;
+        else if (isWord(toks[j], "CASE")) { depth--; if (depth === 0) { s = j; break; } }
+      }
+    } else if (toks[e]?.s === ")") {
       s = matchParenBack(toks, e);
       const before = s - 1;
       if (toks[before] && (toks[before].t === "word" || toks[before].t === "qid")) s = before;
@@ -506,7 +524,14 @@ function passFunctions(toksIn: Tok[]): Tok[] {
         const inner = trimToks(toks.slice(o + 1, c));
         const fromAt = inner.findIndex((x) => isWord(x, "FROM"));
         if (fromAt > 0 && isWord(inner[0], "EPOCH")) {
-          toks = [...toks.slice(0, i), W("UNIX_TIMESTAMP"), P("("), ...trimToks(inner.slice(fromAt + 1)), P(")"), ...toks.slice(c + 1)];
+          let body = trimToks(inner.slice(fromAt + 1));
+          if (body[0]?.s === "(" && matchParen(body, 0) === body.length - 1) body = trimToks(body.slice(1, -1));
+          // epoch of a difference: (a - b) in seconds
+          let depth = 0, minus = -1;
+          body.forEach((x, k) => { if (x.s === "(") depth++; else if (x.s === ")") depth--; else if (depth === 0 && x.t === "p" && x.s === "-") minus = k; });
+          const ts = (x: Tok[]) => [W("UNIX_TIMESTAMP"), P("("), ...trimToks(x), P(")")];
+          const rep = minus > 0 ? [P("("), ...ts(body.slice(0, minus)), SP, P("-"), SP, ...ts(body.slice(minus + 1)), P(")")] : ts(body);
+          toks = [...toks.slice(0, i), ...rep, ...toks.slice(c + 1)];
           changed = true; break;
         }
       }
@@ -616,7 +641,10 @@ function passUpsert(toksIn: Tok[]): Tok[] {
     const pc = matchParen(toks, nx);
     firstCol = splitTop(toks, nx + 1, pc).map(trimToks)[0];
     nx = nextSig(toks, pc);
-    if (isWord(toks[nx], "WHERE")) throw new Error("sql-compat: ON CONFLICT ... WHERE is not supported");
+    if (isWord(toks[nx], "WHERE")) {
+      // target of a partial unique index: the hidden unique key built from the predicate does the work
+      while (nx < toks.length && !isWord(toks[nx], "DO")) nx = nextSig(toks, nx);
+    }
   }
   if (!isWord(toks[nx], "DO")) throw new Error("sql-compat: malformed ON CONFLICT");
   const act = nextSig(toks, nx);
@@ -660,6 +688,105 @@ function passUpsert(toksIn: Tok[]): Tok[] {
   return [...toks.slice(0, oi), ...repl, ...tail];
 }
 
+/* ----------------------------------------------- pass 8: date arithmetic */
+
+let DATE_COLS: Set<string> = new Set();
+let STAMP_COLS: Set<string> = new Set();
+/** Wire in the column-name sets generated from the live schema (see gen-schema.mjs). */
+export function configure(opts: { dateColumns: Set<string>; timestampColumns: Set<string> }) {
+  DATE_COLS = opts.dateColumns;
+  STAMP_COLS = opts.timestampColumns;
+  cache.clear();
+}
+/** Things the translator saw but could not safely rewrite; read by the SQL checker. */
+export const warnings: string[] = [];
+
+function operandBefore(toks: Tok[], e: number): number {
+  let s = e;
+  if (isWord(toks[e], "END")) {
+    let depth = 0;
+    for (let j = e; j >= 0; j--) {
+      if (isWord(toks[j], "END")) depth++;
+      else if (isWord(toks[j], "CASE")) { depth--; if (depth === 0) return j; }
+    }
+  }
+  if (toks[e]?.s === ")") {
+    s = matchParenBack(toks, e);
+    const before = s - 1;
+    if (toks[before] && (toks[before].t === "word" || toks[before].t === "qid")) s = before;
+  } else {
+    while (s > 1 && toks[s - 1]?.s === "." && (toks[s - 2]?.t === "word" || toks[s - 2]?.t === "qid")) s -= 2;
+  }
+  return s;
+}
+
+function operandAfter(toks: Tok[], s: number): number {
+  const t = toks[s];
+  if (!t) return s;
+  if (t.s === "(") return matchParen(toks, s);
+  let e = s;
+  const nx = nextSig(toks, e);
+  if (t.t === "word" && toks[nx]?.s === "(" && nx === s + 1) return matchParen(toks, nx); // func(...)
+  while (toks[e + 1]?.s === "." && (toks[e + 2]?.t === "word" || toks[e + 2]?.t === "qid")) e += 2;
+  return e;
+}
+
+const lastIdent = (toks: Tok[]) => {
+  const w = toks.filter((t) => t.t === "word" || t.t === "qid");
+  return (w[w.length - 1]?.s ?? "").replace(/`/g, "").toLowerCase();
+};
+
+function isDateOperand(op: Tok[]): boolean {
+  const t = trimToks(op);
+  if (!t.length) return false;
+  const txt = join(t).replace(/\s+/g, " ").trim().toUpperCase();
+  if (txt === "CURRENT_DATE" || txt === "CURDATE()") return true;
+  if (/^CAST\(.* AS DATE\)$/.test(txt) || /^DATE\(/.test(txt)) return true;
+  if (/^(COALESCE|GREATEST|LEAST)\(/.test(txt)) return t.some((x) => (x.t === "word" && (x.s.toUpperCase() === "CURRENT_DATE" || DATE_COLS.has(x.s.toLowerCase()))));
+  if (t.length <= 3 && t.every((x, i) => (i % 2 === 0 ? x.t === "word" || x.t === "qid" : x.s === "."))) return DATE_COLS.has(lastIdent(t));
+  return false;
+}
+const isNumber = (op: Tok[]) => { const t = trimToks(op); return t.length === 1 && t[0].t === "num"; };
+
+function passDates(toksIn: Tok[]): Tok[] {
+  let toks = toksIn;
+  for (let guard = 0; guard < 500; guard++) {
+    let changed = false;
+    for (let i = 1; i < toks.length - 1 && !changed; i++) {
+      const t = toks[i];
+      if (!(t.t === "p" && (t.s === "-" || t.s === "+"))) continue;
+      const pe = prevSig(toks, i);
+      if (pe < 0) continue;
+      const pt = toks[pe];
+      // must be a binary operator: something operand-like ends just before it
+      if (!(pt.t === "word" || pt.t === "num" || pt.t === "qid" || pt.t === "str" || pt.t === "param" || pt.s === ")")) continue;
+      if (pt.t === "word" && /^(SELECT|WHERE|AND|OR|THEN|ELSE|WHEN|ON|BY|IN|AS|FROM|SET|AT|THEN|NOT|LIKE|BETWEEN|VALUES)$/i.test(pt.s)) continue;
+      const rs = nextSig(toks, i);
+      if (isWord(toks[rs], "INTERVAL") || isWord(toks[rs], "MAKE_INTERVAL")) continue;
+      const ls = operandBefore(toks, pe);
+      const re = operandAfter(toks, rs);
+      const left = toks.slice(ls, pe + 1), right = toks.slice(rs, re + 1);
+      if (!isDateOperand(left)) continue;
+      let rep: Tok[] | null = null;
+      if (t.s === "-" && isDateOperand(right)) rep = [W("DATEDIFF"), P("("), ...left, P(","), SP, ...right, P(")")];
+      else if (isNumber(right)) rep = [W(t.s === "-" ? "DATE_SUB" : "DATE_ADD"), P("("), ...left, P(","), SP, W("INTERVAL"), SP, ...right, SP, W("DAY"), P(")")];
+      if (rep) { toks = [...toks.slice(0, ls), ...rep, ...toks.slice(re + 1)]; changed = true; }
+    }
+    if (!changed) break;
+  }
+  // anything date-looking still being added or subtracted is a mistake waiting to happen
+  for (let i = 1; i < toks.length - 1; i++) {
+    const t = toks[i];
+    if (t.t === "p" && (t.s === "-" || t.s === "+")) {
+      const pe = prevSig(toks, i);
+      if (toks[pe]?.t !== "word" && toks[pe]?.t !== "qid") continue; // a function result is not a bare column
+      const l = lastIdent(toks.slice(Math.max(0, pe - 2), pe + 1));
+      if (DATE_COLS.has(l) || STAMP_COLS.has(l)) warnings.push(`date-looking operand next to "${t.s}": ${join(toks.slice(Math.max(0, i - 6), i + 6)).replace(/\s+/g, " ")}`);
+    }
+  }
+  return toks;
+}
+
 /* -------------------------------------------------------------------- public API */
 
 type Seg = { k: "text"; s: string } | { k: "scalar"; n: number } | { k: "list"; n: number };
@@ -679,6 +806,7 @@ export function compile(sql: string): Template {
   toks = passCasts(toks);
   toks = passNulls(toks);
   toks = passFunctions(toks);
+  toks = passDates(toks);
   toks = passUpsert(toks);
 
   const tpl: Template = [];

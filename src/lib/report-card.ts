@@ -199,15 +199,15 @@ export async function classProgress(
        JOIN students s ON s.id = e.student_id
        JOIN class_levels cl ON cl.id = e.class_level_id
        JOIN centers ce ON ce.id = e.center_id
-       LEFT JOIN LATERAL (
-         SELECT sum(em.marks_obtained) AS obtained,
+       LEFT JOIN (
+         SELECT em.student_id, x.session_id, sum(em.marks_obtained) AS obtained,
                 sum(x.max_marks) FILTER (WHERE em.marks_obtained IS NOT NULL) AS out_of,
                 count(*) FILTER (WHERE em.marks_obtained IS NOT NULL) AS papers,
                 count(DISTINCT (x.exam_type, COALESCE(x.term_label, x.title))) AS tests
            FROM exam_marks em
            JOIN exams x ON x.id = em.exam_id
-          WHERE em.student_id = s.id AND x.session_id = e.session_id
-       ) m ON TRUE
+          GROUP BY em.student_id, x.session_id
+       ) m ON m.student_id = s.id AND m.session_id = e.session_id
       WHERE e.session_id = $1 AND e.status = 'active' AND s.status = 'active' ${where}
       ORDER BY ce.code, cl.sequence, e.roll_no NULLS LAST, s.first_name`,
     params,

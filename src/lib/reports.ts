@@ -1589,11 +1589,13 @@ const SPORT_LEVEL: Record<string, string> = {
 
 /** Turnout across every session a child has been marked for, per sport. */
 const TURNOUT = `
-  LEFT JOIN LATERAL (
-    SELECT count(*) FILTER (WHERE a.status = 'present') AS present, count(*) AS marked
-      FROM sport_attendance a
-     WHERE a.sport_id = ss.sport_id AND a.student_id = ss.student_id
-  ) t ON TRUE`;
+  LEFT JOIN (
+    SELECT q.sport_id, q.student_id,
+           count(a.id) FILTER (WHERE a.status = 'present') AS present, count(a.id) AS marked
+      FROM sport_students q
+      LEFT JOIN sport_attendance a ON a.sport_id = q.sport_id AND a.student_id = q.student_id
+     GROUP BY q.sport_id, q.student_id
+  ) t ON t.sport_id = ss.sport_id AND t.student_id = ss.student_id`;
 
 async function sportsPlayers(p: ReportParams): Promise<ReportResult> {
   const params: unknown[] = [p.sessionId];
@@ -2003,10 +2005,11 @@ async function offRoll(p: ReportParams, status: "suspended" | "graduated"): Prom
             COALESCE(s.left_reason, s.dropout_reason) AS left_reason, s.status
        FROM students s
        JOIN centers c ON c.id = s.center_id
-       LEFT JOIN LATERAL (
-         SELECT e.class_level_id FROM enrollments e
-          WHERE e.student_id = s.id ORDER BY e.session_id DESC LIMIT 1
-       ) last ON TRUE
+       LEFT JOIN (
+         SELECT e.student_id, e.class_level_id FROM enrollments e
+          WHERE e.session_id = (SELECT max(e2.session_id) FROM enrollments e2
+                                 WHERE e2.student_id = e.student_id)
+       ) last ON last.student_id = s.id
        LEFT JOIN class_levels cl ON cl.id = last.class_level_id
       WHERE s.status = ANY($1) ${where}
       ORDER BY c.code, cl.sequence NULLS LAST, student`,

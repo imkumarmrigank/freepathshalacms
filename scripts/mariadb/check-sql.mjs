@@ -9,7 +9,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import mysql from "mysql2/promise";
-import { compile, bind } from "../../src/lib/sql-compat.ts";
+import { compile, bind, configure, warnings } from "../../src/lib/sql-compat.ts";
+import { DATE_COLUMNS, TIMESTAMP_COLUMNS } from "../../src/lib/sql-columns.ts";
+configure({ dateColumns: DATE_COLUMNS, timestampColumns: TIMESTAMP_COLUMNS });
 
 const ROOT = path.join(process.cwd(), "src");
 const verbose = process.argv.includes("--verbose");
@@ -54,21 +56,35 @@ const SQLISH = /\b(SELECT\b[\s\S]*\bFROM\b|INSERT INTO|UPDATE\s+\w+\s+SET|DELETE
 
 // constants that are plain SQL fragments (no interpolation), so ${NAME} can be filled in
 const files = walk(ROOT);
-const globalConsts = {};            // ALL_CAPS fragments exported from lib files (SIBLING_JOIN, IST, ...)
+const globalConsts = {};            // ALL_CAPS fragments (SIBLING_JOIN, IST, ...) usable from any file
 const fileConsts = new Map();       // everything else only counts inside its own file
+const pending = [];                 // constants that interpolate other constants: resolved below
 for (const f of files) {
   const src = fs.readFileSync(f, "utf8");
   const local = {};
+  fileConsts.set(f, local);
   for (const t of templates(src)) {
     const before = src.slice(Math.max(0, t.at - 120), t.at);
     const m = before.match(/(?:const|let)\s+([A-Za-z_]\w*)\s*(?::[^=]+)?=\s*(?:\n\s*)?$/);
-    if (m && t.parts.every((p) => p.expr === null)) {
+    if (!m) continue;
+    if (t.parts.every((p) => p.expr === null)) {
       const body = t.parts.map((p) => p.text).join("");
       local[m[1]] = body;
       if (/^[A-Z][A-Z0-9_]+$/.test(m[1])) globalConsts[m[1]] = body;
+    } else if (/^[A-Z][A-Z0-9_]+$/.test(m[1]) && t.parts.every((p) => p.expr === null || /^[A-Z][A-Z0-9_]+$/.test(p.expr.trim()))) {
+      pending.push({ name: m[1], parts: t.parts, local });
     }
   }
-  fileConsts.set(f, local);
+}
+// resolve constants built from other constants (SIBLING_COLS uses SIBLING_COUNT ...)
+for (let round = 0; round < 5; round++) {
+  for (const c of pending) {
+    if (c.name in globalConsts) continue;
+    if (c.parts.every((p) => p.expr === null || p.expr.trim() in globalConsts)) {
+      const body = c.parts.map((p) => p.text + (p.expr === null ? "" : globalConsts[p.expr.trim()])).join("");
+      globalConsts[c.name] = body; c.local[c.name] = body;
+    }
+  }
 }
 
 function fill(t, file) {
@@ -88,13 +104,17 @@ function fill(t, file) {
 }
 
 const stmts = [];
+let skipped = 0;
 for (const f of files) {
   const src = fs.readFileSync(f, "utf8");
   for (const t of templates(src)) {
     const raw = t.parts.map((p) => p.text).join("");
     if (!SQLISH.test(raw)) continue;
     const line = src.slice(0, t.at).split("\n").length;
-    stmts.push({ file: path.relative(process.cwd(), f), line, sql: fill(t, f) });
+    const sql = fill(t, f);
+    // a fragment (a lone JOIN, a WHERE clause) is only meaningful inside a statement; skip it
+    if (!/^\s*(SELECT|INSERT|UPDATE|DELETE|WITH)\b/i.test(sql)) { skipped++; continue; }
+    stmts.push({ file: path.relative(process.cwd(), f), line, sql });
   }
 }
 
@@ -106,11 +126,13 @@ const conn = await mysql.createConnection({
 });
 await conn.query("SET SESSION sql_mode = CONCAT(@@sql_mode, ',PIPES_AS_CONCAT,ANSI_QUOTES')");
 
-const results = { ok: 0, compileFail: [], prepareFail: [] };
+const results = { ok: 0, compileFail: [], prepareFail: [], dateWarnings: [] };
 for (const s of stmts) {
   let out;
   try {
+    const before = warnings.length;
     out = bind(compile(s.sql), Array.from({ length: 40 }, () => ["x"])); // arrays satisfy both ANY lists and JSON scalars
+    for (const w of warnings.slice(before)) results.dateWarnings.push({ file: s.file, line: s.line, w });
   } catch (e) {
     results.compileFail.push({ ...s, err: e.message });
     continue;
@@ -124,7 +146,7 @@ for (const s of stmts) {
   }
 }
 
-console.log(`statements: ${stmts.length}  ok: ${results.ok}  compile errors: ${results.compileFail.length}  prepare errors: ${results.prepareFail.length}`);
+console.log(`(skipped ${skipped} fragments)  statements: ${stmts.length}  ok: ${results.ok}  compile errors: ${results.compileFail.length}  prepare errors: ${results.prepareFail.length}`);
 const group = (list) => {
   const g = {};
   for (const r of list) {
@@ -139,6 +161,10 @@ for (const [label, list] of [["COMPILE", results.compileFail], ["PREPARE", resul
     console.log(`\n[${label}] ${rs.length}x  ${err}`);
     for (const r of rs.slice(0, verbose ? 50 : 3)) console.log(`   ${r.file}:${r.line}`);
   }
+}
+if (results.dateWarnings.length) {
+  console.log(`\n[DATE ARITHMETIC NOT REWRITTEN] ${results.dateWarnings.length}`);
+  for (const w of results.dateWarnings) console.log(`   ${w.file}:${w.line}  ${w.w}`);
 }
 if (verbose) fs.writeFileSync("/tmp/check-sql-failures.json", JSON.stringify(results, null, 2));
 await conn.end();

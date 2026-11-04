@@ -310,24 +310,29 @@ export async function standings(centerId?: number | null): Promise<Standing[]> {
             COALESCE(o.critical_open, 0) AS critical_open,
             nxt.scheduled_for AS next_visit_on
        FROM centers c
-       LEFT JOIN LATERAL (
-         SELECT v.overall, v.visited_on, v.score_pct
-           FROM audit_visits v
-          WHERE v.center_id = c.id AND v.status = 'submitted'
-          ORDER BY v.visited_on DESC NULLS LAST, v.id DESC LIMIT 1) last ON TRUE
-       LEFT JOIN LATERAL (
-         SELECT count(*) FILTER (WHERE s.status IN ('open','in_progress','done')) AS open_total,
+       LEFT JOIN (
+         SELECT x.center_id, x.overall, x.visited_on, x.score_pct FROM (
+           SELECT v.center_id, v.overall, v.visited_on, v.score_pct,
+                  ROW_NUMBER() OVER (PARTITION BY v.center_id
+                                     ORDER BY v.visited_on DESC NULLS LAST, v.id DESC) AS rn
+             FROM audit_visits v WHERE v.status = 'submitted') x
+          WHERE x.rn = 1) last ON last.center_id = c.id
+       LEFT JOIN (
+         SELECT s.center_id,
+                count(*) FILTER (WHERE s.status IN ('open','in_progress','done')) AS open_total,
                 count(*) FILTER (WHERE s.status IN ('open','in_progress')
                                    AND s.due_on IS NOT NULL
                                    AND s.due_on < CURRENT_DATE) AS overdue,
                 count(*) FILTER (WHERE s.status IN ('open','in_progress')
                                    AND s.priority = 'critical') AS critical_open
-           FROM audit_suggestions s WHERE s.center_id = c.id) o ON TRUE
-       LEFT JOIN LATERAL (
-         SELECT v.scheduled_for FROM audit_visits v
-          WHERE v.center_id = c.id AND v.status = 'planned'
-            AND v.scheduled_for IS NOT NULL
-          ORDER BY v.scheduled_for LIMIT 1) nxt ON TRUE
+           FROM audit_suggestions s GROUP BY s.center_id) o ON o.center_id = c.id
+       LEFT JOIN (
+         SELECT x.center_id, x.scheduled_for FROM (
+           SELECT v.center_id, v.scheduled_for,
+                  ROW_NUMBER() OVER (PARTITION BY v.center_id ORDER BY v.scheduled_for) AS rn
+             FROM audit_visits v
+            WHERE v.status = 'planned' AND v.scheduled_for IS NOT NULL) x
+          WHERE x.rn = 1) nxt ON nxt.center_id = c.id
        ${filter}
       ORDER BY c.name`, params);
 
