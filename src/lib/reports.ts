@@ -30,6 +30,8 @@ export type ReportParams = {
   enrollmentStatus?: string | null;
   /** 1 / 2 / 3 / null (= all terms) */
   term?: number | null;
+  /** YYYY-MM: the off-roll reports keep only children whose "since" date is in it */
+  month?: string | null;
 };
 
 const COUNTED = "('present','late','half_day')";   // counts towards attendance
@@ -1971,17 +1973,26 @@ async function studentTransfers(p: ReportParams, period: string): Promise<Report
 /* ------------------------------------------------ suspended and passed out */
 
 async function offRoll(p: ReportParams, status: "suspended" | "graduated"): Promise<ReportResult> {
-  const params: unknown[] = [status];
+  // "Suspended" also lists inactive and dropped children, with a Status column, so one
+  // report covers everyone who is off the roll; passed-out children stay on their own.
+  const params: unknown[] = [status === "suspended" ? ["suspended", "inactive", "dropped"] : [status]];
   let where = "";
   if (p.centerId) { params.push(p.centerId); where += ` AND s.center_id = $${params.length}`; }
+  if (p.month && /^[0-9]{4}-(0[1-9]|1[0-2])$/.test(p.month)) {
+    params.push(p.month);
+    where += ` AND to_char(COALESCE(s.left_on, s.dropout_date, s.status_changed_at::date), 'YYYY-MM') = $${params.length}`;
+  }
   const rows = await query<{
     student: string; enrollment_no: string; admission_no: string | null; gender: string | null;
     father_name: string | null; primary_phone: string | null; center_name: string;
     class_name: string | null; left_on: string | null; left_reason: string | null;
+    status: string;
   }>(
     `SELECT trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
             s.enrollment_no, s.admission_no, s.gender, s.father_name, s.primary_phone,
-            c.name AS center_name, cl.name AS class_name, s.left_on, s.left_reason
+            c.name AS center_name, cl.name AS class_name,
+            COALESCE(s.left_on, s.dropout_date, s.status_changed_at::date) AS left_on,
+            COALESCE(s.left_reason, s.dropout_reason) AS left_reason, s.status
        FROM students s
        JOIN centers c ON c.id = s.center_id
        LEFT JOIN LATERAL (
@@ -1989,13 +2000,13 @@ async function offRoll(p: ReportParams, status: "suspended" | "graduated"): Prom
           WHERE e.student_id = s.id ORDER BY e.session_id DESC LIMIT 1
        ) last ON TRUE
        LEFT JOIN class_levels cl ON cl.id = last.class_level_id
-      WHERE s.status = $1 ${where}
+      WHERE s.status = ANY($1) ${where}
       ORDER BY c.code, cl.sequence NULLS LAST, student`,
     params,
   );
   const passed = status === "graduated";
   return {
-    title: passed ? "Passed out students" : "Suspended students",
+    title: passed ? "Passed out students" : "Suspended, inactive and dropped students",
     subtitle: `${rows.length} child${rows.length === 1 ? "" : "ren"}`,
     columns: [
       { key: "center_name", label: "Last centre", width: 16 },
@@ -2006,12 +2017,14 @@ async function offRoll(p: ReportParams, status: "suspended" | "graduated"): Prom
       { key: "gender", label: "Gender", width: 9 },
       { key: "father_name", label: "Father", width: 20 },
       { key: "primary_phone", label: "Phone", width: 13 },
+      ...(passed ? [] : [{ key: "status", label: "Status", width: 11 }]),
       { key: "left_on", label: "Since", width: 12 },
       { key: "left_reason", label: passed ? "Went to" : "Reason", width: 44 },
     ],
     rows: rows.map((r) => ({
       center_name: r.center_name, student: r.student, enrollment_no: r.enrollment_no,
       admission_no: r.admission_no ?? "", class_name: r.class_name ?? "—",
+      status: titleCase(r.status),
       gender: r.gender ? titleCase(r.gender) : "—", father_name: r.father_name ?? "",
       primary_phone: r.primary_phone ?? "", left_on: r.left_on ? String(r.left_on).slice(0, 10) : "",
       left_reason: r.left_reason ?? "",

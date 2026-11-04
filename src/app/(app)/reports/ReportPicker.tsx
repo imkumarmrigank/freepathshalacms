@@ -44,6 +44,22 @@ function presetRange(key: string) {
   }
 }
 
+/** Months from January 2025 to now, newest first, as YYYY-MM with a readable label. */
+function monthOptions() {
+  const out: { value: string; label: string }[] = [];
+  const now = new Date();
+  let y = now.getFullYear();
+  let m = now.getMonth();
+  while (y >= 2025) {
+    out.push({
+      value: `${y}-${String(m + 1).padStart(2, "0")}`,
+      label: new Date(y, m, 1).toLocaleString("en-IN", { month: "long", year: "numeric" }),
+    });
+    if (--m < 0) { m = 11; y--; }
+  }
+  return out;
+}
+
 export default function ReportPicker({
   available, centers, classes, sessions, current, showCenter,
 }: {
@@ -212,6 +228,17 @@ export default function ReportPicker({
                 <option value="active">Active only</option>
                 <option value="suspended">Suspended</option>
                 <option value="graduated">Passed out</option>
+              </select>
+            </label>
+          )}
+
+          {uses("month") && (
+            <label>
+              <span className="mb-1.5 block text-[13px] font-medium text-[var(--muted)]">Since month</span>
+              <select className="select w-auto" value={current.month ?? ""}
+                onChange={(e) => push({ month: e.target.value })}>
+                <option value="">All months</option>
+                {monthOptions().map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
               </select>
             </label>
           )}

@@ -8,7 +8,9 @@ export type ReportFilter =
   /** active / suspended / graduated / all */
   | "enrollmentStatus"
   /** 1 / 2 / 3 / all — syllabus term */
-  | "term";
+  | "term"
+  /** YYYY-MM: only rows whose date falls in that month */
+  | "month";
 
 /** The buckets a cumulative attendance report can be added up over. */
 export const GROUP_BY = [
@@ -65,11 +67,12 @@ export const REPORTS: ReportMeta[] = [
   },
   {
     key: "suspended-students",
-    label: "Suspended students",
+    label: "Suspended, inactive and dropped students",
     group: "Students",
     description:
-      "Every child currently suspended: their last centre and class, since when, and why.",
-    filters: ["center"],
+      "Every child currently suspended, inactive or dropped, with a status column: their last centre and class, since when, and why. "
+      + "Pick a month to see only those off the roll since then.",
+    filters: ["center", "month"],
     roles: ["super_admin", "admin"],
   },
   {
@@ -78,7 +81,7 @@ export const REPORTS: ReportMeta[] = [
     group: "Students",
     description:
       "Children who have moved on from the centre to a formal school, with where they went.",
-    filters: ["center"],
+    filters: ["center", "month"],
     roles: ["super_admin", "admin"],
   },
   {

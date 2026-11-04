@@ -39,6 +39,7 @@ export default async function ReportsPage({
     groupBy: sp.groupBy || null,
     enrollmentStatus: sp.enrollmentStatus || null,
     term: Number(sp.term) || null,
+    month: /^[0-9]{4}-[0-9]{2}$/.test(sp.month ?? "") ? sp.month! : null,
   };
 
   let result: ReportResult | null = null;
@@ -60,6 +61,7 @@ export default async function ReportsPage({
     ...(params.role ? { role: params.role } : {}),
     ...(params.enrollmentStatus ? { enrollmentStatus: params.enrollmentStatus } : {}),
     ...(params.term ? { term: String(params.term) } : {}),
+    ...(params.month ? { month: params.month } : {}),
   }).toString();
 
   // The whole report is already in memory; the table shows it a page at a time.
