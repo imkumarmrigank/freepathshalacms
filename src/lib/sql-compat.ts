@@ -485,6 +485,62 @@ function passNulls(toksIn: Tok[]): Tok[] {
   throw new Error("sql-compat: too many NULLS clauses");
 }
 
+/* --------------- pass 5b: PostgreSQL's default NULL order for ORDER BY items */
+
+const ORDER_END = /^(LIMIT|OFFSET|FETCH|UNION|INTERSECT|EXCEPT|FOR|ROWS|RANGE|SEPARATOR|RETURNING)$/i;
+
+/**
+ * PostgreSQL sorts NULL as larger than everything: last when ascending, first when
+ * descending. MariaDB is the opposite. Every ORDER BY item that is a column reference or
+ * expression gets an explicit "IS [NOT] NULL" key in front, so lists keep their order.
+ * Bare words (usually an output alias) and ordinals are left alone.
+ */
+function passOrderDefaults(toksIn: Tok[]): Tok[] {
+  const toks = [...toksIn];
+  const out: Tok[] = [];
+  let i = 0;
+  while (i < toks.length) {
+    const t = toks[i];
+    out.push(t);
+    if (isWord(t, "BY") && isWord(toks[prevSig(toks, i)], "ORDER")) {
+      // collect the clause up to its end at this nesting level
+      let j = i + 1, depth = 0;
+      const clause: Tok[] = [];
+      for (; j < toks.length; j++) {
+        const x = toks[j];
+        if (x.t === "p" && x.s === "(") depth++;
+        if (x.t === "p" && x.s === ")") { if (depth === 0) break; depth--; }
+        if (depth === 0 && x.t === "p" && x.s === ";") break;
+        if (depth === 0 && x.t === "word" && ORDER_END.test(x.s)) break;
+        clause.push(x);
+      }
+      const items = splitTop(clause, 0, clause.length);
+      const rebuilt = items.map((item) => {
+        const body = trimToks(item);
+        if (!body.length) return item;
+        if (body.some((x, k) => isWord(x, "NULLS") && /^(FIRST|LAST)$/i.test(body[nextSig(body, k)]?.s ?? ""))) return item; // explicit
+        let dir = "ASC";
+        let core = body;
+        const lastTok = body[body.length - 1];
+        if (isWord(lastTok, "ASC") || isWord(lastTok, "DESC")) { dir = lastTok.s.toUpperCase(); core = trimToks(body.slice(0, -1)); }
+        if (!core.length) return item;
+        if (core.length === 1 && (core[0].t === "num" || core[0].t === "word")) return item; // ordinal or alias
+        if (isWord(core[0], "CASE") || core[0].s === "(" ) return item;
+        const nullKey: Tok[] = dir === "ASC"
+          ? [...core, SP, W("IS"), SP, W("NULL")]
+          : [...core, SP, W("IS"), SP, W("NOT"), SP, W("NULL")];
+        return [SP, ...nullKey, P(","), SP, ...core, ...(dir === "DESC" ? [SP, W("DESC")] : [])];
+      });
+      rebuilt.forEach((it, k) => { if (k) out.push(P(",")); out.push(...it); });
+      if (clause.length && clause[clause.length - 1].t === "ws") out.push(SP); // keep the gap before LIMIT etc.
+      i = j; // the terminator (or ")") is handled by the main loop
+      continue;
+    }
+    i++;
+  }
+  return out;
+}
+
 /* --------------------------------------------- pass 6: functions and keywords */
 
 const TO_CHAR: [RegExp, string][] = [
@@ -565,6 +621,33 @@ function passFunctions(toksIn: Tok[]): Tok[] {
           const ts = (x: Tok[]) => [W("UNIX_TIMESTAMP"), P("("), ...trimToks(x), P(")")];
           const rep = minus > 0 ? [P("("), ...ts(body.slice(0, minus)), SP, P("-"), SP, ...ts(body.slice(minus + 1)), P(")")] : ts(body);
           toks = [...toks.slice(0, i), ...rep, ...toks.slice(c + 1)];
+          changed = true; break;
+        }
+      }
+
+      // substring(x FROM 'regex')  ->  REGEXP_SUBSTR(x, 'regex')   (MariaDB's FROM form is numeric)
+      if (u === "SUBSTRING") {
+        const inner = trimToks(toks.slice(o + 1, c));
+        const fromAt = inner.findIndex((x) => isWord(x, "FROM"));
+        const after = fromAt > 0 ? trimToks(inner.slice(fromAt + 1)) : [];
+        if (after.length === 1 && after[0].t === "str" && !isWord(inner[fromAt + 3], "FOR")) {
+          toks = [...toks.slice(0, i), W("REGEXP_SUBSTR"), P("("), ...trimToks(inner.slice(0, fromAt)), P(","), SP, after[0], P(")"), ...toks.slice(c + 1)];
+          changed = true; break;
+        }
+      }
+
+      // GREATEST / LEAST: PostgreSQL skips NULL arguments, MariaDB returns NULL if any is NULL
+      if ((u === "GREATEST" || u === "LEAST") && !(toks[i - 1]?.s === "_")) {
+        const args = splitTop(toks, o + 1, c).map(trimToks);
+        const already = args.every((a) => a[0] && isWord(a[0], "COALESCE"));
+        if (args.length > 1 && !already) {
+          const wrapped: Tok[] = [];
+          args.forEach((a, k) => {
+            if (k) wrapped.push(P(","), SP);
+            const others = args.filter((_, j) => j !== k);
+            wrapped.push(W("COALESCE"), P("("), ...a, ...others.flatMap((x) => [P(","), SP, ...x]), P(")"));
+          });
+          toks = [...toks.slice(0, i), W(u), P("("), ...wrapped, P(")"), ...toks.slice(c + 1)];
           changed = true; break;
         }
       }
@@ -854,6 +937,7 @@ export function compile(sql: string): Template {
   toks = passSubscripts(toks);
   toks = passFilter(toks); // before casts: `count(*) FILTER (...)::int` must not treat FILTER as a function
   toks = passCasts(toks);
+  toks = passOrderDefaults(toks);
   toks = passNulls(toks);
   toks = passFunctions(toks);
   toks = passDates(toks);
