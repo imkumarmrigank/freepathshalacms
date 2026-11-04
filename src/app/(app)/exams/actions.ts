@@ -39,6 +39,9 @@ async function assertCanTouchClass(
  */
 export async function createExam(_prev: unknown, form: FormData) {
   const user = await requireUser();
+  // Tests follow the centre's fixed formats, so only administrators set them.
+  // Teachers and centre staff enter marks on the tests they are given.
+  if (!isGlobalRole(user.role)) return { error: "Only administrators can create tests." };
   const session = await currentSession();
   if (!session) return { error: "No academic session is open." };
 

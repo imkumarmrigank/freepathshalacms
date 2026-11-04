@@ -204,8 +204,10 @@ export default async function ExamsPage({
           {isGlobalRole(user.role) && (
             <PromotionalExamForm centerCount={centers.length} />
           )}
-          <NewExamForm classes={myClasses} centers={centers}
-            isAdmin={isGlobalRole(user.role)} isTeacher={isTeaching(user.role)} />
+          {isGlobalRole(user.role) && (
+            <NewExamForm classes={myClasses} centers={centers}
+              isAdmin isTeacher={false} />
+          )}
         </div>
       </div>
     </>
