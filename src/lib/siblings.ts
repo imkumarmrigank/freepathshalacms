@@ -33,10 +33,9 @@ export async function aadhaarMatches(p: {
   if (!own && parents.length === 0) return [];
 
   return query<Match>(
-    `SELECT DISTINCT ON (s.id)
-            s.id, s.enrollment_no, s.admission_no,
+    `SELECT s.id, s.enrollment_no, s.admission_no,
             trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS name,
-            cl.name AS class_name, ce.name AS center_name,
+            max(cl.name) AS class_name, ce.name AS center_name,
             CASE
               WHEN $1::text IS NOT NULL AND s.aadhaar_number = $1 THEN 'the same child Aadhaar'
               ELSE 'the same parent Aadhaar'
@@ -53,6 +52,7 @@ export async function aadhaarMatches(p: {
              OR s.mother_aadhaar_number = ANY($2)
              OR s.guardian_aadhaar_number = ANY($2)))
         )
+      GROUP BY s.id, s.enrollment_no, s.admission_no, s.first_name, s.last_name, ce.name, s.aadhaar_number
       ORDER BY s.id DESC`,
     [own, parents, p.excludeId ?? null],
   );

@@ -19,27 +19,17 @@ const LATE_AFTER_MINUTES = 10 * 60 + 15; // 10:15 local
  */
 async function rollUpDay(c: PoolClient, attendanceId: number) {
   await c.query(
-    `WITH spells AS (
-       SELECT * FROM staff_punches WHERE attendance_id = $1
-     ),
-     arrival AS (SELECT * FROM spells ORDER BY check_in_at ASC LIMIT 1),
-     departure AS (
-       SELECT * FROM spells WHERE check_out_at IS NOT NULL
-        ORDER BY check_out_at DESC LIMIT 1
-     ),
-     total AS (SELECT sum(worked_minutes) AS minutes FROM spells)
-     UPDATE staff_attendance a
-        SET check_in_at          = f.check_in_at,
-            check_in_lat         = f.check_in_lat,
-            check_in_lng         = f.check_in_lng,
-            check_in_distance_m  = f.check_in_distance_m,
-            check_in_accuracy_m  = f.check_in_accuracy_m,
-            check_out_at         = l.check_out_at,
-            check_out_lat        = l.check_out_lat,
-            check_out_lng        = l.check_out_lng,
-            check_out_distance_m = l.check_out_distance_m,
-            worked_minutes       = t.minutes
-       FROM arrival f, total t LEFT JOIN departure l ON TRUE
+    `UPDATE staff_attendance a
+        SET check_in_at          = (SELECT p.check_in_at FROM staff_punches p WHERE p.attendance_id = a.id ORDER BY p.check_in_at ASC LIMIT 1),
+            check_in_lat         = (SELECT p.check_in_lat FROM staff_punches p WHERE p.attendance_id = a.id ORDER BY p.check_in_at ASC LIMIT 1),
+            check_in_lng         = (SELECT p.check_in_lng FROM staff_punches p WHERE p.attendance_id = a.id ORDER BY p.check_in_at ASC LIMIT 1),
+            check_in_distance_m  = (SELECT p.check_in_distance_m FROM staff_punches p WHERE p.attendance_id = a.id ORDER BY p.check_in_at ASC LIMIT 1),
+            check_in_accuracy_m  = (SELECT p.check_in_accuracy_m FROM staff_punches p WHERE p.attendance_id = a.id ORDER BY p.check_in_at ASC LIMIT 1),
+            check_out_at         = (SELECT p.check_out_at FROM staff_punches p WHERE p.attendance_id = a.id AND p.check_out_at IS NOT NULL ORDER BY p.check_out_at DESC LIMIT 1),
+            check_out_lat        = (SELECT p.check_out_lat FROM staff_punches p WHERE p.attendance_id = a.id AND p.check_out_at IS NOT NULL ORDER BY p.check_out_at DESC LIMIT 1),
+            check_out_lng        = (SELECT p.check_out_lng FROM staff_punches p WHERE p.attendance_id = a.id AND p.check_out_at IS NOT NULL ORDER BY p.check_out_at DESC LIMIT 1),
+            check_out_distance_m = (SELECT p.check_out_distance_m FROM staff_punches p WHERE p.attendance_id = a.id AND p.check_out_at IS NOT NULL ORDER BY p.check_out_at DESC LIMIT 1),
+            worked_minutes       = (SELECT sum(p.worked_minutes) FROM staff_punches p WHERE p.attendance_id = a.id)
       WHERE a.id = $1`,
     [attendanceId],
   );

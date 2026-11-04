@@ -97,7 +97,7 @@ export function attendanceByCentre(
        JOIN centers ce ON ce.id = a.center_id
       WHERE a.session_id = $1 AND a.att_date BETWEEN $2 AND $3 ${c}
       GROUP BY ce.id, ce.code, ce.name
-      ORDER BY pct ASC NULLS LAST, ce.code`,
+      ORDER BY pct ASC, ce.code`,
     args);
 }
 
@@ -144,21 +144,26 @@ export function mostAbsent(
             count(*)::int AS days_marked,
             round(100.0 * count(*) FILTER (WHERE a.status = 'present')
                   / NULLIF(count(*), 0))::int AS pct,
-            (SELECT string_agg(x.reason || ' ×' || x.n, ', ' ORDER BY x.n DESC)
-               FROM (SELECT b.reason, count(*)::int AS n
-                       FROM student_attendance b
-                      WHERE b.student_id = s.id AND b.att_date BETWEEN $2 AND $3
-                        AND b.reason IS NOT NULL
-                      GROUP BY b.reason ORDER BY count(*) DESC LIMIT 3) x) AS reasons,
+            rs.reasons AS reasons,
             cf.status AS flag_status, cf.urgency AS flag_urgency, cf.raised_on AS flag_on
        FROM student_attendance a
        JOIN students s ON s.id = a.student_id
        JOIN centers ce ON ce.id = a.center_id
        LEFT JOIN class_levels cl ON cl.id = a.class_level_id
        LEFT JOIN counselling_flags cf ON cf.student_id = s.id AND cf.status <> 'closed'
+       -- each child's three most frequent absence reasons, worked out once per child
+       LEFT JOIN (
+         SELECT y.student_id, string_agg(y.reason || ' ×' || y.n, ', ' ORDER BY y.n DESC) AS reasons
+           FROM (SELECT b.student_id, b.reason, count(*)::int AS n,
+                        ROW_NUMBER() OVER (PARTITION BY b.student_id
+                                           ORDER BY count(*) DESC, b.reason) AS rk
+                   FROM student_attendance b
+                  WHERE b.att_date BETWEEN $2 AND $3 AND b.reason IS NOT NULL
+                  GROUP BY b.student_id, b.reason) y
+          WHERE y.rk <= 3 GROUP BY y.student_id) rs ON rs.student_id = s.id
       WHERE a.session_id = $1 AND a.att_date BETWEEN $2 AND $3 ${c}
       GROUP BY s.id, s.first_name, s.last_name, s.enrollment_no, ce.name, cl.name,
-               cf.status, cf.urgency, cf.raised_on
+               cf.status, cf.urgency, cf.raised_on, rs.reasons
      HAVING count(*) FILTER (WHERE a.status = 'absent') > 0
       ORDER BY count(*) FILTER (WHERE a.status = 'absent') DESC, s.first_name
       LIMIT $${args.length}`,

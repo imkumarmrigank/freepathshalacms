@@ -69,7 +69,7 @@ export async function attendanceDaily(sessionId: number, centerId: number | null
             count(*) FILTER (WHERE a.status <> 'holiday') AS marked
        FROM student_attendance a
       WHERE a.session_id = $1
-        AND a.att_date > CURRENT_DATE - ($2::int || ' days')::interval ${where}
+        AND a.att_date > CURRENT_DATE - make_interval(days => $2::int) ${where}
       GROUP BY a.att_date ORDER BY a.att_date`,
     params,
   );

@@ -88,11 +88,14 @@ export async function addPlayers(_prev: unknown, form: FormData): Promise<Result
   if (rows.length === 0) return { error: "None of those children are at this centre." };
 
   await query(
+    // A child who left and is added again is revived; one who is still in is left alone.
+    // MariaDB applies the SET list left to right, so left_on is cleared last.
     `INSERT INTO sport_students (sport_id, student_id, added_by)
-     SELECT $1, unnest($2::bigint[]), $3
+     SELECT $1, u.id, $3 FROM unnest($2::bigint[]) AS u(id)
      ON CONFLICT (sport_id, student_id) DO UPDATE
-       SET left_on = NULL, joined_on = CURRENT_DATE, added_by = EXCLUDED.added_by
-       WHERE sport_students.left_on IS NOT NULL`,
+       SET joined_on = CASE WHEN sport_students.left_on IS NOT NULL THEN CURRENT_DATE ELSE sport_students.joined_on END,
+           added_by = CASE WHEN sport_students.left_on IS NOT NULL THEN EXCLUDED.added_by ELSE sport_students.added_by END,
+           left_on = CASE WHEN sport_students.left_on IS NOT NULL THEN NULL ELSE sport_students.left_on END`,
     [got.sport.id, rows.map((r) => r.id), user.uid]);
   touched(got.sport.id);
   return { ok: `${rows.length} ${rows.length === 1 ? "child" : "children"} added to ${got.sport.name}.` };

@@ -532,13 +532,16 @@ export async function filedReports(user: SessionUser, opts: {
             to_char(v.submitted_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD HH24:MI') AS submitted_at,
             (SELECT count(*) FROM audit_suggestions s WHERE s.visit_id = v.id)::int AS suggestions,
             -- the checks that came out worst, so a row says what went wrong
-            (SELECT string_agg(r.criterion_title, ', ' ORDER BY r.band, r.id)
-               FROM (SELECT criterion_title, band, id FROM audit_ratings
-                      WHERE visit_id = v.id AND band BETWEEN 1 AND 2
-                      ORDER BY band, id LIMIT 3) r) AS weakest
+            wk.weakest AS weakest
        FROM audit_visits v
        JOIN centers c ON c.id = v.center_id
        LEFT JOIN users u ON u.id = v.auditor_id
+       LEFT JOIN (
+         SELECT q.visit_id, string_agg(q.criterion_title, ', ' ORDER BY q.band, q.id) AS weakest
+           FROM (SELECT r.visit_id, r.criterion_title, r.band, r.id,
+                        ROW_NUMBER() OVER (PARTITION BY r.visit_id ORDER BY r.band, r.id) AS rk
+                   FROM audit_ratings r WHERE r.band BETWEEN 1 AND 2) q
+          WHERE q.rk <= 3 GROUP BY q.visit_id) wk ON wk.visit_id = v.id
       ${where}
       ORDER BY v.visited_on DESC, c.code
       LIMIT $${params.length - 1} OFFSET $${params.length}`,

@@ -2367,16 +2367,23 @@ async function ptmDaily(p: ReportParams, period: string): Promise<ReportResult> 
             round(avg((i.created_at AT TIME ZONE 'Asia/Kolkata')::date
                       - i.interaction_date), 1)                  AS days_later,
             to_char(max(i.created_at AT TIME ZONE 'Asia/Kolkata'), 'YYYY-MM-DD') AS written_on,
-            (SELECT array_agg(x.t || ' (' || x.n || ')' ORDER BY x.n DESC, x.t)
-               FROM (SELECT t, count(*) AS n
-                       FROM ptm_interactions j, unnest(j.concern_tags) t
-                      WHERE j.center_id = i.center_id
-                        AND j.interaction_date = i.interaction_date
-                      GROUP BY t ORDER BY count(*) DESC, t LIMIT 3) x) AS concerns
+            cn.concerns AS concerns
        FROM ptm_interactions i
        JOIN centers ce ON ce.id = i.center_id
+       -- the three commonest concerns of each centre-day, worked out once per centre-day
+       LEFT JOIN (
+         SELECT z.center_id, z.interaction_date,
+                array_agg(z.t || ' (' || z.n || ')' ORDER BY z.n DESC, z.t) AS concerns
+           FROM (SELECT j.center_id, j.interaction_date, c.t, count(*) AS n,
+                        ROW_NUMBER() OVER (PARTITION BY j.center_id, j.interaction_date
+                                           ORDER BY count(*) DESC, c.t) AS rk
+                   FROM ptm_interactions j, unnest(j.concern_tags) AS c(t)
+                  WHERE j.interaction_date BETWEEN $1 AND $2
+                  GROUP BY j.center_id, j.interaction_date, c.t) z
+          WHERE z.rk <= 3 GROUP BY z.center_id, z.interaction_date
+       ) cn ON cn.center_id = i.center_id AND cn.interaction_date = i.interaction_date
       WHERE i.interaction_date BETWEEN $1 AND $2 ${where}
-      GROUP BY i.interaction_date, i.center_id, ce.code, ce.name
+      GROUP BY i.interaction_date, i.center_id, ce.code, ce.name, cn.concerns
       ORDER BY i.interaction_date DESC, ce.code`,
     params,
   );
@@ -2656,9 +2663,9 @@ async function auditReportsFiled(p: ReportParams, period: string): Promise<Repor
     `SELECT to_char(v.visited_on, 'YYYY-MM-DD') AS visited_on,
             c.name AS center_name, u.name AS auditor, v.kind, v.overall, v.score_pct,
             v.children_present, v.children_on_roll, v.staff_present, v.staff_on_roll, v.summary,
-            (SELECT string_agg(x.criterion_title, '; ' ORDER BY x.band, x.criterion_title)
-               FROM (SELECT r.criterion_title, r.band FROM audit_ratings r
-                      WHERE r.visit_id = v.id AND r.band BETWEEN 1 AND 2) x)        AS weakest,
+            (SELECT string_agg(r.criterion_title, '; ' ORDER BY r.band, r.criterion_title)
+               FROM audit_ratings r
+              WHERE r.visit_id = v.id AND r.band BETWEEN 1 AND 2)        AS weakest,
             (SELECT count(*) FROM audit_suggestions s WHERE s.visit_id = v.id)::int AS suggestions
        FROM audit_visits v
        JOIN centers c ON c.id = v.center_id

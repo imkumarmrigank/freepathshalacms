@@ -279,7 +279,7 @@ function passSets(toksIn: Tok[]): Tok[] {
       if (arrays.length === 1) {
         // with ORDINALITY the last listed column is the position
         const ordName = ordinality ? (cols[1] ?? "ordinality") : null;
-        rep = [...mk(arrays[0], colName(0), ordName), SP, W("AS"), SP, W(`${alias || "unnest"}_t`)];
+        rep = [...mk(arrays[0], colName(0), ordName), SP, W("AS"), SP, W(alias || "unnest")];
         // the column name equals the alias in PostgreSQL's `unnest(x) AS name`; keep the table alias distinct
       } else {
         const sel = arrays.map((_, i) => `a${i}.${colName(i)} AS ${colName(i)}`).join(", ");
@@ -318,6 +318,38 @@ function passSets(toksIn: Tok[]): Tok[] {
     toks = [...toks.slice(0, start), ...rep, ...toks.slice(end + 1)];
   }
   throw new Error("sql-compat: too many set-returning functions");
+}
+
+/* ----------------------------------------- pass 2c: column[index] on array columns */
+
+function matchBracket(toks: Tok[], open: number) {
+  let depth = 0;
+  for (let j = open; j < toks.length; j++) {
+    if (toks[j].t === "p" && toks[j].s === "[") depth++;
+    else if (toks[j].t === "p" && toks[j].s === "]") { depth--; if (depth === 0) return j; }
+  }
+  return -1;
+}
+
+/** col[n] is 1-based in PostgreSQL; array columns are JSON here, indexed from 0. */
+function passSubscripts(toksIn: Tok[]): Tok[] {
+  let toks = toksIn;
+  for (let guard = 0; guard < 200; guard++) {
+    const bi = toks.findIndex((t, i) =>
+      t.t === "p" && t.s === "[" && i > 0 &&
+      (toks[i - 1].t === "word" || toks[i - 1].t === "qid") && !isWord(toks[i - 1], "ARRAY") &&
+      toks[nextSig(toks, i)]?.s !== "]");
+    if (bi < 0) return toks;
+    const close = matchBracket(toks, bi);
+    let s = bi - 1;
+    while (s > 1 && toks[s - 1]?.s === "." && (toks[s - 2]?.t === "word" || toks[s - 2]?.t === "qid")) s -= 2;
+    const operand = toks.slice(s, bi);
+    const idx = trimToks(toks.slice(bi + 1, close));
+    const rep: Tok[] = [W("JSON_UNQUOTE"), P("("), W("JSON_EXTRACT"), P("("), ...operand, P(","), SP, W("CONCAT"), P("("),
+      { t: "str", s: "'$['" }, P(","), SP, P("("), ...idx, P(")"), SP, P("-"), SP, { t: "num", s: "1" }, P(","), SP, { t: "str", s: "']'" }, P(")"), P(")"), P(")")];
+    toks = [...toks.slice(0, s), ...rep, ...toks.slice(close + 1)];
+  }
+  throw new Error("sql-compat: too many subscripts");
 }
 
 /* -------------------------------------------------------- pass 3: x::type casts */
@@ -513,6 +545,7 @@ function passFunctions(toksIn: Tok[]): Tok[] {
         let rep: Tok[];
         if (unit === "month") rep = [W("DATE_FORMAT"), P("("), ...x, P(","), SP, { t: "str", s: "'%Y-%m-01'" }, P(")")];
         else if (unit === "year") rep = [W("DATE_FORMAT"), P("("), ...x, P(","), SP, { t: "str", s: "'%Y-01-01'" }, P(")")];
+        else if (unit === "quarter") rep = [W("CAST"), P("("), W("DATE_ADD"), P("("), W("MAKEDATE"), P("("), W("YEAR"), P("("), ...x, P(")"), P(","), SP, { t: "num", s: "1" }, P(")"), P(","), SP, W("INTERVAL"), SP, P("("), W("QUARTER"), P("("), ...x, P(")"), SP, P("-"), SP, { t: "num", s: "1" }, P(")"), SP, W("QUARTER"), P(")"), SP, W("AS"), SP, W("DATE"), P(")")];
         else if (unit === "day") rep = [W("DATE"), P("("), ...x, P(")")];
         else if (unit === "week") rep = [W("DATE_SUB"), P("("), W("DATE"), P("("), ...x, P(")"), P(","), SP, W("INTERVAL"), SP, W("WEEKDAY"), P("("), ...x, P(")"), SP, W("DAY"), P(")")];
         else throw new Error(`sql-compat: date_trunc('${unit}') unsupported`);
@@ -557,6 +590,22 @@ function passFunctions(toksIn: Tok[]): Tok[] {
           toks = [...toks.slice(0, i), W("COALESCE"), P("("), W("NULLIF"), P("("), W("FIELD"), P("("), ...args[1], P(","), SP, ...items, P(")"), P(","), SP, { t: "num", s: "0" }, P(")"), P(","), SP, { t: "num", s: "999" }, P(")"), ...toks.slice(c + 1)];
           changed = true; break;
         }
+      }
+
+      // array_position(json_array_column, x)  ->  1-based position via JSON_SEARCH
+      if (u === "ARRAY_POSITION") {
+        const args = splitTop(toks, o + 1, c).map(trimToks);
+        if (!(isWord(args[0][0], "ARRAY") && args[0][1]?.s === "[")) {
+          toks = [...toks.slice(0, i), P("("), W("CAST"), P("("), W("REPLACE"), P("("), W("REPLACE"), P("("), W("JSON_UNQUOTE"), P("("), W("JSON_SEARCH"), P("("), ...args[0], P(","), SP, { t: "str", s: "'one'" }, P(","), SP, ...args[1], P(")"), P(")"), P(","), SP, { t: "str", s: "'$['" }, P(","), SP, { t: "str", s: "''" }, P(")"), P(","), SP, { t: "str", s: "']'" }, P(","), SP, { t: "str", s: "''" }, P(")"), SP, W("AS"), SP, W("SIGNED"), P(")"), SP, P("+"), SP, { t: "num", s: "1" }, P(")"), ...toks.slice(c + 1)];
+          changed = true; break;
+        }
+      }
+
+      // array_length(x, 1)  ->  JSON_LENGTH(x)
+      if (u === "ARRAY_LENGTH") {
+        const args = splitTop(toks, o + 1, c).map(trimToks);
+        toks = [...toks.slice(0, i), W("JSON_LENGTH"), P("("), ...args[0], P(")"), ...toks.slice(c + 1)];
+        changed = true; break;
       }
 
       // array_to_string(json_array_column, sep)  ->  scalar subquery over JSON_TABLE
@@ -802,6 +851,7 @@ export function compile(sql: string): Template {
   toks = passWords(toks);
   toks = passParams(toks);
   toks = passSets(toks);
+  toks = passSubscripts(toks);
   toks = passFilter(toks); // before casts: `count(*) FILTER (...)::int` must not treat FILTER as a function
   toks = passCasts(toks);
   toks = passNulls(toks);

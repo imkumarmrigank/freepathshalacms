@@ -63,7 +63,7 @@ export async function trends(centerId: number | null, period: Period): Promise<T
   const months = await query<{
     y: number; m: number; admissions: number; marked: number; present: number; ptms: number;
   }>(
-    `WITH first_month AS (
+    `WITH RECURSIVE first_month AS (
        SELECT GREATEST(
                 date_trunc('month', CURRENT_DATE) - interval '${back} months',
                 date_trunc('month', LEAST(
@@ -74,8 +74,10 @@ export async function trends(centerId: number | null, period: Period): Promise<T
                   CURRENT_DATE))) AS m
      ),
      months AS (
-       SELECT generate_series((SELECT m FROM first_month), date_trunc('month', CURRENT_DATE),
-                              interval '1 month')::date AS m
+       SELECT (SELECT m FROM first_month)::date AS m
+        UNION ALL
+       SELECT (m + interval '1 month')::date FROM months
+        WHERE m + interval '1 month' <= date_trunc('month', CURRENT_DATE)
      ),
      adm AS (
        SELECT date_trunc('month', admission_date)::date AS m, count(*)::int AS n
