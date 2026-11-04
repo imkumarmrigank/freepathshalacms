@@ -55,6 +55,9 @@ function makePool(): Pool {
     waitForConnections: true,
     connectionLimit: Number(process.env.DB_POOL_MAX ?? 5),
     queueLimit: 0,
+    // count rows really changed, not rows matched: a no-op "ON CONFLICT DO NOTHING" then reports 0 rows,
+    // as PostgreSQL does (promotions rely on that to skip children already moved up)
+    flags: ["-FOUND_ROWS"],
     charset: "UTF8MB4_BIN", // exact comparison and code-point ordering, like PostgreSQL C.UTF-8
     timezone: TZ,
     // DATE columns are calendar days, not instants: keep "YYYY-MM-DD" so they never shift
