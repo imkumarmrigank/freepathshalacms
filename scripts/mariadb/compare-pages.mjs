@@ -94,7 +94,11 @@ function sameBag(la, lb) {
 }
 
 function firstDiff(la, lb) {
+  // pages stream in pieces, so identical words can arrive split into different blocks
+  if (la.join(" ").replace(/\s+/g, "") === lb.join(" ").replace(/\s+/g, "")) return null;
   if (sameBag(la, lb)) return "ORDER ONLY: same rows, different order";
+  const words = (l) => l.join(" ").split(/\s+/).filter((w) => w && w !== "|").sort().join(" ");
+  if (words(la) === words(lb)) return "ORDER ONLY: same words, different order";
   const sa = new Set(la), sb = new Set(lb);
   const onlyOld = la.filter((l) => !sb.has(l)), onlyNew = lb.filter((l) => !sa.has(l));
   return `old-only ${onlyOld.length}, new-only ${onlyNew.length}\n      OLD: ${onlyOld.slice(0, 3).map((s) => s.slice(0, 150)).join(" | ")}\n      NEW: ${onlyNew.slice(0, 3).map((s) => s.slice(0, 150)).join(" | ")}`;

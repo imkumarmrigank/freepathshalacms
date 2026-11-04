@@ -154,6 +154,9 @@ function passWords(toks: Tok[]): Tok[] {
   const out: Tok[] = [];
   for (let i = 0; i < toks.length; i++) {
     const t = toks[i];
+    // PostgreSQL's special dates: "older than any date" / "later than any date"
+    if (t.t === "str" && /^'-infinity'$/i.test(t.s)) { out.push({ t: "str", s: "'0001-01-01'" }); continue; }
+    if (t.t === "str" && /^'infinity'$/i.test(t.s)) { out.push({ t: "str", s: "'9999-12-31'" }); continue; }
     if (t.t === "str" && t.s === "'{}'") { out.push({ t: "str", s: "'[]'" }); continue; } // empty array literal
     if (t.t !== "word") { out.push(t); continue; }
     const u = t.s.toUpperCase();
@@ -934,7 +937,7 @@ function passDates(toksIn: Tok[]): Tok[] {
 /* -------------------------------------------------------------------- public API */
 
 type Seg = { k: "text"; s: string } | { k: "scalar"; n: number } | { k: "list"; n: number };
-export type Template = { segs: Seg[]; booleans: string[] };
+export type Template = { segs: Seg[]; booleans: string[]; jsons: string[] };
 
 const cache = new Map<string, Template>();
 
@@ -943,6 +946,39 @@ const cache = new Map<string, Template>();
  * statement's own select list, return the output names that are boolean expressions, so only
  * those results are turned back into true/false (a count named "present" must stay a number).
  */
+/** output names whose value is built by an array/JSON aggregate (or an empty-array literal) */
+function jsonAliases(toks: Tok[]): string[] {
+  let depth = 0, sel = -1;
+  for (let i = 0; i < toks.length; i++) {
+    const t = toks[i];
+    if (t.t === "p" && t.s === "(") depth++;
+    else if (t.t === "p" && t.s === ")") depth--;
+    else if (depth === 0 && isWord(t, "SELECT")) { sel = i; break; }
+  }
+  if (sel < 0) return [];
+  depth = 0;
+  let end = toks.length;
+  for (let i = sel + 1; i < toks.length; i++) {
+    const t = toks[i];
+    if (t.t === "p" && t.s === "(") depth++;
+    else if (t.t === "p" && t.s === ")") depth--;
+    else if (depth === 0 && isWord(t, "FROM")) { end = i; break; }
+  }
+  const out: string[] = [];
+  for (const raw of splitTop(toks, sel + 1, end)) {
+    const item = trimToks(raw);
+    let d = 0, asAt = -1;
+    item.forEach((t, k) => { if (t.s === "(") d++; else if (t.s === ")") d--; else if (d === 0 && isWord(t, "AS")) asAt = k; });
+    if (asAt < 0) continue;
+    const alias = item[nextSig(item, asAt)];
+    const expr = item.slice(0, asAt);
+    if (alias && expr.some((t) => (t.t === "word" && /^(array_agg|json_agg|jsonb_agg|json_build_object|jsonb_build_object)$/i.test(t.s)) || (t.t === "str" && t.s === "'{}'"))) {
+      out.push(alias.s.replace(/["`]/g, ""));
+    }
+  }
+  return out;
+}
+
 function booleanAliases(toks: Tok[]): string[] {
   let depth = 0, sel = -1;
   for (let i = 0; i < toks.length; i++) {
@@ -972,7 +1008,14 @@ function booleanAliases(toks: Tok[]): string[] {
     if (!aliasTok) continue;
     let expr = trimToks(item.slice(0, asAt));
     // unwrap one level of redundant parentheses: (a = b)
-    while (expr[0]?.s === "(" && matchParen(expr, 0) === expr.length - 1) expr = trimToks(expr.slice(1, -1));
+    let wrappedSubquery = false;
+    while (expr[0]?.s === "(" && matchParen(expr, 0) === expr.length - 1) {
+      expr = trimToks(expr.slice(1, -1));
+      if (isWord(expr[0], "SELECT") || isWord(expr[0], "WITH")) { wrappedSubquery = true; break; } // a scalar subquery, not a comparison
+    }
+    if (wrappedSubquery) continue;
+    // COALESCE(flag, FALSE), CASE ... THEN TRUE, bool_or(...)
+    if (expr.some((t) => t.t === "word" && /^(TRUE|FALSE|BOOL_OR|BOOL_AND)$/i.test(t.s))) { out.push(aliasTok.s.replace(/["`]/g, "")); continue; }
     if (isWord(expr[0], "EXISTS") || isWord(expr[0], "NOT")) { out.push(aliasTok.s.replace(/["`]/g, "")); continue; }
     // a comparison / IS / BETWEEN / IN / LIKE / AND / OR at the top level, and no CASE or arithmetic wrapper
     d = 0;
@@ -998,6 +1041,7 @@ export function compile(sql: string): Template {
 
   let toks = tokenize(sql);
   const booleans = booleanAliases(toks);
+  const jsons = jsonAliases(toks);
   toks = passWords(toks);
   toks = passParams(toks);
   toks = passSets(toks);
@@ -1019,7 +1063,7 @@ export function compile(sql: string): Template {
     } else text += t.s;
   }
   if (text) tpl.push({ k: "text", s: text });
-  const compiled: Template = { segs: tpl, booleans };
+  const compiled: Template = { segs: tpl, booleans, jsons };
   if (cache.size > 2000) cache.clear();
   cache.set(sql, compiled);
   return compiled;
@@ -1035,7 +1079,7 @@ const plain = (v: unknown) =>
  * Fill a compiled template. Scalars become "?"; lists (from = ANY($n)) become "?,?,?", or
  * NULL when empty, which is what `= ANY('{}')` evaluates to (never true).
  */
-export function bind(tpl: Template, params: unknown[]): { sql: string; values: unknown[]; booleans: string[] } {
+export function bind(tpl: Template, params: unknown[]): { sql: string; values: unknown[]; booleans: string[]; jsons: string[] } {
   let sql = "";
   const values: unknown[] = [];
   for (const seg of tpl.segs) {
@@ -1048,7 +1092,7 @@ export function bind(tpl: Template, params: unknown[]): { sql: string; values: u
       else { sql += arr.map(() => "?").join(","); values.push(...arr); }
     }
   }
-  return { sql, values, booleans: tpl.booleans };
+  return { sql, values, booleans: tpl.booleans, jsons: tpl.jsons };
 }
 
 export function translate(sql: string, params: unknown[] = []) {

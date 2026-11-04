@@ -33,6 +33,9 @@ const TZ = "+05:30";
  */
 const INIT_SQL =
   `SET SESSION time_zone = '${TZ}', group_concat_max_len = 1048576, explicit_defaults_for_timestamp = 1, ` +
+  // PostgreSQL keeps ~16 digits in a numeric division; MariaDB keeps 4 more than the operands by default,
+  // which makes sums of "one third" amounts drift and round differently
+  `div_precision_increment = 16, ` +
   `sql_mode = CONCAT(REPLACE(@@sql_mode, 'ONLY_FULL_GROUP_BY', ''), ',PIPES_AS_CONCAT,ANSI_QUOTES')`;
 
 function makePool(): Pool {
@@ -127,7 +130,7 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
 }
 
 async function run<T>(conn: Pool | PoolConnection, text: string, params: unknown[]): Promise<DbResult<T>> {
-  const { sql, values, booleans } = bind(compile(text), params);
+  const { sql, values, booleans, jsons } = bind(compile(text), params);
   const [res] = await conn.query(sql, values);
   if (Array.isArray(res)) {
     const rows = res as T[];
@@ -137,6 +140,15 @@ async function run<T>(conn: Pool | PoolConnection, text: string, params: unknown
         for (const name of booleans) {
           const v = r[name];
           if (v === 0 || v === 1 || v === "0" || v === "1") r[name] = v === 1 || v === "1";
+        }
+      }
+    }
+    // array aggregates come back as JSON text when COALESCE'd with an empty-array literal
+    if (jsons.length) {
+      for (const r of rows as Record<string, unknown>[]) {
+        for (const name of jsons) {
+          const v = r[name];
+          if (typeof v === "string") { try { r[name] = JSON.parse(v); } catch { /* leave it as text */ } }
         }
       }
     }
