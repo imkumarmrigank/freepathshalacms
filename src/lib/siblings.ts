@@ -1,6 +1,6 @@
 import "server-only";
 import { query } from "./db";
-import type { PoolClient } from "pg";
+import type { PoolClient } from "@/lib/db";
 
 export type Match = {
   id: number; enrollment_no: string; admission_no: string | null;

@@ -2,7 +2,7 @@
 import { isSection } from "@/lib/sections";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import type { PoolClient } from "pg";
+import type { PoolClient } from "@/lib/db";
 import { canTouchCenter, requireUser } from "@/lib/auth";
 import { one, query, tx } from "@/lib/db";
 import { nextEnrollmentNo } from "@/lib/enrollment";

@@ -160,8 +160,9 @@ for (const name of names) {
     if (i.method !== "btree") { warn(`${name}.${i.name}: ${i.method} index dropped (not portable)`); continue; }
     if (i.has_expr) {
       if (i.name === "uq_sports_centre_name") {
-        // lower(name): the table collation is case-insensitive, so a plain unique key does it
-        lines.push(`  UNIQUE KEY ${q(i.name)} (${list(i.cols)})`);
+        // unique on (centre, lower(name)): the table collation is case-insensitive, so a plain
+        // unique key on the two columns does it. (i.cols omits the expression column.)
+        lines.push(`  UNIQUE KEY ${q(i.name)} (${q("center_id")}, ${q("name")})`);
       } else if (i.name === "uq_teacher_day_note") {
         generated.push(`  ${q("_cl0")} BIGINT AS (COALESCE(${q("class_level_id")}, 0)) VIRTUAL INVISIBLE`);
         lines.push(`  UNIQUE KEY ${q(i.name)} (${q("user_id")}, ${q("on_date")}, ${q("_cl0")})`);

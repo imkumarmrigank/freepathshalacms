@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import type { PoolClient } from "pg";
+import type { PoolClient } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { one, query, tx } from "@/lib/db";
 import { BY_HAND_FROM_M, BY_HAND_UPTO_M, checkGeofence } from "@/lib/geo";

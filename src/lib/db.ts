@@ -1,95 +1,111 @@
-import pg, { Pool, type PoolClient, type QueryResultRow } from "pg";
+import mysql, { type Pool, type PoolConnection, type ResultSetHeader } from "mysql2/promise";
+import { bind, compile, configure } from "./sql-compat";
+import { DATE_COLUMNS, TIMESTAMP_COLUMNS } from "./sql-columns";
 
 /**
- * node-postgres hands BIGINT (int8) back as a string so that values beyond
- * Number.MAX_SAFE_INTEGER survive. Every id in this schema is a BIGSERIAL that
- * will never come close to 2^53, and leaving them as strings silently breaks
- * `===` comparisons against ids we parsed from forms and query strings.
+ * The app is written in PostgreSQL-flavoured SQL; sql-compat turns each statement into
+ * MariaDB SQL the first time it is seen. Everything below keeps the shape the rest of the
+ * app already uses: query() returns rows, one() returns a row or null, tx() runs a set of
+ * statements in a transaction and hands its callback a client with a pg-style query().
  */
-pg.types.setTypeParser(pg.types.builtins.INT8, (v) => Number(v));
+configure({ dateColumns: DATE_COLUMNS, timestampColumns: TIMESTAMP_COLUMNS });
 
-/**
- * DATE columns are calendar days, not instants. Left alone, node-postgres turns
- * them into local Date objects, which both shifts the day across timezones and
- * makes `"2026-09-01" > start_date` compare against "Sat Apr 01 2026 …". Keeping
- * the raw YYYY-MM-DD string makes date comparisons and rendering correct.
- */
-pg.types.setTypeParser(pg.types.builtins.DATE, (v) => v);
+export type DbResult<T> = { rows: T[]; rowCount: number | null; insertId?: number };
+export interface DbClient {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  query<T = any>(text: string, params?: unknown[]): Promise<DbResult<T>>;
+}
+/** The name the rest of the app imported from "pg". */
+export type PoolClient = DbClient;
 
 declare global {
   // eslint-disable-next-line no-var
   var __fpPool: Pool | undefined;
 }
 
-function makePool() {
-  let connectionString = process.env.DATABASE_URL;
-  if (!connectionString) throw new Error("DATABASE_URL is not set");
+/** IST everywhere: the app has always run on Asia/Kolkata, so TIMESTAMPs read and write in it. */
+const TZ = "+05:30";
 
-  // Bake the timezone into the connection string so no extra round-trip is
-  // needed on every new connection. options=-c+TimeZone=... is the Postgres
-  // wire-protocol way to set a startup parameter.
-  if (!connectionString.includes("options=")) {
-    const sep = connectionString.includes("?") ? "&" : "?";
-    connectionString += `${sep}options=-c+TimeZone%3DAsia%2FKolkata`;
-  }
+/**
+ * Per connection: PostgreSQL's `||` is string concatenation and "double quotes" name
+ * identifiers; keep MariaDB's default strict mode but drop ONLY_FULL_GROUP_BY, which
+ * PostgreSQL-style queries do not satisfy.
+ */
+const INIT_SQL =
+  `SET SESSION time_zone = '${TZ}', group_concat_max_len = 1048576, explicit_defaults_for_timestamp = 1, ` +
+  `sql_mode = CONCAT(REPLACE(@@sql_mode, 'ONLY_FULL_GROUP_BY', ''), ',PIPES_AS_CONCAT,ANSI_QUOTES')`;
 
-  const pool = new Pool({
-    connectionString,
-    ssl: { rejectUnauthorized: false },
-    // Keep a small pool — Neon's pooler handles fan-out on its side, and fewer
-    // local slots means less memory pressure on the Hostinger process.
-    max: Number(process.env.PG_POOL_MAX ?? 3),
-    // 60 s keeps connections alive across normal bursts of page views so SSL
-    // re-handshakes (≈ 150 ms each on cross-region links) happen rarely.
-    // Previously 10 s was too short: connections died between clicks, and
-    // Neon suspended its compute, adding a 400-600 ms wake-up penalty.
-    idleTimeoutMillis: 60_000,
-    keepAlive: true,
-    keepAliveInitialDelayMillis: 10_000,
-    connectionTimeoutMillis: 15_000,
+function makePool(): Pool {
+  const raw = process.env.DATABASE_URL;
+  if (!raw) throw new Error("DATABASE_URL is not set");
+  const u = new URL(raw); // mysql://user:password@host:3306/database
+  if (!/^mysql/.test(u.protocol)) throw new Error("DATABASE_URL must be a mysql:// address");
+
+  const pool = mysql.createPool({
+    host: u.hostname,
+    port: Number(u.port || 3306),
+    user: decodeURIComponent(u.username),
+    password: decodeURIComponent(u.password),
+    database: u.pathname.slice(1),
+    ssl: u.searchParams.get("ssl") === "true" ? { rejectUnauthorized: false } : undefined,
+    waitForConnections: true,
+    connectionLimit: Number(process.env.DB_POOL_MAX ?? 5),
+    queueLimit: 0,
+    charset: "utf8mb4",
+    timezone: TZ,
+    // DATE columns are calendar days, not instants: keep "YYYY-MM-DD" so they never shift
+    // across timezones. (TIMESTAMPs still arrive as Date objects.)
+    dateStrings: ["DATE"],
+    supportBigNumbers: true,
+    bigNumberStrings: false,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10_000,
+    connectTimeout: 15_000,
+    typeCast(field, next) {
+      // TINYINT(1) columns are booleans
+      if (field.type === "TINY" && field.length === 1) {
+        const v = field.string();
+        return v === null ? null : v !== "0";
+      }
+      // DECIMAL keeps its scale as a string ("20.00") like PostgreSQL numeric, but a whole
+      // number — the result of SUM() over integers — comes back as a number
+      if (field.type === "NEWDECIMAL" || field.type === "DECIMAL") {
+        const v = field.string();
+        if (v === null) return null;
+        return /^-?\d+$/.test(v) ? Number(v) : v;
+      }
+      return next();
+    },
   });
 
-  pool.on("connect", () => {
-    // Timezone is set via the connection string; nothing more to do here.
+  pool.pool.on("connection", (conn) => {
+    conn.query(INIT_SQL, (err: Error | null) => {
+      if (err) console.warn("[db] could not set session options:", err.message);
+    });
   });
-
-  // Without this, an error on an *idle* client is an unhandled 'error' event on
-  // the pool, which takes the whole server process down.
-  pool.on("error", (err) => {
-    console.warn("[db] idle client error (it will be replaced):", err.message);
-  });
-
   return pool;
 }
 
 /**
- * Built on first use, not at import. Next collects route metadata at build time,
- * and a build machine has no database credentials — constructing the pool eagerly
- * turned that into a build failure.
+ * Built on first use, not at import. Next collects route metadata at build time, and a build
+ * machine has no database credentials.
  */
 export function getPool(): Pool {
   if (!global.__fpPool) global.__fpPool = makePool();
   return global.__fpPool;
 }
 
-/**
- * Errors that mean "this particular socket is dead", not "your query is wrong".
- * The first request after the dyno or the database has been idle hits these,
- * which is why a page used to fail once and then work on reload.
- */
+/** Errors that mean "this socket is dead", not "your query is wrong". */
 const TRANSIENT = new Set([
   "ECONNRESET", "EPIPE", "ETIMEDOUT", "ENOTFOUND", "EAI_AGAIN", "ECONNREFUSED",
-  "08000", "08003", "08006", "08001", "08004",  // connection exception family
-  "57P01", "57P02", "57P03",                    // admin shutdown / crash / not ready
-  "XX000",                                      // Neon uses this when waking up
+  "PROTOCOL_CONNECTION_LOST", "PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR", "ER_SERVER_SHUTDOWN",
 ]);
 
 function isTransient(err: unknown) {
   if (!(err instanceof Error)) return false;
   const code = (err as NodeJS.ErrnoException & { code?: string }).code;
   if (code && TRANSIENT.has(code)) return true;
-  return /terminated unexpectedly|Connection terminated|connection closed|socket hang up|server closed the connection|Client has encountered a connection error|timeout exceeded when trying to connect/i
-    .test(err.message);
+  return /server has gone away|connection (is )?closed|closed state|Connection lost|socket hang up/i.test(err.message);
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -103,25 +119,28 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
     } catch (err) {
       lastErr = err;
       if (!isTransient(err) || i === attempts - 1) throw err;
-      // Neon takes a moment to wake from suspend; back off a little each time.
       await sleep(250 * (i + 1));
     }
   }
   throw lastErr;
 }
 
-export async function query<T extends QueryResultRow = QueryResultRow>(
-  text: string,
-  params: unknown[] = [],
-): Promise<T[]> {
-  const res = await withRetry(() => getPool().query<T>(text, params as never[]));
+async function run<T>(conn: Pool | PoolConnection, text: string, params: unknown[]): Promise<DbResult<T>> {
+  const { sql, values } = bind(compile(text), params);
+  const [res] = await conn.query(sql, values);
+  if (Array.isArray(res)) return { rows: res as T[], rowCount: res.length };
+  const h = res as ResultSetHeader;
+  return { rows: [], rowCount: h.affectedRows, insertId: h.insertId };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function query<T = any>(text: string, params: unknown[] = []): Promise<T[]> {
+  const res = await withRetry(() => run<T>(getPool(), text, params));
   return res.rows;
 }
 
-export async function one<T extends QueryResultRow = QueryResultRow>(
-  text: string,
-  params: unknown[] = [],
-): Promise<T | null> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function one<T = any>(text: string, params: unknown[] = []): Promise<T | null> {
   const rows = await query<T>(text, params);
   return rows[0] ?? null;
 }
@@ -129,26 +148,27 @@ export async function one<T extends QueryResultRow = QueryResultRow>(
 /**
  * Runs a set of statements in one transaction.
  *
- * Only the checkout is retried. Once BEGIN has run we cannot know whether a
- * dropped connection committed, so a mid-transaction failure is surfaced rather
- * than replayed — re-running an enrolment or a supply issue would double it.
+ * Only the checkout is retried. Once the transaction has begun we cannot know whether a
+ * dropped connection committed, so a mid-transaction failure is surfaced rather than
+ * replayed — re-running an enrolment or a supply issue would double it.
  */
-export async function tx<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
-  const client = await withRetry(() => getPool().connect());
+export async function tx<T>(fn: (c: DbClient) => Promise<T>): Promise<T> {
+  const conn = await withRetry(() => getPool().getConnection());
   try {
-    await client.query("BEGIN");
+    await conn.beginTransaction();
+    const client: DbClient = { query: (text, params = []) => run(conn, text, params) };
     const out = await fn(client);
-    await client.query("COMMIT");
+    await conn.commit();
     return out;
   } catch (err) {
     try {
-      await client.query("ROLLBACK");
+      await conn.rollback();
     } catch {
       // the connection is already gone; the transaction dies with it
     }
     throw err;
   } finally {
-    client.release();
+    conn.release();
   }
 }
 

@@ -689,7 +689,7 @@ CREATE TABLE `sports` (
   `created_by` BIGINT,
   `created_at` TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_sports_centre_name` (`center_id`)
+  UNIQUE KEY `uq_sports_centre_name` (`center_id`, `name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `sports_visits` (

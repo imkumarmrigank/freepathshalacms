@@ -1,5 +1,5 @@
 import "server-only";
-import type { PoolClient } from "pg";
+import type { PoolClient } from "@/lib/db";
 
 /**
  * Whether a child passed the year, read off the tests they actually sat.
