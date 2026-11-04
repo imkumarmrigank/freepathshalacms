@@ -2,7 +2,7 @@
 
 Student, attendance and parent–teacher management for FreePathshala centres.
 
-Built with Next.js 16 (App Router) + TypeScript + Tailwind, on Neon Postgres, deployed to Hostinger (Node.js hosting, from GitHub).
+Built with Next.js 16 (App Router) + TypeScript + Tailwind, on MariaDB (Hostinger), deployed to Hostinger (Node.js hosting, from GitHub).
 
 ---
 
@@ -119,7 +119,7 @@ on its own.
 
 | Script | Purpose |
 |---|---|
-| `npm run migrate` | Applies `db/migrations/*.sql` once each, tracked in `schema_migrations` |
+| `npm run migrate` | Creates the schema on an empty database, then applies `db/mariadb/migrations/*.sql` once each, tracked in `schema_migrations` |
 | `npm run seed` | Class ladder, two sessions, super admin |
 | `npm run seed:demo` | Adds sample centres, staff and students |
 | `npm run close-register` | Closes unmarked past days (what the cron job calls) |
@@ -141,15 +141,15 @@ The site runs on Hostinger Node.js hosting and redeploys from the `main` branch 
 1. Set the environment variables below in hPanel (Node.js → Environment variables).
 2. Push to `main`; Hostinger builds and restarts the app.
 
-**Migrations are not run on deploy.** Apply new SQL files from `db/migrations` to the
-Neon database yourself (`npm run migrate` with `DATABASE_URL` set, or paste the SQL into
-the Neon SQL editor and record it in `schema_migrations`) *before* pushing code that needs them.
+**Migrations are not run on deploy.** Apply new SQL files from `db/mariadb/migrations` to the
+MariaDB database yourself (`npm run migrate` with `DATABASE_URL` set, or run the SQL in phpMyAdmin
+and record it in `schema_migrations`) *before* pushing code that needs them.
 
 ### Environment variables
 
 | Variable | Required | Notes |
 |---|---|---|
-| `DATABASE_URL` | yes | Neon pooled connection string |
+| `DATABASE_URL` | yes | MariaDB address, `mysql://user:password@127.0.0.1:3306/database` (on Hostinger use 127.0.0.1, not localhost) |
 | `JWT_SECRET` | yes | Signs the session cookie. 32+ random characters |
 | `ENROLLMENT_PREFIX` | no | Defaults to `FP` |
 | `CRON_SECRET` | no | If set, the close-register endpoint requires it |
@@ -212,7 +212,7 @@ Two notes that matter when you add queries:
 - `BIGINT` ids and `DATE` columns are given custom parsers in `src/lib/db.ts` so ids compare as
   numbers and dates stay `YYYY-MM-DD` strings. Without them, id comparisons and date comparisons
   both fail silently.
-- Adding a migration means dropping a new numbered `.sql` file into `db/migrations/`. Never edit
+- Adding a migration means dropping a new numbered `.sql` file (MariaDB SQL) into `db/mariadb/migrations/`. Never edit
   one that has already been applied.
 - A new report is a row in `src/lib/report-meta.ts` plus a function in `src/lib/reports.ts`
   returning `{ columns, rows }`. The page preview and the Excel export both read that shape, so

@@ -3,16 +3,14 @@
  * With --demo : also two sample centres, staff, students and PTM records.
  * Safe to re-run — everything is upsert-style.
  */
-import pg from "pg";
 import bcrypt from "bcryptjs";
+import { connect } from "./db-connect.mjs";
 
-const url = process.env.DATABASE_URL;
-if (!url) { console.error("DATABASE_URL is not set"); process.exit(1); }
 const demo = process.argv.includes("--demo");
 
-const pool = new pg.Pool({ connectionString: url, ssl: { rejectUnauthorized: false }, max: 2 });
-const c = await pool.connect();
-const q = (t, p = []) => c.query(t, p);
+const c = await connect();
+/** Like the old PostgreSQL helper: returns { rows }; SELECTs give their rows, writes give []. */
+const q = async (t, p = []) => { const [res] = await c.query(t, p); return { rows: Array.isArray(res) ? res : [], header: res }; };
 
 const adminEmail = process.env.SEED_ADMIN_EMAIL || "admin@freepathshala.org";
 const adminPass = process.env.SEED_ADMIN_PASSWORD || "ChangeMe@123";
@@ -25,7 +23,7 @@ try {
   for (const cl of classes) {
     await q(
       `INSERT INTO class_levels (name, sequence, is_terminal)
-       VALUES ($1, $2, $3) ON CONFLICT (name) DO NOTHING`,
+       VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE name = name`,
       [cl.name, cl.seq, cl.seq === 12],
     );
   }
@@ -41,20 +39,20 @@ try {
   for (const s of sessions) {
     await q(
       `INSERT INTO academic_sessions (name, start_date, end_date, sequence, is_current)
-       VALUES ($1,$2,$3,$4,$5) ON CONFLICT (name) DO NOTHING`,
+       VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE name = name`,
       [s.name, s.s, s.e, s.seq, s.cur],
     );
   }
 
   // ---------------------------------------------------------------- super admin
   const hash = await bcrypt.hash(adminPass, 10);
-  const { rows: [admin] } = await q(
+  await q(
     `INSERT INTO users (name, email, password_hash, role)
-     VALUES ($1,$2,$3,'super_admin')
-     ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
-     RETURNING id, email`,
+     VALUES (?,?,?,'super_admin')
+     ON DUPLICATE KEY UPDATE name = VALUES(name)`,
     ["System Administrator", adminEmail, hash],
   );
+  const { rows: [admin] } = await q("SELECT id, email FROM users WHERE email = ?", [adminEmail]);
   console.log(`✓ classes, sessions, super admin (${admin.email})`);
   if (!process.env.SEED_ADMIN_PASSWORD)
     console.log(`  ⚠ default password "${adminPass}" — change it after first login.`);
@@ -68,14 +66,14 @@ try {
     ];
     const centres = [];
     for (const d of centreDefs) {
-      const { rows: [row] } = await q(
+      await q(
         `INSERT INTO centers (code, name, area, city, state, latitude, longitude, geofence_radius_m)
-         VALUES ($1,$2,$3,$4,'Maharashtra',$5,$6,200)
-         ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name,
-           latitude = EXCLUDED.latitude, longitude = EXCLUDED.longitude
-         RETURNING id, code, name`,
+         VALUES (?,?,?,?,'Maharashtra',?,?,50)
+         ON DUPLICATE KEY UPDATE name = VALUES(name),
+           latitude = VALUES(latitude), longitude = VALUES(longitude)`,
         [d.code, d.name, d.area, d.city, d.lat, d.lng],
       );
+      const { rows: [row] } = await q("SELECT id, code, name FROM centers WHERE code = ?", [d.code]);
       centres.push(row);
     }
 
@@ -88,22 +86,22 @@ try {
     ];
     const staff = [];
     for (const s of staffDefs) {
-      const { rows: [row] } = await q(
+      await q(
         `INSERT INTO users (name, email, password_hash, role, center_id)
-         VALUES ($1,$2,$3,$4,$5)
-         ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name, center_id = EXCLUDED.center_id
-         RETURNING id, name, role, center_id`,
+         VALUES (?,?,?,?,?)
+         ON DUPLICATE KEY UPDATE name = VALUES(name), center_id = VALUES(center_id)`,
         [s.name, s.email, hash, s.role, centres[s.centre].id],
       );
+      const { rows: [row] } = await q("SELECT id, name, role, center_id FROM users WHERE email = ?", [s.email]);
       staff.push(row);
     }
     for (const centre of centres) {
       const mgr = staff.find((s) => s.role === "center_manager" && s.center_id === centre.id);
-      if (mgr) await q("UPDATE centers SET manager_id = $1 WHERE id = $2", [mgr.id, centre.id]);
+      if (mgr) await q("UPDATE centers SET manager_id = ? WHERE id = ?", [mgr.id, centre.id]);
     }
 
     // -------------------------------------------------------------- students
-    const { rows: [cur] } = await q("SELECT id FROM academic_sessions WHERE is_current LIMIT 1");
+    const { rows: [cur] } = await q("SELECT id FROM academic_sessions WHERE is_current = 1 LIMIT 1");
     const { rows: classRows } = await q("SELECT id, name, sequence FROM class_levels ORDER BY sequence");
     const byName = Object.fromEntries(classRows.map((r) => [r.name, r]));
 
@@ -119,23 +117,21 @@ try {
     for (const [first, last, cls, ci] of names) {
       const centre = centres[ci];
       const exists = await q(
-        "SELECT id FROM students WHERE first_name=$1 AND last_name=$2 AND center_id=$3",
+        "SELECT id FROM students WHERE first_name=? AND last_name=? AND center_id=?",
         [first, last, centre.id],
       );
       if (exists.rows.length) continue;
 
-      await q(`INSERT INTO enrollment_counters (center_id, next_seq) VALUES ($1,1)
-               ON CONFLICT (center_id) DO NOTHING`, [centre.id]);
-      const { rows: [ctr] } = await q(
-        "UPDATE enrollment_counters SET next_seq = next_seq + 1 WHERE center_id = $1 RETURNING next_seq - 1 AS seq",
-        [centre.id],
-      );
+      await q(`INSERT INTO enrollment_counters (center_id, next_seq) VALUES (?,1)
+               ON DUPLICATE KEY UPDATE center_id = center_id`, [centre.id]);
+      const { rows: [ctr] } = await q("SELECT next_seq AS seq FROM enrollment_counters WHERE center_id = ?", [centre.id]);
+      await q("UPDATE enrollment_counters SET next_seq = next_seq + 1 WHERE center_id = ?", [centre.id]);
       const enrollNo = `${prefix}-${centre.code}-${String(ctr.seq).padStart(4, "0")}`;
 
-      const { rows: [st] } = await q(
+      const { header: st } = await q(
         `INSERT INTO students (enrollment_no, center_id, first_name, last_name, gender,
            father_name, mother_name, primary_phone, admission_date)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8, CURRENT_DATE - INTERVAL '60 days') RETURNING id`,
+         VALUES (?,?,?,?,?,?,?,?, DATE_SUB(CURDATE(), INTERVAL 60 DAY))`,
         [enrollNo, centre.id, first, last,
          ["Priya","Ayesha","Kavita","Neha","Meera"].includes(first) ? "female" : "male",
          `${last} Senior`, `Mrs. ${last}`, `98${Math.floor(10000000 + Math.random() * 89999999)}`],
@@ -143,8 +139,8 @@ try {
       await q(
         `INSERT INTO enrollments (student_id, session_id, class_level_id, center_id,
             enrolled_on, source)
-         VALUES ($1,$2,$3,$4, CURRENT_DATE - INTERVAL '60 days', 'new')`,
-        [st.id, cur.id, byName[cls].id, centre.id],
+         VALUES (?,?,?,?, DATE_SUB(CURDATE(), INTERVAL 60 DAY), 'new')`,
+        [st.insertId, cur.id, byName[cls].id, centre.id],
       );
       created++;
     }
@@ -154,6 +150,5 @@ try {
   console.error(err);
   process.exit(1);
 } finally {
-  c.release();
-  await pool.end();
+  await c.end();
 }
