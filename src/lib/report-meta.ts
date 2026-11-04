@@ -10,7 +10,11 @@ export type ReportFilter =
   /** 1 / 2 / 3 / all — syllabus term */
   | "term"
   /** YYYY-MM: only rows whose date falls in that month */
-  | "month";
+  | "month"
+  /** suspended / inactive / dropped: which off-roll status to list */
+  | "offRollStatus"
+  /** suspended / graduated: what a reactivated child had been before coming back */
+  | "wasStatus";
 
 /** The buckets a cumulative attendance report can be added up over. */
 export const GROUP_BY = [
@@ -72,7 +76,7 @@ export const REPORTS: ReportMeta[] = [
     description:
       "Every child currently suspended, inactive or dropped, with a status column: their last centre and class, since when, and why. "
       + "Pick a month to see only those off the roll since then.",
-    filters: ["center", "month"],
+    filters: ["center", "class", "offRollStatus", "month"],
     roles: ["super_admin", "admin"],
   },
   {
@@ -81,17 +85,18 @@ export const REPORTS: ReportMeta[] = [
     group: "Students",
     description:
       "Children who have moved on from the centre to a formal school, with where they went.",
-    filters: ["center", "month"],
+    filters: ["center", "class", "month"],
     roles: ["super_admin", "admin"],
   },
   {
     key: "student-reactivations",
-    label: "Students brought back",
+    label: "Reactivated students",
     group: "Students",
     description:
-      "Suspended or passed-out children returned to the roll in the period: from where and "
-      + "what class, to where and what class, why they had left, and who brought them back.",
-    filters: ["dates", "center"],
+      "Children brought back onto the roll after being suspended or passed out: from where and "
+      + "what class, to where and what class, why they had left, who brought them back, and "
+      + "whether they are on the roll now.",
+    filters: ["dates", "center", "class", "wasStatus"],
     roles: ["super_admin", "admin"],
   },
   {

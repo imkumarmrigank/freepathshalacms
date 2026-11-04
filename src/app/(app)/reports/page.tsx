@@ -40,6 +40,8 @@ export default async function ReportsPage({
     enrollmentStatus: sp.enrollmentStatus || null,
     term: Number(sp.term) || null,
     month: /^[0-9]{4}-[0-9]{2}$/.test(sp.month ?? "") ? sp.month! : null,
+    offStatus: sp.offStatus || null,
+    wasStatus: sp.wasStatus || null,
   };
 
   let result: ReportResult | null = null;
@@ -62,6 +64,8 @@ export default async function ReportsPage({
     ...(params.enrollmentStatus ? { enrollmentStatus: params.enrollmentStatus } : {}),
     ...(params.term ? { term: String(params.term) } : {}),
     ...(params.month ? { month: params.month } : {}),
+    ...(params.offStatus ? { offStatus: params.offStatus } : {}),
+    ...(params.wasStatus ? { wasStatus: params.wasStatus } : {}),
   }).toString();
 
   // The whole report is already in memory; the table shows it a page at a time.

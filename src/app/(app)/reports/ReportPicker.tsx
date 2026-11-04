@@ -232,6 +232,31 @@ export default function ReportPicker({
             </label>
           )}
 
+          {uses("offRollStatus") && (
+            <label>
+              <span className="mb-1.5 block text-[13px] font-medium text-[var(--muted)]">Status</span>
+              <select className="select w-auto" value={current.offStatus ?? ""}
+                onChange={(e) => push({ offStatus: e.target.value })}>
+                <option value="">Suspended, inactive and dropped</option>
+                <option value="suspended">Suspended only</option>
+                <option value="inactive">Inactive only</option>
+                <option value="dropped">Dropped only</option>
+              </select>
+            </label>
+          )}
+
+          {uses("wasStatus") && (
+            <label>
+              <span className="mb-1.5 block text-[13px] font-medium text-[var(--muted)]">Was</span>
+              <select className="select w-auto" value={current.wasStatus ?? ""}
+                onChange={(e) => push({ wasStatus: e.target.value })}>
+                <option value="">Suspended or passed out</option>
+                <option value="suspended">Suspended</option>
+                <option value="graduated">Passed out</option>
+              </select>
+            </label>
+          )}
+
           {uses("month") && (
             <label>
               <span className="mb-1.5 block text-[13px] font-medium text-[var(--muted)]">Since month</span>

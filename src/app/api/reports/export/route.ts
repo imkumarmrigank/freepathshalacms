@@ -37,6 +37,8 @@ export async function GET(req: Request) {
     sessionId: Number(url.searchParams.get("session")) || session?.id || 0,
     role: url.searchParams.get("role") || null,
     groupBy: url.searchParams.get("groupBy") || null,
+    offStatus: url.searchParams.get("offStatus") || null,
+    wasStatus: url.searchParams.get("wasStatus") || null,
     month: /^[0-9]{4}-[0-9]{2}$/.test(url.searchParams.get("month") ?? "") ? url.searchParams.get("month") : null,
   };
 

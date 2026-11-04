@@ -32,6 +32,10 @@ export type ReportParams = {
   term?: number | null;
   /** YYYY-MM: the off-roll reports keep only children whose "since" date is in it */
   month?: string | null;
+  /** suspended / inactive / dropped / null (= all three) */
+  offStatus?: string | null;
+  /** suspended / graduated / null (= both): what a reactivated child had been */
+  wasStatus?: string | null;
 };
 
 const COUNTED = "('present','late','half_day')";   // counts towards attendance
@@ -1975,9 +1979,13 @@ async function studentTransfers(p: ReportParams, period: string): Promise<Report
 async function offRoll(p: ReportParams, status: "suspended" | "graduated"): Promise<ReportResult> {
   // "Suspended" also lists inactive and dropped children, with a Status column, so one
   // report covers everyone who is off the roll; passed-out children stay on their own.
-  const params: unknown[] = [status === "suspended" ? ["suspended", "inactive", "dropped"] : [status]];
+  const offStatuses = ["suspended", "inactive", "dropped"];
+  const params: unknown[] = [status === "suspended"
+    ? (p.offStatus && offStatuses.includes(p.offStatus) ? [p.offStatus] : offStatuses)
+    : [status]];
   let where = "";
   if (p.centerId) { params.push(p.centerId); where += ` AND s.center_id = $${params.length}`; }
+  if (p.classId) { params.push(p.classId); where += ` AND last.class_level_id = $${params.length}`; }
   if (p.month && /^[0-9]{4}-(0[1-9]|1[0-2])$/.test(p.month)) {
     params.push(p.month);
     where += ` AND to_char(COALESCE(s.left_on, s.dropout_date, s.status_changed_at::date), 'YYYY-MM') = $${params.length}`;
@@ -2039,7 +2047,13 @@ async function reactivations(p: ReportParams, period: string): Promise<ReportRes
     params.push(p.centerId);
     where = ` AND (r.from_center_id = $${params.length} OR r.to_center_id = $${params.length})`;
   }
+  if (p.classId) { params.push(p.classId); where += ` AND r.to_class_id = $${params.length}`; }
+  if (p.wasStatus === "suspended" || p.wasStatus === "graduated") {
+    params.push(p.wasStatus);
+    where += ` AND r.from_status = $${params.length}`;
+  }
   const rows = await query<{
+    current_status: string;
     reactivated_on: string; student: string; enrollment_no: string; from_status: string;
     from_centre: string | null; to_centre: string; from_class: string | null; to_class: string;
     left_reason: string | null; note: string | null; by_name: string | null;
@@ -2047,7 +2061,7 @@ async function reactivations(p: ReportParams, period: string): Promise<ReportRes
     `SELECT r.reactivated_on, trim(s.first_name || ' ' || COALESCE(s.last_name, '')) AS student,
             s.enrollment_no, r.from_status, fc.name AS from_centre, tc.name AS to_centre,
             fcl.name AS from_class, tcl.name AS to_class, r.left_reason, r.note,
-            u.name AS by_name
+            u.name AS by_name, s.status AS current_status
        FROM student_reactivations r
        JOIN students s ON s.id = r.student_id
        LEFT JOIN centers fc ON fc.id = r.from_center_id
@@ -2060,7 +2074,7 @@ async function reactivations(p: ReportParams, period: string): Promise<ReportRes
     params,
   );
   return {
-    title: "Students brought back",
+    title: "Reactivated students",
     subtitle: `${period} · ${rows.length} student${rows.length === 1 ? "" : "s"}`,
     columns: [
       { key: "reactivated_on", label: "Date", width: 12 },
@@ -2074,13 +2088,14 @@ async function reactivations(p: ReportParams, period: string): Promise<ReportRes
       { key: "left_reason", label: "Why they had left", width: 36 },
       { key: "note", label: "Note", width: 30 },
       { key: "by_name", label: "Brought back by", width: 18 },
+      { key: "current_status", label: "Status now", width: 12 },
     ],
     rows: rows.map((r) => ({
       reactivated_on: String(r.reactivated_on).slice(0, 10), student: r.student,
       enrollment_no: r.enrollment_no, was: r.from_status === "graduated" ? "Passed out" : "Suspended",
       from_centre: r.from_centre ?? "", to_centre: r.to_centre, from_class: r.from_class ?? "—",
       to_class: r.to_class, left_reason: r.left_reason ?? "", note: r.note ?? "",
-      by_name: r.by_name ?? "",
+      by_name: r.by_name ?? "", current_status: titleCase(r.current_status),
     })),
   };
 }
