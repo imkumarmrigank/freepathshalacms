@@ -979,6 +979,41 @@ function jsonAliases(toks: Tok[]): string[] {
   return out;
 }
 
+/** PostgreSQL names `col::text` after the column; MariaDB would name it `CAST(col AS CHAR)`. Keep the name. */
+function passCastAlias(toks: Tok[]): Tok[] {
+  const inserts: { at: number; name: string }[] = [];
+  for (let s = 0; s < toks.length; s++) {
+    if (!isWord(toks[s], "SELECT")) continue;
+    let depth = 0, itemStart = s + 1;
+    const flush = (end: number) => {
+      let a = itemStart, b = end;
+      while (a < b && (toks[a].t === "ws" || toks[a].t === "cmt")) a++;
+      while (b > a && (toks[b - 1].t === "ws" || toks[b - 1].t === "cmt")) b--;
+      const it = toks.slice(a, b);
+      if (it.length < 3 || it.some((t) => isWord(t, "AS") || isWord(t, "DISTINCT"))) return;
+      const ci = it.findIndex((t) => t.t === "op" && t.s === "::");
+      if (ci < 1) return;
+      const lhs = it.slice(0, ci);
+      const ok = lhs.length === 1 ? lhs[0].t === "word" : lhs.length === 3 && lhs[0].t === "word" && lhs[1].s === "." && lhs[2].t === "word";
+      const rest = it.slice(ci + 1);
+      if (/^(NULL|TRUE|FALSE|CURRENT_DATE|CURRENT_TIMESTAMP|NOW)$/i.test(lhs[lhs.length - 1].s)) return;
+      if (!ok || !rest.length || rest.some((t) => t.t === "op" || t.s === ",")) return;
+      inserts.push({ at: b, name: lhs[lhs.length - 1].s });
+    };
+    let j = s + 1;
+    for (; j < toks.length; j++) {
+      const t = toks[j];
+      if (t.t === "p" && (t.s === "(" || t.s === "[")) depth++;
+      else if (t.t === "p" && (t.s === ")" || t.s === "]")) { if (depth === 0) break; depth--; }
+      else if (depth === 0 && t.t === "p" && t.s === ",") { flush(j); itemStart = j + 1; }
+      else if (depth === 0 && isWord(t, "FROM")) break;
+    }
+    if (j < toks.length && isWord(toks[j], "FROM")) flush(j);
+  }
+  for (const { at, name } of inserts.sort((x, y) => y.at - x.at)) toks.splice(at, 0, SP, W("AS"), SP, W(name));
+  return toks;
+}
+
 function booleanAliases(toks: Tok[]): string[] {
   let depth = 0, sel = -1;
   for (let i = 0; i < toks.length; i++) {
@@ -1047,6 +1082,7 @@ export function compile(sql: string): Template {
   toks = passSets(toks);
   toks = passSubscripts(toks);
   toks = passFilter(toks); // before casts: `count(*) FILTER (...)::int` must not treat FILTER as a function
+  toks = passCastAlias(toks);
   toks = passCasts(toks);
   toks = passOrderDefaults(toks);
   toks = passNulls(toks);

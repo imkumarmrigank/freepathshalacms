@@ -12,13 +12,13 @@ import { SignJWT } from "jose";
 const OLD = process.env.OLD, NEW = process.env.NEW, SECRET = process.env.JWT_SECRET;
 const arg = (n, d) => (process.argv.find((a) => a.startsWith(`--${n}=`)) ?? `--${n}=${d}`).split("=")[1];
 const ROLE = arg("role", "super_admin"), UID = Number(arg("uid", "1")), ONLY = arg("only", "");
-const CENTER = arg("center", "");
+const CENTER = arg("center", ""), CNAME = arg("cname", "");
 if (!OLD || !NEW || !SECRET) { console.error("Set OLD, NEW and JWT_SECRET."); process.exit(2); }
 
 const ids = JSON.parse(process.env.SAMPLE_IDS ?? "{}");
 const token = await new SignJWT({
   uid: UID, name: "Compare User", email: "compare@test.local", role: ROLE,
-  centerId: CENTER ? Number(CENTER) : null, centerName: null, centerIds: [], coveringIds: [], isTest: false,
+  centerId: CENTER ? Number(CENTER) : null, centerName: CNAME || null, centerIds: [], coveringIds: [], isTest: false,
 }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("2h").sign(new TextEncoder().encode(SECRET));
 const cookie = `fp_session=${token}`;
 
