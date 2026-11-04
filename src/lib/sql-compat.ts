@@ -775,6 +775,46 @@ function passFunctions(toksIn: Tok[]): Tok[] {
 
 /* --------------------------------------------------- pass 7: ON CONFLICT upserts */
 
+/**
+ * PostgreSQL evaluates every right-hand side in SET against the OLD row; MariaDB applies the
+ * assignments left to right, so a later one sees the new value of an earlier column. Put each
+ * assignment that reads a column before the assignment that overwrites it.
+ */
+function orderAssignments(body: Tok[]): Tok[] {
+  const parts = splitTop(body, 0, body.length).map(trimToks).filter((a) => a.length);
+  if (parts.length < 2) return body;
+  const info = parts.map((a) => {
+    const eq = a.findIndex((t) => t.s === "=");
+    return { a, col: (a[prevSig(a, eq)]?.s ?? "").replace(/["`]/g, "").toLowerCase(), rhs: a.slice(eq + 1), eq };
+  });
+  const written = new Set(info.map((x) => x.col));
+  const reads = info.map((x) => {
+    const r = new Set<string>();
+    x.rhs.forEach((t, i) => {
+      if (t.t !== "word" && t.t !== "qid") return;
+      const name = t.s.replace(/["`]/g, "").toLowerCase();
+      if (!written.has(name)) return;
+      // VALUES(col) is the incoming value, not the stored one
+      if (x.rhs[i - 1]?.s === "(" && isWord(x.rhs[i - 2], "VALUES")) return;
+      r.add(name);
+    });
+    r.delete(x.col);
+    return r;
+  });
+  const order: number[] = [];
+  const left = new Set(info.map((_, i) => i));
+  while (left.size) {
+    // an assignment can go once no remaining assignment still needs to read the column it writes
+    const next = [...left].find((i) => ![...left].some((j) => j !== i && reads[j].has(info[i].col)));
+    if (next === undefined) { warnings.push("upsert SET order has a cycle: " + info.map((x) => x.col).join(",")); return body; }
+    order.push(next);
+    left.delete(next);
+  }
+  const out: Tok[] = [];
+  order.forEach((i, k) => { if (k) out.push(P(","), SP); out.push(...info[i].a); });
+  return out;
+}
+
 function passUpsert(toksIn: Tok[]): Tok[] {
   let toks = toksIn;
   const oi = toks.findIndex((t, i) => isWord(t, "ON") && isWord(toks[nextSig(toks, i)], "CONFLICT"));
@@ -828,7 +868,7 @@ function passUpsert(toksIn: Tok[]): Tok[] {
         else if (depth === 0 && isWord(t, "WHERE")) throw new Error("sql-compat: DO UPDATE ... WHERE is not supported");
       }
     }
-    repl = [W("ON"), SP, W("DUPLICATE"), SP, W("KEY"), SP, W("UPDATE"), ...body];
+    repl = [W("ON"), SP, W("DUPLICATE"), SP, W("KEY"), SP, W("UPDATE"), SP, ...orderAssignments(body)];
     tail = [];
   } else throw new Error("sql-compat: unsupported ON CONFLICT action");
 
