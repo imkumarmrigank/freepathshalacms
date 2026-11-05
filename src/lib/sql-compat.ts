@@ -847,6 +847,13 @@ function passUpsert(toksIn: Tok[]): Tok[] {
       const colsClose = matchParen(toks, colsOpen);
       firstCol = splitTop(toks, colsOpen + 1, colsClose).map(trimToks)[0];
     }
+    // INSERT ... SELECT over joined tables: a bare column name can match several of them, so
+    // name the table being inserted into
+    if (firstCol.length === 1 && firstCol[0].t === "word") {
+      const ins = toks.findIndex((t, i) => isWord(t, "INSERT") && isWord(toks[nextSig(toks, i)], "INTO"));
+      const tbl = ins >= 0 ? toks[nextSig(toks, nextSig(toks, ins))] : undefined;
+      if (tbl && tbl.t === "word") firstCol = [tbl, P("."), firstCol[0]];
+    }
     repl = [W("ON"), SP, W("DUPLICATE"), SP, W("KEY"), SP, W("UPDATE"), SP, ...firstCol, SP, P("="), SP, ...firstCol];
   } else if (isWord(toks[act], "UPDATE")) {
     const setI = nextSig(toks, act);
