@@ -1,7 +1,6 @@
 "use server";
 import { isSection } from "@/lib/sections";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import type { PoolClient } from "@/lib/db";
 import { canTouchCenter, requireUser } from "@/lib/auth";
 import { one, query, tx } from "@/lib/db";
@@ -266,5 +265,8 @@ export async function submitAdmission(
   }
 
   revalidatePath("/students");
-  redirect(`/students/new/success?student=${result.id}`);
+  // Not redirect(): on this host Next's own follow-up request for a redirect fails
+  // ("failed to get redirect response: fetch failed"), so the child was saved but the centre was
+  // shown a system error. The form moves on to this address itself.
+  return { redirectTo: `/students/new/success?student=${result.id}` };
 }

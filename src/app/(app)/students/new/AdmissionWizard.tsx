@@ -289,6 +289,7 @@ export default function AdmissionWizard({
     start(async () => {
       const res = await submitAdmission(data, draftId, siblings, notSiblings);
       if (res?.matches) { setMatches(res.matches); setPicked([]); return; }
+      if (res?.redirectTo) { router.push(res.redirectTo); return; }
       setMatches(null);
       if (res?.error) {
         setMessage({ kind: "bad", text: res.error });
