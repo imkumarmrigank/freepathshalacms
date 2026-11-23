@@ -36,6 +36,9 @@ const INIT_SQL =
   // PostgreSQL keeps ~16 digits in a numeric division; MariaDB keeps 4 more than the operands by default,
   // which makes sums of "one third" amounts drift and round differently
   `div_precision_increment = 16, ` +
+  // a runaway query is stopped after 45 s so it cannot hold one of the few connections for ever and
+  // starve attendance saves and admissions behind it
+  `max_statement_time = 45, lock_wait_timeout = 20, ` +
   `sql_mode = CONCAT(REPLACE(@@sql_mode, 'ONLY_FULL_GROUP_BY', ''), ',PIPES_AS_CONCAT,ANSI_QUOTES')`;
 
 function makePool(): Pool {
@@ -53,8 +56,9 @@ function makePool(): Pool {
     database: u.pathname.slice(1),
     ssl: u.searchParams.get("ssl") === "true" ? { rejectUnauthorized: false } : undefined,
     waitForConnections: true,
-    connectionLimit: Number(process.env.DB_POOL_MAX ?? 5),
+    connectionLimit: Number(process.env.DB_POOL_MAX ?? 10),
     queueLimit: 0,
+    // (waiting callers queue; the statement cap above is what frees a stuck connection)
     // count rows really changed, not rows matched: a no-op "ON CONFLICT DO NOTHING" then reports 0 rows,
     // as PostgreSQL does (promotions rely on that to skip children already moved up)
     flags: ["-FOUND_ROWS"],
