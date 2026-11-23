@@ -7,7 +7,7 @@ import Filters from "@/components/Filters";
 import FlagMark from "@/components/FlagMark";
 import SiblingMark from "@/components/SiblingMark";
 import TransportMark from "@/components/TransportMark";
-import { SIBLING_COLS, SIBLING_JOIN } from "@/lib/siblings";
+import { SIBLING_STUB, SIBLING_JOIN, fillSiblings } from "@/lib/siblings";
 import { fmtDate, fullName, titleCase } from "@/lib/format";
 import { isGlobalRole } from "@/lib/roles";
 import Pager from "@/components/Pager";
@@ -56,7 +56,7 @@ export default async function PtmPage({
             u.name AS mentor, i.parent_present, i.engagement, ce.name AS center_name,
             cl.name AS class_name, i.follow_up_required, i.follow_up_status,
             cf.status AS flag_status, cf.urgency AS flag_urgency,
-            cf.raised_on AS flag_on, ${SIBLING_COLS}
+            cf.raised_on AS flag_on, ${SIBLING_STUB}
        FROM ptm_interactions i
        JOIN students s ON s.id = i.student_id
        JOIN centers ce ON ce.id = i.center_id
@@ -70,6 +70,7 @@ export default async function PtmPage({
     params,
   );
 
+  await fillSiblings(rows);
   const total = totalOf(rows);
   const win = pageWindow(pg, rows.length, total);
 

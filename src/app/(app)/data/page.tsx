@@ -7,7 +7,7 @@ import Pager from "@/components/Pager";
 import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
 import { fmtDate } from "@/lib/format";
 import SiblingMark from "@/components/SiblingMark";
-import { SIBLING_COLS, SIBLING_JOIN } from "@/lib/siblings";
+import { SIBLING_STUB, SIBLING_JOIN, fillSiblings } from "@/lib/siblings";
 
 const STUDENT_STATUSES = ["active", "inactive", "dropped", "transferred", "graduated", "suspended"];
 const STAFF_ROLES = [
@@ -67,7 +67,7 @@ export default async function DataExplorerPage({
               s.admission_date::text AS admission_date,
               e.source,
               sess.name AS session_name,
-              ${SIBLING_COLS}
+              ${SIBLING_STUB}
          FROM students s
          LEFT JOIN enrollments e ON e.student_id = s.id
            AND e.id = (SELECT id FROM enrollments WHERE student_id = s.id ORDER BY id DESC LIMIT 1)
@@ -80,6 +80,7 @@ export default async function DataExplorerPage({
          LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params,
     );
+    await fillSiblings(rows);
     enrollmentTotal = totalOf(rows);
     enrollmentRows = rows;
   }
@@ -129,7 +130,7 @@ export default async function DataExplorerPage({
               s.whatsapp_number, s.address, s.city, s.state, s.pincode,
               s.religion, s.category, s.blood_group, s.aadhaar_number,
               s.admission_date::text AS admission_date, e.source, s.status,
-              ${SIBLING_COLS}
+              ${SIBLING_STUB}
          FROM students s
          LEFT JOIN enrollments e ON e.student_id = s.id
            ${sessionId ? "AND e.session_id = $1" : "AND e.id = (SELECT id FROM enrollments WHERE student_id = s.id ORDER BY id DESC LIMIT 1)"}
@@ -141,6 +142,7 @@ export default async function DataExplorerPage({
          LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params,
     );
+    await fillSiblings(rows);
     studentTotal = totalOf(rows);
     studentRows = rows;
   }

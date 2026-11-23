@@ -6,7 +6,7 @@ import { Badge, Card, Empty, PageHeader, StatCard } from "@/components/ui";
 import Filters from "@/components/Filters";
 import SiblingMark from "@/components/SiblingMark";
 import TransportMark from "@/components/TransportMark";
-import { SIBLING_COLS, SIBLING_JOIN } from "@/lib/siblings";
+import { SIBLING_STUB, SIBLING_JOIN, fillSiblings } from "@/lib/siblings";
 import Pager from "@/components/Pager";
 import SortHeader, { sortFrom } from "@/components/SortHeader";
 import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
@@ -114,7 +114,7 @@ export default async function FlaggedStudentsPage({
               f.outcome, f.closed_on,
               r.name AS raised_by_name, r.role AS raised_by_role, m.name AS mentor_name,
               COALESCE(f.closed_on, CURRENT_DATE) - f.raised_on AS days_open,
-              COALESCE(a.steps, 0) AS steps, a.trail, ${SIBLING_COLS},
+              COALESCE(a.steps, 0) AS steps, a.trail, ${SIBLING_STUB},
               ${TIMES_FLAGGED}::int AS times_flagged,
               -- which referral this is, counting from the first
               (SELECT count(*) FROM counselling_flags f2
@@ -150,6 +150,7 @@ export default async function FlaggedStudentsPage({
     ),
   ]);
 
+  await fillSiblings(rows);
   const tally = tallyRows[0];
   const total = totalOf(rows);
   const win = pageWindow(pg, rows.length, total);

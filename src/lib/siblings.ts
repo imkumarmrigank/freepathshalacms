@@ -140,6 +140,30 @@ export const SIBLING_JOIN = ``;
 /** The two columns for a list that already joins `students s`. */
 export const SIBLING_COLS = `${SIBLING_COUNT} AS sibling_count, ${SIBLING_NAMES} AS sibling_names`;
 
+/**
+ * For long, paged lists. The brothers-and-sisters match compares a child with every other child, so
+ * running it for every row of a list that also counts its total (every child on the roll) takes tens
+ * of seconds. A list selects ${SIBLING_STUB} instead and calls fillSiblings() on the page it got back,
+ * so the match only runs for the rows on screen.
+ */
+export const SIBLING_STUB = `0 AS sibling_count, NULL AS sibling_names, s.id AS sibling_sid`;
+
+export async function fillSiblings<T extends object>(rows: T[]): Promise<T[]> {
+  const sids = [...new Set(rows.map((r) => Number((r as any).sibling_sid)).filter(Boolean))];
+  if (!sids.length) return rows;
+  const found = await query<{ id: number; sibling_count: number; sibling_names: string | null }>(
+    `SELECT s.id, ${SIBLING_COLS} FROM students s WHERE s.id = ANY($1::bigint[])`,
+    [sids],
+  );
+  const by = new Map(found.map((x) => [Number(x.id), x]));
+  for (const r of rows) {
+    const x = by.get(Number((r as any).sibling_sid));
+    if (x) { (r as any).sibling_count = Number(x.sibling_count); (r as any).sibling_names = x.sibling_names; }
+    delete (r as any).sibling_sid;
+  }
+  return rows;
+}
+
 /** The same reckoning for one child, for their own page. */
 export async function siblingMark(studentId: number) {
   const rows = await query<{ n: number; names: string | null }>(

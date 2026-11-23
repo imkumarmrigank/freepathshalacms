@@ -1,5 +1,5 @@
 import "server-only";
-import { SIBLING_COLS, SIBLING_JOIN } from "./siblings";
+import { SIBLING_COLS, SIBLING_STUB, SIBLING_JOIN, fillSiblings } from "./siblings";
 import { one, query } from "./db";
 
 /** Yesterday's headline: how many meetings were held, and what came of them. */
@@ -262,10 +262,10 @@ export async function ptmDayCoverage(day: string, centerId: number | null) {
  * child carries the parents' names, a number to ring and when the family was
  * last sat down with, so the call can be made from this page.
  */
-export function ptmAbsentees(day: string, centerId: number | null, limit = 200) {
+export async function ptmAbsentees(day: string, centerId: number | null, limit = 200) {
   const args: unknown[] = centerId ? [day, centerId] : [day];
   args.push(limit);
-  return query<{
+  const rows = await query<{
     student_id: number; student: string; enrollment_no: string; class_name: string | null;
     center_name: string; father_name: string | null; mother_name: string | null;
     guardian_name: string | null; phone: string | null; last_met: string | null;
@@ -285,7 +285,7 @@ export function ptmAbsentees(day: string, centerId: number | null, limit = 200) 
             to_char(seen.last_met, 'YYYY-MM-DD') AS last_met,
             COALESCE(seen.n_session, 0) AS met_this_session,
             cf.status AS flag_status, cf.urgency AS flag_urgency,
-            cf.raised_on AS flag_on, ${SIBLING_COLS}
+            cf.raised_on AS flag_on, ${SIBLING_STUB}
        FROM expected x
        JOIN students s ON s.id = x.student_id
        JOIN centers ce ON ce.id = x.center_id
@@ -302,6 +302,7 @@ export function ptmAbsentees(day: string, centerId: number | null, limit = 200) 
       ORDER BY seen.last_met NULLS FIRST, ce.code, cl.sequence NULLS LAST, s.first_name
       LIMIT $${args.length}`,
     args);
+  return fillSiblings(rows);
 }
 
 /**

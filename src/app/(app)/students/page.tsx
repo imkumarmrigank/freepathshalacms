@@ -13,7 +13,7 @@ import SortHeader, { sortFrom } from "@/components/SortHeader";
 import FlagMark from "@/components/FlagMark";
 import SiblingMark from "@/components/SiblingMark";
 import TransportMark from "@/components/TransportMark";
-import { SIBLING_COLS, SIBLING_JOIN } from "@/lib/siblings";
+import { SIBLING_STUB, SIBLING_JOIN, fillSiblings } from "@/lib/siblings";
 import { pageFrom, pageWindow, totalOf } from "@/lib/paginate";
 import { getT } from "@/lib/i18n";
 
@@ -88,7 +88,7 @@ export default async function StudentsPage({
             s.id, s.enrollment_no, s.first_name, s.last_name, s.status, s.admission_date, s.transport_mode,
             cl.name AS class_name, ce.name AS center_name, e.section, e.id AS enrollment_id,
             cf.status AS flag_status, cf.urgency AS flag_urgency, cf.raised_on AS flag_on,
-            ${SIBLING_COLS},
+            ${SIBLING_STUB},
             (e.id IS NOT NULL) AS enrolled_here,
             -- The best date there is for the current status: the dropout date for a
             -- dropout, the day a suspended or passed-out child left, otherwise the
@@ -115,6 +115,8 @@ export default async function StudentsPage({
       LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params,
   );
+
+  await fillSiblings(rows);
 
   const total = totalOf(rows);
   const office = canChangeSection(user.role);
