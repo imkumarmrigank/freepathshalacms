@@ -1,7 +1,7 @@
 "use server";
+import { goTo } from "@/lib/go-to";
 import { revalidatePath } from "next/cache";
 import { today } from "@/lib/format";
-import { redirect } from "next/navigation";
 import { requireUser, canTouchCenter } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
@@ -110,7 +110,7 @@ export async function recordInteraction(_prev: unknown, form: FormData) {
 
   revalidatePath("/ptm");
   revalidatePath("/follow-ups");
-  redirect(`/ptm/${row!.id}?created=1`);
+  return goTo(`/ptm/${row!.id}?created=1`);
 }
 
 /**

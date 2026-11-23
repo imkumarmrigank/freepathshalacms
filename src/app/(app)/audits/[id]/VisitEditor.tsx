@@ -14,6 +14,7 @@ import {
   addSuggestion, saveVisitDetails, submitVisit, verifySuggestion,
 } from "../actions";
 import CriterionRow from "./CriterionRow";
+import { useFollowRedirect } from "@/lib/use-follow-redirect";
 
 /**
  * The auditor's working screen.
@@ -310,7 +311,7 @@ function NewSuggestion({ visitId, criteria, raised }: {
 }
 
 function FileReport({ visit, rated }: { visit: VisitRow; rated: number }) {
-  const [state, action] = useActionState(submitVisit, null);
+  const [state, action] = useActionState(submitVisit, null); useFollowRedirect(state);
   const ready = rated > 0 && Boolean(visit.overall);
   return (
     <Card className="mt-5">

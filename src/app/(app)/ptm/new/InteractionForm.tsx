@@ -10,6 +10,7 @@ import {
   NO_COMMITMENT, PARENT_PRESENT, PTM_MODES, followUpDateFor,
 } from "@/lib/ptm-meta";
 import { useT } from "@/components/LocaleProvider";
+import { useFollowRedirect } from "@/lib/use-follow-redirect";
 
 export type StudentOption = {
   id: number; name: string; enrollmentNo: string;
@@ -68,7 +69,7 @@ export default function InteractionForm({
   meetings: { id: number; label: string }[];
 }) {
 
-  const t = useT();  const [state, action] = useActionState(recordInteraction, null);
+  const t = useT();  const [state, action] = useActionState(recordInteraction, null); useFollowRedirect(state);
   const [centerId, setCenterId] = useState<number | "">(
     () => lockedMeeting?.centerId ?? students.find((s) => s.id === defaultStudentId)?.centerId ?? (centers.length === 1 ? centers[0].id : ""),
   );

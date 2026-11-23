@@ -5,6 +5,7 @@ import { createPlan } from "./actions";
 import { Card, Field } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
 import HindiInput from "@/components/HindiInput";
+import { useFollowRedirect } from "@/lib/use-follow-redirect";
 
 export default function NewPlanForm({
   classes, teachers, centers, isTeacher, isAdmin, leadDays,
@@ -16,7 +17,7 @@ export default function NewPlanForm({
   isTeacher: boolean;
   isAdmin: boolean;
 }) {
-  const [state, action] = useActionState(createPlan, null);
+  const [state, action] = useActionState(createPlan, null); useFollowRedirect(state);
   // a Hindi plan is written in Hindi, so the fields start in Hindi
   const [subject, setSubject] = useState("");
   const hindiPlan = /hindi|हिंदी|हिन्दी/i.test(subject);

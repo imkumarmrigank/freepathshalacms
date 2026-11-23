@@ -1,6 +1,6 @@
 "use server";
+import { goTo } from "@/lib/go-to";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import type { Role } from "@/lib/roles";
 import { one, query } from "@/lib/db";
@@ -206,7 +206,7 @@ export async function openVisitAt(_prev: unknown, form: FormData) {
   }
 
   revalidatePath("/audits");
-  redirect(`/audits/${id}`);
+  return goTo(`/audits/${id}`);
 }
 
 /* ------------------------------------------------------------- the visit */
@@ -322,7 +322,7 @@ export async function submitVisit(_prev: unknown, form: FormData) {
 
   revalidatePath("/audits");
   revalidatePath(`/audits/${id}`);
-  redirect(`/audits/${id}`);
+  return goTo(`/audits/${id}`);
 }
 
 /* --------------------------------------------------------- the suggestions */

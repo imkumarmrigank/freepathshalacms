@@ -4,6 +4,7 @@ import { Field } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
 import { VISIT_KINDS, VISIT_KIND_BLURB, VISIT_KIND_LABEL } from "@/lib/audit-meta";
 import { openVisitAt } from "./actions";
+import { useFollowRedirect } from "@/lib/use-follow-redirect";
 
 /**
  * The auditor's way in: pick the centre you are standing in and begin.
@@ -16,7 +17,7 @@ export default function StartVisit({ centres, preset }: {
   centres: { id: number; name: string; code: string }[];
   preset?: number | null;
 }) {
-  const [state, action] = useActionState(openVisitAt, null);
+  const [state, action] = useActionState(openVisitAt, null); useFollowRedirect(state);
   const [kind, setKind] = useState("special");
 
   return (

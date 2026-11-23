@@ -1,7 +1,7 @@
 "use server";
+import { goTo } from "@/lib/go-to";
 import { revalidatePath } from "next/cache";
 import { today } from "@/lib/format";
-import { redirect } from "next/navigation";
 import { requireUser, canTouchCenter, effectiveTeacherIds } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
@@ -87,7 +87,7 @@ export async function createPlan(_prev: unknown, form: FormData) {
   );
 
   revalidatePath("/teaching-plans");
-  redirect(`/teaching-plans/${row!.id}`);
+  return goTo(`/teaching-plans/${row!.id}`);
 }
 
 /**

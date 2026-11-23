@@ -2,6 +2,7 @@
 import { useActionState, useState } from "react";
 import { openDirect, openCentreRoom } from "./actions";
 import { FormMessage } from "@/components/form";
+import { useFollowRedirect } from "@/lib/use-follow-redirect";
 
 /** Opening a thread with somebody, or walking into a centre's room. */
 export default function StartChat({ people, centres }: {
@@ -9,8 +10,8 @@ export default function StartChat({ people, centres }: {
             center_name: string | null }[];
   centres: { id: number; code: string; name: string }[];
 }) {
-  const [dmState, openDm] = useActionState(openDirect, null);
-  const [roomState, openRoom] = useActionState(openCentreRoom, null);
+  const [dmState, openDm] = useActionState(openDirect, null); useFollowRedirect(dmState);
+  const [roomState, openRoom] = useActionState(openCentreRoom, null); useFollowRedirect(roomState);
   const [q, setQ] = useState("");
 
   const matches = q.trim() === ""

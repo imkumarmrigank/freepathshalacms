@@ -6,6 +6,7 @@ import { Card, Field } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
 import { EXAM_TYPES, MONTHS } from "@/lib/exam-meta";
 import { CENTRE_TYPES } from "@/lib/centre-meta";
+import { useFollowRedirect } from "@/lib/use-follow-redirect";
 
 const COMMON_SUBJECTS = [
   "English", "Hindi", "Mathematics", "Science", "Social Science",
@@ -68,7 +69,7 @@ export default function NewExamForm({
   isAdmin: boolean;
   isTeacher: boolean;
 }) {
-  const [state, action] = useActionState(createExam, null);
+  const [state, action] = useActionState(createExam, null); useFollowRedirect(state);
   const [rows, setRows] = useState<Row[]>([blank(), blank(), blank()]);
   const [pickedClasses, setPickedClasses] = useState<number[]>([]);
 

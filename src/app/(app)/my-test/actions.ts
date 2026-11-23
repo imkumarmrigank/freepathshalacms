@@ -1,6 +1,6 @@
 "use server";
+import { goTo } from "@/lib/go-to";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { one, query, tx } from "@/lib/db";
 import {
@@ -24,7 +24,7 @@ export async function startTest(_prev: unknown, form: FormData) {
   const already = await one<{ id: number }>(
     `SELECT id FROM staff_tests WHERE user_id = $1 AND cycle_month = $2 AND slot = $3`,
     [user.uid, cycle, slot]);
-  if (already) redirect(`/my-test/${already.id}`);
+  if (already) return goTo(`/my-test/${already.id}`);
 
   const ids = await drawQuestions(user.uid, role, cfg.question_count, cfg.avoid_last_tests);
   if (ids.length === 0)
@@ -47,7 +47,7 @@ export async function startTest(_prev: unknown, form: FormData) {
   });
 
   revalidatePath("/my-test");
-  redirect(`/my-test/${id}`);
+  return goTo(`/my-test/${id}`);
 }
 
 /**

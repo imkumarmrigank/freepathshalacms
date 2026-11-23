@@ -1,6 +1,6 @@
 "use server";
+import { goTo } from "@/lib/go-to";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { requireUser, canTouchCenter } from "@/lib/auth";
 import { centreRoom, directWith, isMember, markRead, send } from "@/lib/chat";
 
@@ -24,7 +24,7 @@ export async function openDirect(_prev: unknown, form: FormData) {
   if (!otherId || otherId === user.uid) return { error: "Pick somebody else." };
 
   const id = await directWith(user.uid, otherId);
-  redirect(`/messages?c=${id}`);
+  return goTo(`/messages?c=${id}`);
 }
 
 export async function openCentreRoom(_prev: unknown, form: FormData) {
@@ -34,7 +34,7 @@ export async function openCentreRoom(_prev: unknown, form: FormData) {
     return { error: "That centre is not one of yours." };
 
   const id = await centreRoom(centerId);
-  redirect(`/messages?c=${id}`);
+  return goTo(`/messages?c=${id}`);
 }
 
 export async function readConversation(conversationId: number) {

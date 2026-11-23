@@ -1,6 +1,6 @@
 "use server";
+import { goTo } from "@/lib/go-to";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { canTouchCenter, requireUser } from "@/lib/auth";
 import { one, query } from "@/lib/db";
 import { currentSession } from "@/lib/queries";
@@ -92,5 +92,5 @@ export async function giveCentreFeedback(_prev: unknown, form: FormData): Promis
   }
 
   revalidatePath("/centre-feedback");
-  redirect(`/centre-feedback?done=${status}`);
+  return goTo(`/centre-feedback?done=${status}`);
 }

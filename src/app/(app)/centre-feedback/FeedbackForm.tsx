@@ -7,6 +7,7 @@ import { today } from "@/lib/format";
 import {
   ASSESSMENT_PARAMS, BAND_LABEL, SCORE_OPTIONS, consolidate, type Ratings,
 } from "@/lib/centre-feedback-meta";
+import { useFollowRedirect } from "@/lib/use-follow-redirect";
 
 export type DraftValues = {
   id: number; centerId: number; visitedOn: string; ratings: Ratings;
@@ -57,7 +58,7 @@ export default function FeedbackForm({
   draft: DraftValues | null;
   previous: ReactNode;
 }) {
-  const [state, action] = useActionState(giveCentreFeedback, null);
+  const [state, action] = useActionState(giveCentreFeedback, null); useFollowRedirect(state);
   const [ratings, setRatings] = useState<Ratings>(draft?.ratings ?? {});
   const sum = consolidate(ratings);
 

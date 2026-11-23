@@ -5,13 +5,14 @@ import { createPromotionalExams } from "./actions";
 import { Card, Field } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
 import { MONTHS, PROMOTIONAL_TEMPLATE_CLASSES } from "@/lib/exam-meta";
+import { useFollowRedirect } from "@/lib/use-follow-redirect";
 
 export default function PromotionalExamForm({
   centerCount,
 }: {
   centerCount: number;
 }) {
-  const [state, action] = useActionState(createPromotionalExams, null);
+  const [state, action] = useActionState(createPromotionalExams, null); useFollowRedirect(state);
 
   // 6 classes × 10 papers × all centres
   const totalSheets = 6 * 10 * centerCount;

@@ -5,13 +5,14 @@ import { createMonthlyExams } from "./actions";
 import { Card, Field } from "@/components/ui";
 import { FormMessage, Submit } from "@/components/form";
 import { MONTHS, MONTHLY_TEMPLATE_CLASSES } from "@/lib/exam-meta";
+import { useFollowRedirect } from "@/lib/use-follow-redirect";
 
 export default function MonthlyExamForm({
   centerCount,
 }: {
   centerCount: number;
 }) {
-  const [state, action] = useActionState(createMonthlyExams, null);
+  const [state, action] = useActionState(createMonthlyExams, null); useFollowRedirect(state);
 
   // 6 classes × 10 papers × all centres
   const totalSheets = 6 * 10 * centerCount;

@@ -1,4 +1,5 @@
 "use server";
+import { goTo } from "@/lib/go-to";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser, canTouchCenter, effectiveTeacherIds } from "@/lib/auth";
@@ -147,7 +148,7 @@ export async function createExam(_prev: unknown, form: FormData) {
   }
 
   revalidatePath("/exams");
-  redirect(written === 1
+  return goTo(written === 1
     ? `/exams/${firstId}`
     : `/exams?term=${encodeURIComponent(termLabel)}`);
 }
@@ -380,7 +381,7 @@ export async function createMonthlyExams(_prev: unknown, form: FormData) {
   }
 
   revalidatePath("/exams");
-  redirect(`/exams?type=monthly`);
+  return goTo(`/exams?type=monthly`);
 }
 
 /**
@@ -433,7 +434,7 @@ export async function createPromotionalExams(_prev: unknown, form: FormData) {
   }
 
   revalidatePath("/exams");
-  redirect(`/exams?type=promotional`);
+  return goTo(`/exams?type=promotional`);
 }
 
 export async function deleteExam(_prev: unknown, form: FormData) {
