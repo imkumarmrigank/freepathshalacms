@@ -116,10 +116,9 @@ export async function transferStudent(_prev: unknown, form: FormData): Promise<R
 
     // Sports are the old centre's own games; the child leaves them.
     const sports = (await c.query(
-      `UPDATE sport_students ss SET left_on = $3
-         FROM sports sp
-        WHERE ss.sport_id = sp.id AND ss.student_id = $1
-          AND sp.center_id = $2 AND ss.left_on IS NULL`,
+      `UPDATE sport_students SET left_on = $3
+        WHERE student_id = $1 AND left_on IS NULL
+          AND sport_id IN (SELECT id FROM sports WHERE center_id = $2)`,
       [student.id, from, on])).rowCount ?? 0;
 
     await c.query(
